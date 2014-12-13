@@ -1,0 +1,9 @@
+include setup.py
+include README.rst
+include CONTRIBUTORS
+include ForDevelopers.txt
+recursive-include src *.py *.c *.cpp *.h *.cu *.pyx
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include examples makefile
+recursive-include data *.dat
