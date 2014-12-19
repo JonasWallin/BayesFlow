@@ -10,11 +10,7 @@ Obtaining dependencies
 Ubuntu
 -----------
 
-sudo apt-get install python
-
-sudo apt-get install openmpi
-
-sudo apt-get install gcc
+sudo apt-get install python, openmpi, gcc
 
 
 sudo pip install numpy
