@@ -1,0 +1,10 @@
+.DS_Store
+*.pyc
+
+
+# Use wildcards as well
+*~
+
+# Can also ignore all directories and files in a directory.
+build/**/* 
+dist/**/*
