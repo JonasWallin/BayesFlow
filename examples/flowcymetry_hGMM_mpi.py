@@ -10,7 +10,7 @@ import time
 from mpi4py import MPI
 import os
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import matplotlib.pyplot as plt
 
 sim = 10

@@ -9,9 +9,9 @@ from __future__ import division
 import scipy.spatial as ss
 import article_simulatedata
 from mpi4py import MPI
-import bayesianmixture.plot as bm_plot
+import BayesFlow.plot as bm_plot
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import matplotlib.pyplot as plt
 import numpy.random as npr
 sim0  = 50

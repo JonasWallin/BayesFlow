@@ -69,8 +69,8 @@ Created on Fri Jun 20 16:52:31 2014
 from __future__ import division
 import numpy as np
 
-from bayesianmixture import mixture
-import bayesianmixture.PurePython.GMM as GMM
+from BayesFlow import mixture
+import BayesFlow.PurePython.GMM as GMM
 from matplotlib import pyplot as plt
 import numpy.random as npr
 import time

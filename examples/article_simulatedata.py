@@ -6,8 +6,8 @@ Created on Aug 10, 2014
 import numpy as np
 import numpy.random as npr
 import scipy.linalg as spl
-import bayesianmixture.PurePython.GMM as GMM
-import bayesianmixture.PurePython.distribution.wishart as wishart
+import BayesFlow.PurePython.GMM as GMM
+import BayesFlow.PurePython.distribution.wishart as wishart
 
 def simulate_data(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  [1., 1., 0.8, 0.1]):
 	"""

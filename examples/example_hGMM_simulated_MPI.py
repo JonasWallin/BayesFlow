@@ -4,15 +4,15 @@ Created on Jul 19, 2014
 @author: jonaswallin
 '''
 
-import bayesianmixture as bm
+import BayesFlow as bm
 import numpy.random as npr
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution.wishart import  invwishartrand
-from bayesianmixture.PurePython.GMM import mixture
+from BayesFlow.PurePython.distribution.wishart import  invwishartrand
+from BayesFlow.PurePython.GMM import mixture
 from mpi4py import MPI
-from bayesianmixture import distance_sort_MPI
+from BayesFlow import distance_sort_MPI
 import copy as cp
 
 def generate_data( n_obs, K):

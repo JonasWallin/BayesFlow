@@ -6,11 +6,11 @@ Created on Sat Oct 25 23:24:47 2014
 """
 from __future__ import division
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import os
 import time
 import matplotlib.pyplot as plt
-import bayesianmixture.plot as bm_plot
+import BayesFlow.plot as bm_plot
 
 if __name__ == '__main__':
 	plt.close('all')

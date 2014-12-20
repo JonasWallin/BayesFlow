@@ -11,16 +11,16 @@ import scipy.spatial as ss
 import article_simulatedata
 from mpi4py import MPI
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy.random as npr
-import bayesianmixture.plot as bm_plot
+import BayesFlow.plot as bm_plot
 import matplotlib.ticker as ticker
 
 
 
-sim = 10**3
+sim = 10**2
 nCells = 10000
 thin = 2
 nPers = 80

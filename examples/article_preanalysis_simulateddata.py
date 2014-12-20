@@ -6,7 +6,7 @@ Created on Aug 10, 2014
 
 import article_simulatedata
 import matplotlib
-import bayesianmixture.plot as bm_plot
+import BayesFlow.plot as bm_plot
 import matplotlib.pyplot as plt
 import numpy as np
 matplotlib.rc('text', usetex=True)

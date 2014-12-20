@@ -5,7 +5,7 @@ Created on Jul 10, 2014
 '''
 from __future__ import division
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import os
 import time
 import matplotlib.pyplot as plt
