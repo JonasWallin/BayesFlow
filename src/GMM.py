@@ -8,7 +8,7 @@ Created on Fri Jun 20 23:33:57 2014
 import PurePython.GMM
 import numpy as np
 #import bayesianmixture.distributions.rng_cython as rng_cython
-import bayesianmixture.mixture_util.GMM_util as GMM_util
+import BayesFlow.mixture_util.GMM_util as GMM_util
 
 
 

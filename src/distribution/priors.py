@@ -4,7 +4,7 @@ Created on Jul 2, 2014
 @author: jonaswallin
 '''
 from distribution_cython import invWishart, multivariatenormal, Wishart  # @UnresolvedImport
-from bayesianmixture.PurePython.distribution.priors import nu_class 
+from BayesFlow.PurePython.distribution.priors import nu_class 
 import numpy as np
 
 import cPickle as pickle

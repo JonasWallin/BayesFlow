@@ -7,8 +7,8 @@ Created on Jul 10, 2014
 from mpi4py import MPI
 import GMM
 import numpy as np
-from bayesianmixture.distribution import normal_p_wishart, Wishart_p_nu
-from bayesianmixture.GMM import mixture
+from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
+from BayesFlow.GMM import mixture
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr

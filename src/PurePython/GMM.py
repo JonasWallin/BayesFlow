@@ -8,11 +8,11 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-from bayesianmixture.PurePython.distribution import wishart
+from BayesFlow.PurePython.distribution import wishart
 import scipy.special as sps
 import matplotlib.pyplot as plt
 import scipy.linalg as sla
-from bayesianmixture.utils.gammad import ln_gamma_d
+from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
 #import bayesianmixture.mixture_util.GMM_util as GMM_util
 
