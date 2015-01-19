@@ -7,8 +7,8 @@ import unittest
 import numpy as np
 import numpy.random as npr
 import scipy.linalg as spl
-from bayesianmixture.PurePython.GMM import mixture as mixP
-import bayesianmixture.GMM as GMM
+from BayesFlow.PurePython.GMM import mixture as mixP
+import BayesFlow.GMM as GMM
 import copy as cp
 import scipy.spatial as ss
 

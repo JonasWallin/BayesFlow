@@ -1,4 +1,5 @@
 '''
+run with ex: mpiexec -n 10 python article_simulated_estimate_mpi.py
 Created on Jul 11, 2014
 
 @author: jonaswallin
@@ -6,7 +7,6 @@ Created on Jul 11, 2014
 from __future__ import division
 
 import time
-
 import scipy.spatial as ss
 import article_simulatedata
 from mpi4py import MPI
@@ -17,156 +17,20 @@ import matplotlib.pyplot as plt
 import numpy.random as npr
 import BayesFlow.plot as bm_plot
 import matplotlib.ticker as ticker
+from article_plotfunctions import plotQ_joint, plotQ, plot_theta
+folderFigs = "/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
 
-
-
-sim = 10**2
-nCells = 10000
+sim = 10**5
+nCells = 15000
 thin = 2
 nPers = 80
 save_fig = 1
 Y = []
 
 
-def plotQ_joint(Qs):
-	
-	n_Q = len(Qs)
-	
-	fig = plt.figure(figsize=(6,0.5*n_Q))
-	# no space between subplots
-	fig.subplots_adjust(hspace=0, wspace=0)
-	
-	for Q_i,Q_in in enumerate(Qs):
-		Q = np.zeros_like(Q_in)
-		Q[:] = Q_in[:]
-		d = Q[0].shape[0]
-		#print Q_i
-		ax = fig.add_subplot(411+Q_i)
-		Q_min = np.min(Q[0])
-		Q_max = np.max(Q[2])
-		Q[0] = np.abs(Q[0] - Q[1])
-		Q[2] = np.abs(Q[2] - Q[1])
-
-		ra = 0.1
-		index = np.triu(np.ones((d,d))) == True
-		err = [Q[0][index],Q[2][index]]
-		
-		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.')
-		ax.set_xlim([-.01,(err[0].shape[0]-1)*ra+.01])
-		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='r',alpha=0.2)
-		ax.xaxis.set_ticks(np.array(range(err[0].shape[0]))*ra)
-		a = np.array([range(d),range(d),range(d)])
-		b = a.T
-		
-		a = a[index]
-		b = b[index]
-		x_tick = []
-		if Q_i == n_Q-1 :
-			for i in range(len(a)):
-				x_tick.append("(%d,%d)"%(a[i] + 1,b[i] + 1))
-			
-			plt.setp(ax, xticklabels=x_tick)
-			ax.xaxis.set_ticks_position('bottom')
-		else:
-			plt.setp(ax, xticklabels=[])
-			
-		ax.set_ylabel(r'$\frac{\boldsymbol{\Psi}_%d}{\nu_%d + 3}$'%(n_Q-Q_i, n_Q - Q_i),fontsize=15, rotation='horizontal',ha='right')
-		ax.tick_params(labeltop='off', labelright='off')
-		ax.xaxis.set_ticks_position('none')
-		ax.yaxis.set_ticks_position('none')
-		ax.yaxis.tick_right()
-		ax.set_ylim([Q_min - 0.1*abs(abs(Q_min)-abs(Q_max)),Q_max + 0.1*abs(abs(Q_min)-abs(Q_max))])
-		#print [Q_min - 0.1*max(abs(Q_min),abs(Q_max)),Q_max + 0.1*max(abs(Q_min),abs(Q_max))]
-		ax.axes.yaxis.set_ticks(np.linspace(Q_min*0.9,Q_max*0.9,2))
-		ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
-		print "Q_min,max = (%lf,%lf)"%(Q_min,Q_max)
-		print "print Q = %s"%Q[1][index]
-		print "print Q_range = %s"%np.linspace(Q_min,Q_max,4)
-	return fig
-
-def plotQ(Qs):
-	
-	figs = []
-	for Q_i, Q_in in enumerate(Qs):
-		Q = np.zeros_like(Q_in)
-		Q[:] = Q_in[:]
-		Q_min = np.min(Q[0])
-		Q_max = np.max(Q[2])
-		Q[0] = np.abs(Q[0] - Q[1])
-		Q[2] = np.abs(Q[2] - Q[1])
-		
-		d = Q[0].shape[0]
-		fig = plt.figure(figsize=(4,0.5))
-		ax = fig.add_subplot(111)
-		ra = 0.1
-		index = np.triu(np.ones((d,d))) == True
-		err = [Q[0][index],Q[2][index]]
-		
-		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.')
-		ax.set_xlim([-.01,(err[0].shape[0]-1)*ra+.01])
-		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='r',alpha=0.2)
-		ax.xaxis.set_ticks(np.array(range(err[0].shape[0]))*ra)
-		a = np.array([range(d),range(d),range(d)])
-		b = a.T
-		
-		a = a[index]
-		b = b[index]
-		x_tick = []
-		for i in range(len(a)):
-			x_tick.append("(%d,%d)"%(a[i] + 1,b[i] + 1))
-		plt.setp(ax, xticklabels=x_tick)
-		#ax.set_title(r"$\boldsymbol{Q}_{%d}/(\nu_{%d} + %d)$"%(Q_i +1,Q_i +1,d), fontsize = 14)
-		ax.tick_params(labeltop='off', labelright='off')
-		ax.xaxis.set_ticks_position('none')
-		ax.yaxis.set_ticks_position('none')
-		ax.yaxis.tick_right()
-		
-		ax.set_ylim([Q_min - 0.1*abs(abs(Q_min)-abs(Q_max)),Q_max + 0.1*abs(abs(Q_min)-abs(Q_max))])
-		ax.axes.yaxis.set_ticks(np.linspace(Q_min,Q_max,2))
-		ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
-		figs.append(fig)
-	return figs
-
-def plot_theta(theta_percentile):
-	spines_to_remove = []
-	K = theta_percentile.shape[0]
-	d = theta_percentile.shape[1]
-	y_lim = [np.min(theta_percentile[:,:,0]) - 0.1*np.abs(np.min(theta_percentile[:,:,0])),np.max(theta_percentile[:,:,2])+ 0.1*np.abs(np.max(theta_percentile[:,:,2]))]
-	theta_percentile[:,:,0] = np.abs(theta_percentile[:,:,0] - theta_percentile[:,:,1])
-	theta_percentile[:,:,2] = np.abs(theta_percentile[:,:,2] - theta_percentile[:,:,1])
-	xticklabels  =[]
-	
-	fig = plt.figure(figsize=(6,0.5))
-	fig.subplots_adjust(wspace=0)
-	for j in range(K):
-		xticklabels = []
-		ax = plt.subplot2grid((1,4), (0,j))
-		for i in range(d):
-			xticklabels.append("%d"%(i + 1))
-		
-		err =  [theta_percentile[j,:, 0] ,theta_percentile[j,:,2]]
-		ra = 0.1	
-		ax.errorbar(np.array(range(d))*ra,theta_percentile[j,:,1],yerr = err,fmt='.')
-		ax.plot(np.array([-.02,(d-1)*ra+.02]),[0,0],color='r',alpha=0.2)
-		ax.xaxis.set_ticks(np.array(range(d))*ra)
-		ax.set_xlim([-.02,(d-1)*ra+.02])
-		plt.setp(ax, xticklabels=xticklabels)
-		ax.tick_params(labeltop='off', labelright='off')
-		ax.xaxis.set_ticks_position('none')
-		ax.yaxis.set_ticks_position('none')
-		ax.set_ylim(y_lim)
-		if j < K-1:
-			ax.yaxis.set_ticks([])
-		else:
-			ax.yaxis.tick_right()
-			ax.axes.yaxis.set_ticks(np.linspace(y_lim[0],y_lim[1],2))
-			ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
-		ax.set_xlabel(r"$\boldsymbol{\theta}_{%d}$"%(j + 1), fontsize = 14)
-		ax.xaxis.set_label_coords(0.5, -0.75) 
-		for spine in spines_to_remove:
-			ax.spines[spine].set_visible(False)
-	return fig
-
+####
+# COLLECTING THE DATA
+####
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
 	Y,act_komp, mus, Thetas, Sigmas, P = np.array(article_simulatedata.simulate_data(nCells = nCells, nPersons = nPers))
 	
@@ -175,6 +39,10 @@ else:
 	act_komp = None
 	#npr.seed(123546)
 
+
+####
+# Setting up model
+####
 hGMM = bm.hierarical_mixture_mpi(K = 4)
 hGMM.set_data(Y)
 hGMM.set_prior_param0()
@@ -254,16 +122,15 @@ for i in range(sim):#
 		mus_vec += mus_
 		actkomp_vec += active_komp
 		
-		# storing the samples equal to number of observations
-		if sim - i < nCells * nPers:
-			Y_sim.append(Y_sample)
-			theta_sim.append(thetas)
-			Q_sim.append(Qs/(nus.reshape(nus.shape[0],1,1)- Qs.shape[1]-1)  )
-			nu_sim.append(nus)
+
+		theta_sim.append(thetas)
+		Q_sim.append(Qs/(nus.reshape(nus.shape[0],1,1)- Qs.shape[1]-1)  )
+		nu_sim.append(nus)
 		
 		# storing the samples equal to number to the first indiviual
 		if sim - i < nCells:
 			Y0_sim.append(hGMM.GMMs[0].simulate_one_obs().reshape(3))
+			Y_sim.append(Y_sample)
 	
 	
 
@@ -356,7 +223,7 @@ if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
 	for k in range(hGMM.K):
 		ax_nu.plot(nu_sim[:,col_index[k]])
 	
-	f_histY  = bm_plot.histnd(Y_sim, 100, [0, 100], [0,100])
+	f_histY  = bm_plot.histnd(Y_sim,  50, [0, 100], [0,100])
 	f_histY0 = bm_plot.histnd(Y0_sim, 50, [0, 100], [0,100])
 	f_theta  = plot_theta(np.array(perc_theta))
 	figs_Q   = plotQ(perc_Q_vec)
@@ -371,41 +238,20 @@ for i, GMM in enumerate(hGMM.GMMs):
 
 if MPI.COMM_WORLD.Get_rank() == 0 and save_fig:  # @UndefinedVariable
 	print col_index
-	fig_nu.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/nus_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
-	fig_nu.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/nus_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	f.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/dcluster_centers_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
-	f.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/dcluster_centers_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	f_histY.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/hist2d_simulated.eps", type="eps",bbox_inches='tight')
-	f_histY.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/hist2d_simulated.pdf", type="pdf",bbox_inches='tight')
-	f_histY0.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/hist2d_indv_simulated.eps", type="eps",bbox_inches='tight')
-	f_histY0.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/hist2d_indv_simulated.pdf", type="pdf",bbox_inches='tight')
-	f_theta.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/theta_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	f_theta.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/theta_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
-	fig_Q_joint.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/Qjoint_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	fig_Q_joint.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/Qjoint_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
+	fig_nu.savefig(folderFigs + "nus_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
+	fig_nu.savefig(folderFigs + "nus_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
+	f.savefig(folderFigs + "dcluster_centers_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
+	f.savefig(folderFigs + "dcluster_centers_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
+	f_histY.savefig(folderFigs + "hist2d_simulated.eps", type="eps",bbox_inches='tight')
+	f_histY.savefig(folderFigs + "hist2d_simulated.pdf", type="pdf",bbox_inches='tight')
+	f_histY0.savefig(folderFigs + "hist2d_indv_simulated.eps", type="eps",bbox_inches='tight')
+	f_histY0.savefig(folderFigs + "hist2d_indv_simulated.pdf", type="pdf",bbox_inches='tight')
+	f_theta.savefig(folderFigs + "theta_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
+	f_theta.savefig(folderFigs + "theta_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
+	fig_Q_joint.savefig(folderFigs + "Qjoint_simulated.pdf", type="pdf",transparent=True,bbox_inches='tight')
+	fig_Q_joint.savefig(folderFigs + "Qjoint_simulated.eps", type="eps",transparent=True,bbox_inches='tight')
 	for i,f_Q in enumerate(figs_Q):
-		f_Q.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/Q%d_simulated.pdf"%(i+1), type="pdf",transparent=True,bbox_inches='tight')
-		f_Q.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/Q%d_simulated.eps"%(i+1), type="eps",transparent=True,bbox_inches='tight')
-
-if MPI.COMM_WORLD.Get_rank() == 0  and save_fig:	  # @UndefinedVariable
-	f_theta  = plt.figure()
-	ax_theta = f_theta.add_subplot(111)
-	ax_theta.set_title("theta")
-	f_Q = plt.figure()
-	ax_Q = f_Q.add_subplot(111)
-	ax_Q.set_title("Q")
-	f_nu = plt.figure()
-	ax_nu = f_nu.add_subplot(111)	
-	ax_nu.set_title("nu")
-	for i in range(Q_sim.shape[1]):
-		ax_nu.plot(bm_plot.autocorr(nu_sim[:,i]))
-		for ii in range(Q_sim.shape[2]):
-			ax_theta.plot(bm_plot.autocorr(theta_sim[:,i,ii]))
-			for iii in range(Q_sim.shape[3]):
-				ax_Q.plot(bm_plot.autocorr(Q_sim[:,i, ii, iii]))
-
-	f_theta.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/correlation_theta.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	f_Q.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/correlation_Q.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	f_nu.savefig("/Users/jonaswallin/Dropbox/articles/FlowCap/figs/correlation_nu.pdf", type="pdf",transparent=True,bbox_inches='tight')
-	
-#plt.show()
+		f_Q.savefig(folderFigs + "Q%d_simulated.pdf"%(i+1), type="pdf",transparent=True,bbox_inches='tight')
+		f_Q.savefig(folderFigs + "Q%d_simulated.eps"%(i+1), type="eps",transparent=True,bbox_inches='tight')
+else:
+	plt.show()

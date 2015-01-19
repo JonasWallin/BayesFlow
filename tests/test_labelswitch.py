@@ -5,9 +5,9 @@ Created on Jul 18, 2014
 '''
 import unittest
 import numpy as np
-from bayesianmixture.PurePython.GMM import mixture
-from bayesianmixture import PurePython
-import bayesianmixture as bm
+from BayesFlow.PurePython.GMM import mixture
+from BayesFlow import PurePython
+import BayesFlow as bm
 import copy as cp
 import scipy.linalg as spl
 

@@ -15,8 +15,8 @@ path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(path + '/../data')
 
 
-from bayesianmixture import GMM
-from bayesianmixture import PurePython
+from BayesFlow import GMM
+from BayesFlow import PurePython
 #TODO: there is a bug in GMM that missed, the sampling of sample_P
 #TODO: need to find a test that discover the
 #TODO: most compute_P given the true parameter should be fairly similar to

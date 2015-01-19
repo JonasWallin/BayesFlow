@@ -9,12 +9,12 @@ Created on Sep 17, 2014
 mpiexec -n 4 python test_hier_GMM.py
 '''
 import unittest
-import bayesianmixture as bm
+import BayesFlow as bm
 import numpy as np
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution.wishart import  invwishartrand
+from BayesFlow.PurePython.distribution.wishart import  invwishartrand
 from mpi4py import MPI
-from bayesianmixture.PurePython.GMM import mixture
+from BayesFlow.PurePython.GMM import mixture
 
 
 

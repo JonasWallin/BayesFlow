@@ -5,12 +5,12 @@ Created on Jul 15, 2014
 '''
 import unittest
 import numpy as np
-import bayesianmixture as bm
+import BayesFlow as bm
 import scipy.linalg as spl
 from mpi4py import MPI
 
-from bayesianmixture.PurePython.distribution.wishart import  invwishartrand
-from bayesianmixture.PurePython.GMM import mixture
+from BayesFlow.PurePython.distribution.wishart import  invwishartrand
+from BayesFlow.PurePython.GMM import mixture
 class Test(unittest.TestCase):
 
 
