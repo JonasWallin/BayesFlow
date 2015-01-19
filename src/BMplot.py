@@ -8,7 +8,6 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pylab as pyl
 import matplotlib.ticker as ticker
 import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
@@ -30,6 +29,14 @@ def black_ip(color,n,N):
     return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
     
 def drawbox(quantiles,boxloc,boxw,ms,ax):
+    '''
+        Draw box in boxplot
+        
+        quantiles   -   quantiles to use for box
+        boxloc      -   x-values where to draw box
+        boxw        -   width of box
+        ms          -   size of whiskers
+    '''
     low = quantiles[0]
     blow = quantiles[1]
     bmid = quantiles[2]
@@ -41,7 +48,7 @@ def drawbox(quantiles,boxloc,boxw,ms,ax):
 
 def visualEigen(Sigma, mu, dim):
     Sigma = Sigma[np.ix_(dim,dim)]
-    E, V = linalg.eig(Sigma)
+    E, V = np.linalg.eig(Sigma)
     t = np.linspace(0,2*np.pi,100)
     e = np.array([np.cos(t), np.sin(t)])
     V2 = np.sqrt(E)*V
@@ -49,6 +56,13 @@ def visualEigen(Sigma, mu, dim):
     return VV
     
 def component_plot(mus,Sigmas,dim,ax,colors=None):
+    '''
+        Viusalize mixture component
+        
+        mu,Sigma    -   mixture component parameters
+        dim         -   dimensions for projection
+    '''
+    
     q_y = [np.inf,-np.inf]
     q_x = [np.inf,-np.inf]
     K = len(mus)
@@ -67,6 +81,9 @@ def component_plot(mus,Sigmas,dim,ax,colors=None):
     return {'q_x': q_x, 'q_y': q_y}
     
 def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
+    '''
+        Visualize mixture components for all samples
+    '''
     q_y = [np.inf,-np.inf]
     q_x = [np.inf,-np.inf]
     q = {'q_x': q_x, 'q_y': q_y}
@@ -74,6 +91,15 @@ def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
         qnew = component_plot(muspers[j],Sigmaspers[j],dim,ax,colors)
         q = mergeQ(q,qnew)
     return q
+
+def set_component_plot_tics(axlist,q):
+    q_x = q['q_x']
+    q_y = q['q_y']
+    for ax in axlist:
+        ax.axes.yaxis.set_ticks(np.linspace(q_y[0], q_y[1],num=3))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+        ax.axes.xaxis.set_ticks(np.linspace(q_x[0], q_x[1],num=3))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
 
 def mergeQ(q1,q2):
     q_x = [0, 0]
@@ -106,7 +132,19 @@ def plot_diagnostics(diagn,ymin,ymax,ybar = None,name = '',log=False,fig=None,to
     return fig
     
 def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sampleid=None,sampmarkers=None):
-    markers = [(4,0,45),(3,0),(0,3),(4,2)]
+    '''
+        PCA biplot
+        
+        data        -   data which to use
+        comp        -   which two principal components to display
+        ax          -   where to plot
+        varcol      -   colors for variables
+        varlabels   -   labels for variables
+        varlabsh    -   shift for labels for variables
+        sampleid    -   which group does each sample belong to?
+        sampmarkers -   which plotmarkers shoud be used for the samples
+    '''
+    
     if ax == None:
     	f = plt.figure()
     	ax = f.add_subplot(111)
@@ -114,8 +152,9 @@ def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sample
     	f = None
      
     K = data.shape[1]
+    print "K = {}".format(K)
     if varcol is None:
-        varcol = ['black']*K
+        varcol = [(0,0,0)]*K
     if varlabels is None:
         varlabels = ['']*K
     if varlabsh is None:
@@ -124,8 +163,13 @@ def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sample
         if sampmarkers is None:
             sampmarkers = [(4,2)]
         sampleid = [0]*data.shape[0]
-    if sampmarkers is None:
-        sampmarkers = [(k,2) for k in range(len(set(sampleid)))]
+    else:
+        sampleids = list(set(sampleid))
+        iddict = dict(zip(sampleids,range(len(sampleids))))
+        sampleid_new = [iddict[sid] for sid in sampleid]
+        sampleid = sampleid_new
+        if sampmarkers is None:
+            sampmarkers = [(k,2) for k in range(3,(len(set(sampleids)))+3)]
         
     # Compute plot data
     data = data - np.mean(data,0)
@@ -243,7 +287,10 @@ class ClustPlot(object):
     def set_population_lab(self,pop_lab):
         self.pop_lab = pop_lab
         
-    def prob(fig=None,totplots=1,plotnbr=1):
+    def prob(self,fig=None,totplots=1,plotnbr=1):
+        '''
+            Plot probabilities of belonging to each cluster
+        '''
         if fig is None:
             fig = plt.figure()
         nbr_cols = 2*totplots-1
@@ -268,6 +315,10 @@ class ClustPlot(object):
         return fig
         
     def box(self,fig=None,totplots=1,plotnbr=1):
+        '''
+            Plot boxplots reprsenting quantiles for each cluster.
+            NB! pooled data is used here.
+        '''
         if fig is None:
             fig = plt.figure()
         quantiles = self.clust.get_quantiles((.01,.25,.5,.75,.99))
@@ -295,6 +346,11 @@ class ClustPlot(object):
         return fig
     
     def pdip(self,fig=None,colorbar=True):
+        '''
+            Plot p-value of Hartigan's dip test for each cluster.
+            Results are plotted order by cluster size, with largest cluster
+            in top.
+        '''
         if fig is None:
             fig = plt.figure()
         pdipsum = self.clust.get_pdip_summary()
@@ -306,11 +362,15 @@ class ClustPlot(object):
             ax.axes.xaxis.set_ticks([])
             ax.axes.yaxis.set_ticks([])
             ax.set_ylim(0,self.clust.K)
+            ax.set_xlabel(s)
         if colorbar:
             fig.colorbar(p)
         return fig
 
     def cum(self,j=None,fig=None):
+        '''
+            Empirical CDF for all the clusters in a sample j (or the pooled data)
+        '''
         if fig is None:
             fig = plt.figure()
         alpha = np.linspace(0,1,200)
@@ -323,50 +383,101 @@ class ClustPlot(object):
                 ax.plot(quantiles[k,:,dd],alpha)
                 ax.set_ylim(0,1)
                 ax.axes.yaxis.set_ticks([])
-    return fig
+        return fig
     
-    def hist(self,j=None,ks=None,dds=None,fig=None,totplots=1,plotnbr=1):
+    def qhist(self,j=None,ks=None,dds=None,fig=None,totplots=1,plotnbr=1):
+        '''
+            Histogram of quantiles for each cluster. Useful for inspecting dip.
+        '''
         if fig is None:
             fig = plt.figure()
-        nbr_cols = d*totplots + totplots-1
-        col_start = (d+1)*(plotnbr-1)        
+      
         alpha = np.linspace(0,1,500)
         quantiles = self.clust.get_quantiles(alpha,j,ks,dds)
         
         if ks is None:
             ks = range(self.K)
+        ks_ord = [self.order[k] for k in ks]
+        ks = ks_ord
         if dds is None:
-            dds = range(self.d)
+            dds = range(self.clust.d)
+        d = len(dds)
+        print "d = {}".format(d)
+        nbr_cols = d*totplots + totplots-1
+        print "nbr_cols = {}".format(nbr_cols)
+        col_start = (d+1)*(plotnbr-1)
 
         for ik,k in enumerate(ks):
             for id,dd in enumerate(dds):
                 ax = fig.add_subplot(self.clust.K,nbr_cols,k*nbr_cols + col_start + dd + 1)
-                ax.hist(quantiles[ik,:,id],bins = 50)
+                ax.hist(quantiles[ik,:,id],bins = 50,color=self.colors[k])
                 ax.axes.xaxis.set_ticks([])
                 ax.axes.yaxis.set_ticks([])
         return fig
         
         
-    def hist_dipcrit(self,q=.25,fig=None,totplots=1,plotnbr=1):
+    def qhist_dipcrit(self,q=.25,fig=None,totplots=1,plotnbr=1):
+        '''
+            Histogram of quantiles for the sample with dip at the qth quantile.
+            I.e. q=.25 displays quantiles for the sample which has its dip at the
+            0.25th quantile among the samples.
+        '''
         if fig is None:
             fig = plt.figure()
+        alpha = np.linspace(0,1,500)
         K = self.clust.K
         d = self.clust.d
         pdiplist = self.clust.get_pdip() 
 
+        nbr_cols = d*totplots + totplots-1
+        col_start = (d+1)*(plotnbr-1)  
         qind = np.int(K*q)-1
         jq = np.zeros((K,d),dtype='i')
-        for k in range(K):
+        for ik,k in enumerate(self.order):
             pd = pdiplist[k]
             for dd in range(d):
                 jq[k,dd] = np.argsort(pd[:,dd])[qind]
-                self.histplot(j=jq,ks=[k],dds=[dd],fig=fig,totplots=totplots,plotnbr=plotnbr)
+                quantiles = self.clust.get_quantiles(alpha,jq[k,dd],[k],[dd])[0,:,0]
+                ax = fig.add_subplot(self.clust.K,nbr_cols,ik*nbr_cols + col_start + dd + 1)
+                ax.hist(quantiles,bins = 50,color=self.colors[k])
         return fig
 
-    def scatter(dim, j, fig=None):
+    def chist_allsamp(self,min_clf,dd,ks,fig=None,ncol=4):
         '''
-            Plots the scatter plot of the data over dim
-            and assigning each class a different color
+            Histogram of data points with at least min_clf probability of belonging to certain clusters.
+            The clusters are displayed with their canonical colors.
+            
+            A panel of plots with ncol columns is showing this for all samples.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        nrow = np.ceil(self.clust.J/ncol)
+        for j in range(self.clust.J):
+            ax = fig.add_subplot(nrow,ncol,j+1)
+            self.chist(min_clf,dd,j,ks,ax)
+        return fig
+
+    def chist(self,min_clf,dd,j=None,ks=None,ax=None):
+        '''
+            Histogram of data points with at least min_clf probability of belonging to certain clusters.
+            The clusters are displayed with their canonical colors (see BMPlot).
+        '''
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        if ks is None:
+            ks = range(self.clust.K)
+
+        for k in ks:
+            data = self.clust.get_data_kdj(min_clf,self.order[k],dd,j)
+            if len(data) > 0:
+                ax.hist(data,color=self.colors[self.order[k]],alpha = .7,range = (-0.1,1.4))
+        return ax
+
+    def scatter(self,dim,j,fig=None):
+        '''
+            Plots the scatter plot of the data over dim.
+            Clusters are plotted with their canonical colors (see BMPlot).
         '''
         if fig is None:
             fig = plt.figure()
@@ -386,7 +497,7 @@ class ClustPlot(object):
                 ax.plot(data[x==k,0],data[x==k,1],data[x==k,2],'+',label='k = %d'%(k+1),color=self.colors[k])
             ax.plot(data[x==self.clust.K,0],data[x==self.clust.K,1],data[x==self.clust.K,2],label='outliers',color='black')
     						
-        return f, ax
+        return fig, ax
         
 class CompPlot(object):
     
@@ -401,7 +512,12 @@ class CompPlot(object):
         self.marker_lab = marker_lab
         
     def center(self,suco=True,fig=None,totplots=1,plotnbr=1,yscale=False):
-
+        '''
+            The centers of all components (mu param) are plotted along one dimension.
+            
+            If suco=True, components belonging to the same super component are
+            plotted in the same panel.
+        '''
         if fig is None:
             fig = plt.figure()
             
@@ -419,11 +535,11 @@ class CompPlot(object):
         
         for s in range(S):
             comps = comps_list[order[s]]
-            print "comps = {}".format(comps)
+            #print "comps = {}".format(comps)
             ax = fig.add_subplot(S,nbr_cols,s*nbr_cols + col_start+1)
             for k in comps:
                 mu_ks = self.comp.mupers[:,k,:]
-                for j in range(self.components.J):
+                for j in range(self.comp.J):
                     ax.plot(range(self.comp.d),mu_ks[j,:],color=self.comp_colors[k])
                 ax.plot([0,self.comp.d-1],[.5,.5],color='grey')
             if s == S-1:
@@ -431,15 +547,20 @@ class CompPlot(object):
                 ax.set_xticklabels(self.marker_lab)
             else:
                 ax.axes.xaxis.set_ticks([])
-    	if not yscale:
-    	        ax.axes.yaxis.set_ticks([])
-            	ax.set_ylim(0,1)
-    	else:
-    	        ax.axes.yaxis.set_ticks([.2,.8])
-            	ax.set_ylim(-.1,1.1)		
+            if not yscale:
+                ax.axes.yaxis.set_ticks([])
+                ax.set_ylim(0,1)
+            else:
+                ax.axes.yaxis.set_ticks([.2,.8])
+                ax.set_ylim(-.1,1.1)		
         return fig
     
     def center3D(self,dim,fig=None):
+        '''
+            Plots the centers (mu) of the components in three dimensions.
+            
+            dim     -   dimensions on which to project centers.
+        '''
         if fig is None:
             fig = plt.figure()
             
@@ -460,7 +581,17 @@ class CompPlot(object):
             
         return ax
 
-    def latent_components(self,dim,ks=None,plim=[0,1],ax=None):
+    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False):
+        '''
+            Plot visualization with ellipses of the latent components.
+            Canonical colors are used (see BMplot).
+            
+            dim     -   which two dimensions to project on.
+            ax     -   where to plot
+            ks      -   which components to plot
+            plim    -   only components with size within plim are plotted
+            plotlab -   should labels be shown?
+        '''
         #print "suco_list = {}".format(suco_list)
         if ax is None:
     		f = plt.figure()
@@ -469,7 +600,7 @@ class CompPlot(object):
     		f = None
 
         if ks is None:
-            ks = range(res.K)            
+            ks = range(self.comp.K)            
         okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
         okcl = set.intersection(set(okcl),set(ks))
         
@@ -478,28 +609,80 @@ class CompPlot(object):
         colors = [self.comp_colors[k] for k in okcl]
 
         q = component_plot(mus,Sigmas,dim,ax,colors=colors)
+        if plotlab:
+            ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
+            ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def allsamp_components(self,dim,ks=None,plim=[0,1],ax=None):
-        if ax == None:
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],plotlab=False):
+        '''
+            Plot visualization of mixture components for all samples.
+            Canonical colors are used (see BMplot).
+            
+            dim     -   which two dimensions to project on.
+            ax     -   where to plot
+            ks      -   which components to plot
+            plim    -   only components with size within plim are plotted
+            plotlab -   should labels be shown?
+        '''
+        if ax is None:
             f = plt.figure()
             ax = f.add_subplot(111)
         else:
             f = None
             
         if ks is None:
-            ks = range(res.K)         
+            ks = range(self.comp.K)         
         okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
         okcl = set.intersection(set(okcl),set(ks))
         
-        muspers = [[self.comp.mupers[j,k,:] for k in okcl] for j in range(res.J)]
-        Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in range(res.J)]
+        muspers = [[self.comp.mupers[j,k,:] for k in okcl] for j in range(self.comp.J)]
+        Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in range(self.comp.J)]
         colors = [self.comp_colors[k] for k in okcl]
 
         q = pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
+        if plotlab:
+            ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
+            ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
-        
+
+    def latent_allsamp(self,dimlist,fig=None,ks=None,plim=[0,1],plotlab=True):
+        '''
+            Plot a panel of both latent component and mixture components for 
+            all samples.
+            
+            dimlist -  list of dimensions which to project on.
+            fig     -   where to plot
+            ks      -   which components to plot
+            plim    -   only components with size within plim are plotted
+            plotlab -   should labels be shown?
+        '''
+
+        if fig is None:
+            fig = plt.figure()
+
+        for m in range(len(dimlist)):
+            ax1 = fig.add_subplot(len(dimlist),2,2*m+1)#plt.subplot2grid((2, 2), (m, 0))
+            ql = self.latent(dimlist[m],ax1,ks,plim)
+            ax2 = fig.add_subplot(len(dimlist),2,2*m+2)#plt.subplot2grid((2, 2), (m, 1))
+            qa = self.allsamp(dimlist[m],ax2,ks,plim)
+
+            if m == 0:
+                ax1.set_title(self.marker_lab[dimlist[m][0]],fontsize=16)
+                ax2.set_title(self.marker_lab[dimlist[m][0]],fontsize=16)
+            else:
+                ax1.set_xlabel(self.marker_lab[dimlist[m][0]],fontsize=16)
+                ax2.set_xlabel(self.marker_lab[dimlist[m][0]],fontsize=16)
+            ax1.set_ylabel(self.marker_lab[dimlist[m][1]],fontsize=16)
+
+            set_component_plot_tics([ax1,ax2],mergeQ(ql,qa))
+        return fig
+    
     def center_distance_quotient(self,fig=None,totplots=1,plotnbr=1):
+        '''
+            Diagnostic plot showing quotient between distance to correct latent
+            center and distance to nearest wrong latent center.
+        '''
         if fig is None:
             fig = plt.figure()
         distquo = self.comp.get_center_distance_quotient()
@@ -507,8 +690,14 @@ class CompPlot(object):
         return fig
     
     def cov_dist(self,norm='F',fig=None,totplots=1,plotnbr=1):
+        '''
+            Diagnostic plot showing distance between convariance matrices
+            of the mixture components and the corresponding latent components.
+            
+            norm    -   which norm to use for computing the distance
+        '''
         distF = self.comp.get_cov_dist(norm)
-        plot_diagnostics(np.log10(distF),-5,0,-3,'Frobenius distance',False,fig=fig,totplots=totplots,plotnbr=plotnbr)
+        plot_diagnostics(np.log10(distF),-5,0,-3,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
 
 class TracePlot(object):
     
@@ -517,22 +706,25 @@ class TracePlot(object):
         self.traces.plot = self
         
     def all(self,fig = None):
+        '''
+            Plot trace plots of latent means and nus.
+        '''
         if fig == None:
             fig = plt.figure()
-        for k in range(self.K):
-            ax = plt.subplot2grid((1, self.K+1), (0, k))
-            self.traceplot_mulat(k,ax)
+        for k in range(self.traces.K):
+            ax = plt.subplot2grid((1, self.traces.K+1), (0, k))
+            self.mulat(k,ax)
             ax.set_title('theta_'+'{}'.format(k+1))
-        ax = plt.subplot2grid((1, res.K+1), (0, k+1))
-        self.traceplot_nu
+        ax = plt.subplot2grid((1, self.traces.K+1), (0, k+1))
+        self.nu(ax)
         ax.set_title('nu',fontsize=16)
-        return f,ax
+        return fig,ax
         
     def mulat(self,k,ax=None):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        ax.plot(self.traces.ind, self.get_mulat_k(k))
+        ax.plot(self.traces.ind, self.traces.get_mulat_k(k))
         ax.set_xlim(0,self.traces.ind[-1])
         ax.set_ylim(-.2,1.2)
         ax.axes.yaxis.set_ticks([0.1,0.9])
@@ -542,7 +734,7 @@ class TracePlot(object):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        ax.plot(self.traces.ind, self.get_nu(k))
+        ax.plot(self.traces.ind, self.traces.get_nu())
         ax.set_xlim(0,self.traces.ind[-1])
         ax.set_yscale('log')
         ax.axes.yaxis.set_ticks([100, 1000])
@@ -569,6 +761,9 @@ class FCplot(object):
         self.marker_lab = marker_lab
         
     def histnd(self,Nsamp=None,bins=50,fig = None):
+        '''
+            Plot panel of 1D and 2D histograms of a given sample (synthetic or real).
+        '''
         if fig == None:
             fig = plt.figure()
         histnd(self.fcsample.get_data(Nsamp),bins,[0, 100],[5,95],fig,self.marker_lab)
@@ -581,17 +776,17 @@ class BMplot(object):
     
     def __init__(self,bmres,marker_lab = None):
         self.bmres = bmres
-        self.hGMM = hGMM
-
         self.comp_colors,self.suco_colors,self.comp_ord,self.suco_ord = self.get_colors_and_order()
         
         self.clp_nm = ClustPlot(bmres.clust_nm,self.comp_colors,self.comp_ord)
-        self.clp_m = ClustPlot(bmres.clust_m,self.suco_colors,self.suco_ord)
+        if hasattr(bmres,'clust_m'):
+            self.clp_m = ClustPlot(bmres.clust_m,self.suco_colors,self.suco_ord)
         self.cop = CompPlot(bmres.components,self.comp_colors,self.comp_ord,self.suco_ord)
         self.trp = TracePlot(bmres.traces)
         
         self.mcsp = []
-        for mimic in bmres.mimics:
+        for mimic_key in bmres.mimics:
+            mimic = bmres.mimics[mimic_key]
             self.mcsp.append(MimicPlot(mimic))
             
         if marker_lab is None:
@@ -601,13 +796,15 @@ class BMplot(object):
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
         self.clp_nm.set_marker_lab(marker_lab)
-        self.clp_m.set_marker_lab(marker_lab)
-        self.cop.se_marker_lab(marker_lab)
+        if hasattr(self,'clp_m'):
+            self.clp_m.set_marker_lab(marker_lab)
+        self.cop.set_marker_lab(marker_lab)
         for mc in self.mcsp:
             mc.set_marker_lab(marker_lab)
 
     def set_population_lab(self,pop_lab):
-        self.pop_lab = pop_lab
+        order = np.argsort(self.suco_ord)
+        self.pop_lab = [pop_lab[k] for k in order]
         self.clp_nm.set_population_lab(pop_lab)
         self.clp_m.set_population_lab(pop_lab)
 
@@ -615,33 +812,47 @@ class BMplot(object):
         '''
             Get order of components (first orderd by super component size, then by
             individual component size) and colors to use for representing components.
+            
+            This gives canonical ordering and colors for other plots.
         '''
         for s,suco in enumerate(self.bmres.mergeind):
-            sc_ord = np.argsort(-np.array(self.bmres.p[suco]))
-            self.bmres.mergeind[s] = [suco[i] for i in sc_ord]
-        prob_mer = [sum(self.bmres.p[scind]) for scind in self.bmres.mergeind]
+            sc_ord = np.argsort(-np.array(np.sum(self.bmres.p,axis=0)[suco]))
+            self.bmres.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
+        prob_mer = [np.sum(self.bmres.p[:,scind]) for scind in self.bmres.mergeind]
         suco_ord = np.argsort(-np.array(prob_mer))
         mergeind_sort = [self.bmres.mergeind[i] for i in suco_ord]
         print "mergeind_sort = {}".format(mergeind_sort)
         comp_ord = [ind for suco in mergeind_sort for ind in suco]
         cm = plt.get_cmap('gist_rainbow')
+        suco_col = [(0,0,0)]*len(suco_ord)
         colors = [(0,0,0)]*len(comp_ord)
         for s,suco in enumerate(mergeind_sort):
-            suco_col = cm(s/len(suco_ord))
+            suco_col[suco_ord[s]] = cm(s/len(suco_ord))
             for i,k in enumerate(suco):
-                colors[k] = black_ip(suco_col,i,len(suco))
+                colors[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
         return colors,suco_col,comp_ord,suco_ord
 
     def pca_biplot(self,comp,ax=None,poplabsh=None,sampmarkers=None):
-        if sampmarkers is None:
-            sampmarkers = [(4,0,45),(3,0),(0,3),(4,2)]
-        if poplabsh is None:
-            poplabsh = [[0,0],[0,-.02],[0,0],[-.1,0],[.22,0],[.06,-.06]]
-        pca_biplot(self.p,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
-                   varlabsh=poplabsh,sampleid=self.bmres.meta_data.group_id,sampmarkers=sampmarkers)        
+        '''
+            PCA biplot of mixture component probabilities. Sample groups are 
+            determined by meta_data 'donorid'.
+            
+            comp        -   which principal components to plot
+            ax          -   where to plot
+            poplabsh    -   shift of population labels
+            sampmarkers -   markers to use for samples
+        '''
+        #if sampmarkers is None:
+        #    sampmarkers = [(4,0,45),(3,0),(0,3),(4,2)]
+        #if poplabsh is None:
+        #    poplabsh = [[0,0],[0,-.02],[0,0],[-.1,0],[.22,0],[.06,-.06]]
+        if not hasattr(self,'pop_lab'):
+            self.pop_lab = None
+        pca_biplot(self.bmres.clust_m.p,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
+                   varlabsh=poplabsh,sampleid=self.bmres.meta_data.samp['donorid'],sampmarkers=sampmarkers)        
 
     def pca_screeplot(self,ax=None):
-        pca_screeplot(self.p,ax)
+        pca_screeplot(self.bmres.p,ax)
 
 
 

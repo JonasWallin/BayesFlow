@@ -9,10 +9,15 @@ import numpy as np
 from rpy2.robjects.packages import importr
 from rpy2.rinterface import RRuntimeError
 import rpy2.robjects as robjects
-import BaysFlow.utils.transform as transform
+import BayesFlow.utils.transform as transform
 
 def load(Nsamp = None,scale = True):
-    
+    '''
+        Load data from R package 'healthyFlowData'.
+
+        Nsamp	-	number of samples to load. If None, all 20 samples are loaded
+        scale	-	should the data be scaled so that the 1st percentile of the pooled data ends up at 0 and the 99th percentile of the pooled data ends up at 1.
+    '''
     try:
         robjects.r('library(healthyFlowData)')
     except RRuntimeError:
@@ -32,8 +37,8 @@ def load(Nsamp = None,scale = True):
     donorids = []    
     for j in range(J):
         samp = str(j+1)
-        sampnames.append('sample '+samp)
-        data.append(np.array(robjects.r('exprs(hd.flowSet[['+samp+']])')))
+        sampnames.append('sample'+samp)
+        data.append(np.ascontiguousarray(np.array(robjects.r('exprs(hd.flowSet[['+samp+']])'))))
         donorids.append(robjects.r('hd.flowSet@phenoData@data$subject[['+samp+']]')[0])
 
     marker_lab = [ma for ma in np.array(robjects.r('hd.flowSet@colnames'))]

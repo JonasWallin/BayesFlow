@@ -5,7 +5,7 @@ Created on Jul 5, 2014
 '''
 import numpy as np
 import numpy.random as npr
-from bayesianmixture.utils.gammad import ln_gamma_d
+from BayesFlow.utils.gammad import ln_gamma_d
 
 def f_prior_nu(x, nu  =0.01): 
 	"""

@@ -7,5 +7,9 @@ Created on Wed Jun 18 15:51:02 2014
 
 import gammad
 import Hellinger
+import Bhattacharyya
+import diptest
+import transform
+import discriminant
 
-__all__ = ['gammad','Hellinger']
+__all__ = ['gammad','Hellinger','Bhattacharyya','diptest','transform','discriminant']

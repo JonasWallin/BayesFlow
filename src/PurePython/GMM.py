@@ -174,12 +174,14 @@ class mixture(object):
 		"""
 		self.name = name
 		
-	def add_noiseclass(self, Sigma_scale  = 5.):
+	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None):
 		"""
 			adds a class that does not update and cant be deactiveted or label switch
 			the data need to be loaded first!
 			
-			Sigma_scale  - (double)  the scaling constants time the covariance matrix
+			Sigma_scale  - (double)  a scaling constant for the the covariance matrix (not used if Sigma supplied)
+			mu           - (d x 1 vector) mean value for the noise. If not supplied, the mean of the data is used.
+			Sigma        - (d x d matrix) covariance matrix fo the noise
 		"""
 		
 		
@@ -189,9 +191,11 @@ class mixture(object):
 		self.noise_class = 1
 		self.active_komp = np.hstack((self.active_komp,True))
 		self.p = np.hstack((self.p * (1- 0.01), 0.01))
-		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.)) 
-		Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
-		mu     = np.mean(self.data,0)
+		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.))
+		if Sigma is None:
+			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
+		if mu is None:
+			mu     = np.mean(self.data,0)
 			
 		self.prob_X = np.zeros((self.n, self.K + 1))
 		self.noise_sigma = Sigma

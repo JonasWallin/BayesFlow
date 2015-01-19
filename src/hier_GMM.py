@@ -6,7 +6,7 @@ Created on Jul 10, 2014
 from __future__ import division
 import GMM
 import numpy as np
-from bayesianmixture.distribution import normal_p_wishart, Wishart_p_nu
+from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 import copy as cp
 import matplotlib.pyplot as plt
 import numpy.random as npr

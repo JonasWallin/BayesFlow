@@ -80,11 +80,13 @@ class hierarical_mixture_mpi(object):
 		Comment about noise_class either all mpi hier class are noise class or none!
 		either incosistency can occuer when loading
 	"""
-	def __init__(self, K ):
+	def __init__(self, K = None, data = None, sampnames = None, prior = None, sim_param = None ):
 		"""
 			starting up the class and defning number of classes
 			
 		"""
+		if K is None:
+			K = prior.K
 		self.K = K
 		self.d = 0
 		self.n = 0
@@ -101,14 +103,44 @@ class hierarical_mixture_mpi(object):
 
 		else:
 			self.normal_p_wisharts = None 
-			self.wishart_p_nus	 = None  
+			self.wishart_p_nus	 = None
+			
+		self.set_data(data,sampnames)
+		if not prior is None:
+			self.set_prior(prior,init=True)
+		if not sim_param is None:
+			self.set_simulation_param(sim_param)
 
-	def set_prior(self, prior):
+	def set_prior(self, prior, init = False):
 		
-		pass
-	
-	
-	
+		self.set_prior_param0()
+		if prior.noise_class:
+			self.add_noise_class(mu = prior.noise_mu, Sigma = prior.noise_Sigma)
+		
+		rank = self.comm.Get_rank()
+		if rank == 0:
+			for k in range(self.K):
+				thetaprior = {}
+				thetaprior['mu'] = prior.t[k,:]
+				thetaprior['Sigma'] = np.diag(prior.S[k,:])
+				self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
+	            
+				Sigmathprior = {}
+				Sigmathprior['Q'] = prior.Q[k]*np.eye(self.d)
+				Sigmathprior['nu'] = prior.n_theta[k]
+				self.normal_p_wisharts[k].Sigma_class.set_prior(Sigmathprior)
+	            
+				Psiprior = {}
+				Psiprior['Qs'] = 1/prior.H[k]*np.eye(4)
+				Psiprior['nus'] = prior.n_Psi[k]
+				self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
+
+		for GMM in self.GMMs:
+			GMM.alpha_vec = prior.a
+			
+		if init:
+			self.set_latent_init(prior)
+			self.set_GMM_init()
 	
 	def save_prior_to_file(self,dirname):
 		"""
@@ -210,7 +242,7 @@ class hierarical_mixture_mpi(object):
 			self.d = self.GMMs[0].d
 			self.n = len(self.GMMs)
 			#mixture.unpickle(name)
-			
+		# TODO: Send counts. Send names?
 			
 	def save_GMMS_to_file(self,dirname):
 		"""
@@ -241,21 +273,29 @@ class hierarical_mixture_mpi(object):
 
 		
 	
-	def set_nu_MH_param(self, sigma = 5, iteration = 5):
+	def set_nu_MH_param(self, sigma = 5, iteration = 5, sigma_nuprop = None):
 		"""
 			setting the parametet for the MH algorithm
 			
 			sigma	 -  the sigma in the MH algorihm on the Natural line
-			iteration -  number of time to sample using the MH algortihm  
+			iteration -  number of time to sample using the MH algortihm
+			sigma_nuprop - if provided, the proportion of nu that will be set as sigma
 			
 		"""
 		if self.comm.Get_rank() == 0:  # @UndefinedVariable
-			for wpn in self.wishart_p_nus:
-				wpn.set_MH_param( sigma , iteration)
+			for k,wpn in enumerate(self.wishart_p_nus):
+				if sigma_nuprop is None:
+					if not isinstance(sigma, list):
+						wpn.set_MH_param( sigma , iteration)
+					else:
+						wpn.set_MH_param( sigma[k] , iteration)
+				else:
+					wpn.set_MH_param( max(np.ceil(sigma_nuprop*wpn.param['nu']),self.d) , iteration)
 		
-	def add_noise_class(self,Sigma_scale = 5.):
+	def add_noise_class(self,Sigma_scale = 5.,mu=None,Sigma=None):
 		
-		[GMM.add_noiseclass(Sigma_scale) for GMM in self.GMMs ]
+		[GMM.add_noiseclass(Sigma_scale,mu,Sigma) for GMM in self.GMMs ]
+		self.noise_class = 1
 		
 		
 	def set_prior_param0(self):
@@ -372,6 +412,12 @@ class hierarical_mixture_mpi(object):
 				self.normal_p_wisharts[k].set_data(mu_k[index,:])
 				self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
 
+	def set_simulation_param(self,sim_par):
+		self.set_p_labelswitch(sim_par.p_sw)
+		self.set_nu_MH_param(sim_par.sigma_nu, sim_par.iter_nu)
+		for GMM in self.GMMs:
+			GMM.set_p_activation(sim_par.p_on_off)
+
 
 	def set_p_activation(self, p):
 		
@@ -417,6 +463,17 @@ class hierarical_mixture_mpi(object):
 		"""
 		rank = self.comm.Get_rank()  # @UndefinedVariable
 		if rank == 0:
+			if data is None:
+				nodata = np.array(1,dtype="i")
+			else:
+				nodata = np.array(0,dtype="i")
+		else:
+			nodata = np.array(0,dtype="i")
+		self.comm.Bcast([nodata, MPI.INT],root=0)  # @UndefinedVariable
+		if nodata:
+			return				
+		
+		if rank == 0:
 			d = np.array(data[0].shape[1],dtype="i")
 			self.n_all = len(data)
 			size = self.comm.Get_size()  # @UndefinedVariable
@@ -446,7 +503,35 @@ class hierarical_mixture_mpi(object):
 		#storing the size of the data used later when sending data
 		self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
 		
+	def set_latent_init(self,prior):
+		rank = self.comm.Get_rank()
+		if rank == 0:
+			for k in range(self.K):
+				npw = self.normal_p_wisharts[k]
+				npwparam = {}
+				npwparam['theta'] = npw.theta_class.mu_p
+				npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
+				if k >= prior.K_inf:
+					npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
+				npwparam['Sigma'] = npw.Sigma_class.Q/(npw.Sigma_class.nu-self.d-1)
+				npw.set_parameter(npwparam)
+	
+				wpn = self.wishart_p_nus[k]
+				wpnparam = {}
+				wpnparam['Q'] = np.linalg.inv(wpn.Q_class.Q_s)*wpn.Q_class.nu_s
+				wpnparam['nu'] = wpn.Q_class.nu_s
+				wpn.set_parameter(wpnparam)
+				wpn.nu_class.set_val(wpn.Q_class.nu_s)
 
+	def set_GMM_init(self):
+		param = [None]*self.K
+		for k in range(self.K):
+			param[k] = {}
+			param[k]['mu'] = self.GMMs[0].prior[k]['mu']['theta'].reshape(self.d)
+			param[k]['sigma'] = self.GMMs[0].prior[k]['sigma']['Q']/(self.GMMs[0].prior[k]['sigma']['nu']-self.d-1)
+		for GMM in self.GMMs:
+			GMM.set_param(param)
+			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
 
 	def get_thetas(self):
 		"""
