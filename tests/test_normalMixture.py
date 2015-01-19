@@ -10,7 +10,7 @@ import numpy as np
 path = os.path.dirname(os.path.realpath(__file__))
 
 
-from bayesianmixture.PurePython import GMM
+from BayesFlow.PurePython import GMM
 
 class test_normalMixture(unittest.TestCase):
     n = 100

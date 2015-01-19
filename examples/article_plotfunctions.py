@@ -1,4 +1,5 @@
 '''
+Plot functions for article
 Created on Dec 14, 2014
 
 @author: jonaswallin
@@ -32,9 +33,9 @@ def plotQ_joint(Qs):
 		index = np.triu(np.ones((d,d))) == True
 		err = [Q[0][index],Q[2][index]]
 		
-		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.')
+		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.',color='black')
 		ax.set_xlim([-.01,(err[0].shape[0]-1)*ra+.01])
-		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='r',alpha=0.2)
+		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='gray',alpha=0.2)
 		ax.xaxis.set_ticks(np.array(range(err[0].shape[0]))*ra)
 		a = np.array([range(d),range(d),range(d)])
 		b = a.T
@@ -83,9 +84,9 @@ def plotQ(Qs):
 		index = np.triu(np.ones((d,d))) == True
 		err = [Q[0][index],Q[2][index]]
 		
-		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.')
+		ax.errorbar(np.array(range(err[0].shape[0]))*ra,Q[1][index],yerr = err,fmt='.',color='black')
 		ax.set_xlim([-.01,(err[0].shape[0]-1)*ra+.01])
-		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='r',alpha=0.2)
+		ax.plot(np.array([-.01,(err[0].shape[0]-1)*ra+.01]),[0,0],color='gray',alpha=0.2)
 		ax.xaxis.set_ticks(np.array(range(err[0].shape[0]))*ra)
 		a = np.array([range(d),range(d),range(d)])
 		b = a.T
@@ -127,8 +128,8 @@ def plot_theta(theta_percentile):
 		
 		err =  [theta_percentile[j,:, 0] ,theta_percentile[j,:,2]]
 		ra = 0.1	
-		ax.errorbar(np.array(range(d))*ra,theta_percentile[j,:,1],yerr = err,fmt='.')
-		ax.plot(np.array([-.02,(d-1)*ra+.02]),[0,0],color='r',alpha=0.2)
+		ax.errorbar(np.array(range(d))*ra,theta_percentile[j,:,1],yerr = err,fmt='.',color='black')
+		ax.plot(np.array([-.02,(d-1)*ra+.02]),[0,0],color='gray',alpha=0.2)
 		ax.xaxis.set_ticks(np.array(range(d))*ra)
 		ax.set_xlim([-.02,(d-1)*ra+.02])
 		plt.setp(ax, xticklabels=xticklabels)

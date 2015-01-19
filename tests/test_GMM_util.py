@@ -6,7 +6,7 @@ Created on Aug 16, 2014
 import unittest
 import scipy.linalg as spl
 
-import bayesianmixture.mixture_util.GMM_util as GMM_util
+import BayesFlow.mixture_util.GMM_util as GMM_util
 import numpy as np
 import numpy.random as npr
 

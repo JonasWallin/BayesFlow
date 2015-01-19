@@ -6,9 +6,9 @@ program for testing activating and deacitvation of mixtures
 from __future__ import division
 import unittest
 import numpy as np
-from bayesianmixture.PurePython.GMM import mixture
-from bayesianmixture import PurePython
-import bayesianmixture as bm
+from BayesFlow.PurePython.GMM import mixture
+from BayesFlow import PurePython
+import BayesFlow as bm
 import scipy.linalg as spl
 
 class comp(object):
