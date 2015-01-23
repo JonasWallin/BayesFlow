@@ -2,8 +2,9 @@ from __future__ import division
 from mpi4py import MPI
 import numpy as np
 import collections
+import warnings
 
-class BMlogB(object):
+class HMlogB(object):
     '''
         Class for saving burn-in iterations from sampling of posterior distribution
     '''
@@ -12,7 +13,7 @@ class BMlogB(object):
             nbrsave = sim
         self.nbrsave = nbrsave
         self.sim = sim
-        self.savefrq = max(np.floor((sim/nbrsave)),1)
+        self.savefrq = max(np.floor(sim/(nbrsave-1)),1)
         self.K = hGMM.K
         self.noise_class = hGMM.noise_class
         self.set_names(hGMM)
@@ -41,6 +42,19 @@ class BMlogB(object):
                 self.lab_sw.append(GMM.lab)
                 print "Label switch: {}".format(GMM.lab)
         return nus
+        
+    def cat(self,hmlog):
+        if self.savefrq != hmlog.savefrq:
+            warnings.warn('Savefrq not compatible: {} vs {}'.format(self.savefrq,hmlog.savefrq))
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            self.theta_sim = np.vstack([self.theta_sim,hmlog.theta_sim])
+            self.nu_sim = np.vstack([self.nu_sim,hmlog.nu_sim])
+            self.lab_sw = np.vstack([self.lab_sw,hmlog.lab_sw])
+            qself = self.sim/(self.sim + hmlog.sim)
+            self.active_komp = qself*self.active_komp + (1-qself)*hmlog.active_komp
+            self.nbrsave = self.nbrsave + hmlog.nbrsave
+            self.sim = self.sim + hmlog.sim
+        return self
     
     def postproc(self):
         '''
@@ -117,7 +131,7 @@ class BMlogB(object):
             names_all = "".join(names_all)
             self.names = names_all.split(':')[0:-1]
 
-class BMlog(BMlogB):
+class HMlog(HMlogB):
 
     '''
         Class for saving results from sampling of posterior distribution
@@ -125,7 +139,7 @@ class BMlog(BMlogB):
     '''
     
     def __init__(self,hGMM,sim,savesamp = [],nbrsave=None,nbrsavey=None):
-        super(BMlog,self).__init__(hGMM,sim,nbrsave)
+        super(HMlog,self).__init__(hGMM,sim,nbrsave)
         if nbrsavey is None:
             nbrsavey = sim
         self.savefrqy = max(np.floor((sim/nbrsavey)),1)
@@ -147,7 +161,7 @@ class BMlog(BMlogB):
         '''
             Save production iteration
         '''
-        super(BMlog,self).savesim(hGMM)
+        super(HMlog,self).savesim(hGMM)
         thetas = hGMM.get_thetas()
         Qs = hGMM.get_Qs()
         mus = hGMM.get_mus()
@@ -165,11 +179,14 @@ class BMlog(BMlogB):
             self.add_Sigmapers(Sigmas)
             self.add_prob(ps)            
 
+        def cat(self):
+            print "cat not implemented yet for this object type"
+
     def postproc(self):
         '''
             Post-processing production iterations
         '''
-        super(BMlog,self).postproc()
+        super(HMlog,self).postproc()
         if MPI.COMM_WORLD.Get_rank() == 0:
             self.theta_sim_mean /= self.sim
             self.Sigmaexp_sim_mean /= self.sim
@@ -222,7 +239,7 @@ class BMlog(BMlogB):
         self.prob_sim_mean += prob
 
 
-class BMElog(BMlog):
+class HMElog(HMlog):
 
     '''
         Class for saving results from sampling of posterior distribution
@@ -231,7 +248,7 @@ class BMElog(BMlog):
     '''
     
     def __init__(self,hGMM,sim,savesamp = [],nbrsave=None,nbrsavey=None):
-        super(BMElog,self).__init__(hGMM,sim,savesamp,nbrsave,nbrsavey)
+        super(HMElog,self).__init__(hGMM,sim,savesamp,nbrsave,nbrsavey)
         self.batch = 1000
         self.ii = -1
         self.init_classif(hGMM)
@@ -246,7 +263,7 @@ class BMElog(BMlog):
         '''
            Saving production iteration
         '''
-        super(BMElog,self).savesim(hGMM)
+        super(HMElog,self).savesim(hGMM)
         self.ii += 1
         if self.ii == self.batch:
             self.add_classif_fr()
@@ -259,7 +276,7 @@ class BMElog(BMlog):
         '''
             Post-processing production iterations
         '''
-        super(BMElog,self).postproc()
+        super(HMElog,self).postproc()
         self.add_classif_fr()
         del self.classif
         if MPI.COMM_WORLD.Get_rank() == 0:

@@ -110,11 +110,13 @@ def mergeQ(q1,q2):
     q_y[1] = max(q1['q_y'][1],q2['q_y'][1])
     return {'q_x': q_x, 'q_y': q_y}
 
-def plot_diagnostics(diagn,ymin,ymax,ybar = None,name = '',log=False,fig=None,totplots=1,plotnbr=1):
+def plot_diagnostics(diagn,ymin,ymax,ybar = None,order=None,name = '',log=False,fig=None,totplots=1,plotnbr=1):
     if fig is None:
         fig = plt.figure()
     J = diagn.shape[0]
     K = diagn.shape[1]
+    if order is None:
+        order = range(K)
     nbr_cols = 2*totplots - 1
     col_start = 2*(plotnbr - 1) 
     xloc = np.arange(J) + .5
@@ -123,7 +125,7 @@ def plot_diagnostics(diagn,ymin,ymax,ybar = None,name = '',log=False,fig=None,to
         ax = fig.add_subplot(K,nbr_cols,k*nbr_cols + col_start + 1)
         if k == 0:
             plt.title(name)
-        ax.bar(xloc,diagn[:,k],bar_width,log=log)
+        ax.bar(xloc,diagn[:,order[k]],bar_width,log=log)
         ax.set_ylim(ymin,ymax)
         if not ybar is None:
             ax.plot([xloc[0],xloc[-1]],[ybar,ybar])
@@ -431,15 +433,19 @@ class ClustPlot(object):
 
         nbr_cols = d*totplots + totplots-1
         col_start = (d+1)*(plotnbr-1)  
-        qind = np.int(K*q)-1
+        #qind = np.int(K*q)-1
         jq = np.zeros((K,d),dtype='i')
         for ik,k in enumerate(self.order):
             pd = pdiplist[k]
+            K_loc = sum(~np.isnan(pd[:,0]))
             for dd in range(d):
+                qind = max(np.int(K_loc*q)-1,0)
                 jq[k,dd] = np.argsort(pd[:,dd])[qind]
                 quantiles = self.clust.get_quantiles(alpha,jq[k,dd],[k],[dd])[0,:,0]
                 ax = fig.add_subplot(self.clust.K,nbr_cols,ik*nbr_cols + col_start + dd + 1)
-                ax.hist(quantiles,bins = 50,color=self.colors[k])
+                ax.hist(quantiles,bins = 50,color=self.colors[k],range=(-0.1,1.4))
+                ax.set_xlim((-0.1,1.4))
+                ax.axes.yaxis.set_ticks([])
         return fig
 
     def chist_allsamp(self,min_clf,dd,ks,fig=None,ncol=4):
@@ -471,7 +477,7 @@ class ClustPlot(object):
         for k in ks:
             data = self.clust.get_data_kdj(min_clf,self.order[k],dd,j)
             if len(data) > 0:
-                ax.hist(data,color=self.colors[self.order[k]],alpha = .7,range = (-0.1,1.4))
+                ax.hist(data,bins=50,color=self.colors[self.order[k]],alpha = .7,range = (-0.1,1.4))
         return ax
 
     def scatter(self,dim,j,fig=None):
@@ -600,7 +606,8 @@ class CompPlot(object):
     		f = None
 
         if ks is None:
-            ks = range(self.comp.K)            
+            ks = range(self.comp.K)
+        ks = [self.comp_ord[k] for k in ks]            
         okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
         okcl = set.intersection(set(okcl),set(ks))
         
@@ -614,7 +621,7 @@ class CompPlot(object):
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],plotlab=False):
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False):
         '''
             Plot visualization of mixture components for all samples.
             Canonical colors are used (see BMplot).
@@ -632,12 +639,15 @@ class CompPlot(object):
             f = None
             
         if ks is None:
-            ks = range(self.comp.K)         
+            ks = range(self.comp.K)
+        ks = [self.comp_ord[k] for k in ks]
+        if js is None:
+            js = range(self.comp.J)
         okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
         okcl = set.intersection(set(okcl),set(ks))
         
-        muspers = [[self.comp.mupers[j,k,:] for k in okcl] for j in range(self.comp.J)]
-        Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in range(self.comp.J)]
+        muspers = [[self.comp.mupers[j,k,:] for k in okcl] for j in js]
+        Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in js]
         colors = [self.comp_colors[k] for k in okcl]
 
         q = pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
@@ -646,7 +656,7 @@ class CompPlot(object):
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def latent_allsamp(self,dimlist,fig=None,ks=None,plim=[0,1],plotlab=True):
+    def latent_allsamp(self,dimlist,fig=None,ks=None,plim=[0,1],js=None,plotlab=True):
         '''
             Plot a panel of both latent component and mixture components for 
             all samples.
@@ -665,7 +675,7 @@ class CompPlot(object):
             ax1 = fig.add_subplot(len(dimlist),2,2*m+1)#plt.subplot2grid((2, 2), (m, 0))
             ql = self.latent(dimlist[m],ax1,ks,plim)
             ax2 = fig.add_subplot(len(dimlist),2,2*m+2)#plt.subplot2grid((2, 2), (m, 1))
-            qa = self.allsamp(dimlist[m],ax2,ks,plim)
+            qa = self.allsamp(dimlist[m],ax2,ks,plim,js)
 
             if m == 0:
                 ax1.set_title(self.marker_lab[dimlist[m][0]],fontsize=16)
@@ -686,7 +696,7 @@ class CompPlot(object):
         if fig is None:
             fig = plt.figure()
         distquo = self.comp.get_center_distance_quotient()
-        fig = plot_diagnostics(distquo,0,3,1,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
+        fig = plot_diagnostics(distquo,0,3,1,self.comp_ord,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
         return fig
     
     def cov_dist(self,norm='F',fig=None,totplots=1,plotnbr=1):
@@ -697,7 +707,7 @@ class CompPlot(object):
             norm    -   which norm to use for computing the distance
         '''
         distF = self.comp.get_cov_dist(norm)
-        plot_diagnostics(np.log10(distF),-5,0,-3,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
+        plot_diagnostics(np.log10(distF),-5,0,-3,self.comp_ord,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
 
 class TracePlot(object):
     

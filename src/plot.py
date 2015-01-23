@@ -73,3 +73,23 @@ def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None):
 		f.subplots_adjust(hspace = .25)
 	
 	return f
+ 
+def plot_GMM_scatter_all(hGMM, dim):
+	
+	for GMM in hGMM.GMMs:
+		plt.figure()
+		ax = plt.subplot(111)
+		plot_GMM_scatter(GMM, ax ,dim)
+
+def plot_GMM_scatter(GMM, ax ,dim):
+	"""
+		Plots the scatter plot of the data over dim
+		and assigning each class a different color
+	"""
+	data= GMM.data[:,dim]
+	x = GMM.x
+	cm = plt.get_cmap('gist_rainbow')
+	ax.set_color_cycle([cm(1.*i/GMM.K) for i in range(GMM.K)])
+	if len(dim) == 2:
+		for k in range(GMM.K):
+			plt.plot(data[x==k,0],data[x==k,1],'+',label='k = %d'%(k+1))

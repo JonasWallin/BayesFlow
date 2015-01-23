@@ -9,10 +9,12 @@ import GMM
 import numpy as np
 from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from BayesFlow.GMM import mixture
+import HMlog
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr
 import os
+import glob
 
 #TODO: change to geomtrical median instead of mean!!
 def distance_sort(hGMM):
@@ -62,18 +64,16 @@ def distance_sort(hGMM):
 	return mus
 
 
-def plot_GMM_scatter(GMM, ax ,dim):
-	"""
-		Plots the scatter plot of the data over dim
-		and assigning each class a different color
-	"""
-	data= GMM.data[:,dim]
-	x = GMM.x
-	cm = plt.get_cmap('gist_rainbow')
-	ax.set_color_cycle([cm(1.*i/GMM.K) for i in range(GMM.K)])
-	if len(dim) == 2:
-		for k in range(GMM.K):
-			plt.plot(data[x==k,0],data[x==k,1],'+',label='k = %d'%(k+1))
+def load_hGMM(dirname):
+	'''
+		Load hGMM from a directory
+	'''
+	if dirname[-1] != '/':
+		dirname += '/'
+	K = len(glob.glob(dirname + 'normal_p_wishart*'))
+	hGMM = hierarical_mixture_mpi(K)
+	hGMM.load_from_file(dirname)
+	return hGMM
 
 class hierarical_mixture_mpi(object):
 	"""	
@@ -165,7 +165,7 @@ class hierarical_mixture_mpi(object):
 			if dirname.endswith("/") == False:
 				dirname += "/"		
 			self.normal_p_wisharts = [ normal_p_wishart.unpickle("%snormal_p_wishart_%d.pkl"%(dirname,k)) for k in range(self.K)] 
-			self.Wishart_p_nu	  = [ Wishart_p_nu.unpickle("%snormal_p_wishart_%d.pkl"%(dirname,k)) for k in range(self.K)] 
+			self.Wishart_p_nu	  = [ Wishart_p_nu.unpickle("%sWishart_p_nu_%d.pkl"%(dirname,k)) for k in range(self.K)] 
 		
 	def save_to_file(self,dirname):
 		"""
@@ -186,7 +186,7 @@ class hierarical_mixture_mpi(object):
 			f.close()		
 		
 
-	def load_to_file(self,dirname):
+	def load_from_file(self,dirname):
 		"""
 			Loads the Hgmm from file
 		"""
@@ -413,10 +413,10 @@ class hierarical_mixture_mpi(object):
 				self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
 
 	def set_simulation_param(self,sim_par):
-		self.set_p_labelswitch(sim_par.p_sw)
-		self.set_nu_MH_param(sim_par.sigma_nu, sim_par.iter_nu)
-		for GMM in self.GMMs:
-			GMM.set_p_activation(sim_par.p_on_off)
+		self.set_p_labelswitch(sim_par['p_sw'])
+		if not sim_par['nu_MH_par'] is None:
+			self.set_nu_MH_param(**sim_par['nu_MH_par'])
+		self.set_p_activation(sim_par['p_on_off'])
 
 
 	def set_p_activation(self, p):
@@ -532,6 +532,10 @@ class hierarical_mixture_mpi(object):
 		for GMM in self.GMMs:
 			GMM.set_param(param)
 			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
+
+	def deactivate_outlying_components(self):
+		for GMM in self.GMMs:
+			GMM.deactivate_outlying_components()
 
 	def get_thetas(self):
 		"""
@@ -785,10 +789,17 @@ class hierarical_mixture_mpi(object):
 		self.comm.Barrier()
 		self.update_GMM()
 		
-	def plot_GMM_scatter_all(self, dim):
+
+	def simulate(self,simpar,name='simulation',printfrq=100):
+		iterations = np.int(simpar['iterations'])
+		self.set_simulation_param(simpar)
+		hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
+		for i in range(iterations):
+			if i%printfrq == 0 and self.comm.Get_rank() == 0:
+				print "{} iteration = {}".format(name,i)
+			self.sample()
+			hmlog.savesim(self) 
+		hmlog.postproc()
 		
-		for GMM in self.GMMs:
-			plt.figure()
-			ax = plt.subplot(111)
-			plot_GMM_scatter(GMM, ax ,dim)
-			
+		return hmlog
+

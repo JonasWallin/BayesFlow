@@ -10,10 +10,10 @@ from mpi4py import MPI
 import copy as cp
 import warnings
 
-import BayesFlow.utils.Bhattacharyya as bhat
-from BayesFlow.utils import diptest
-import BayesFlow.utils.discriminant as discr
-import BayesFlow.BMplot as bmp
+import utils.Bhattacharyya as bhat
+from utils import diptest
+import utils.discriminant as discr
+import BMplot as bmp
 
 def quantile(y,w,alpha):
     '''
@@ -141,6 +141,7 @@ class Clustering(object):
         self.J = len(classif_freq)
         self.K = p.shape[1]
         self.d = data[0].shape[1]
+        self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])        
         
     def merge_kl(self,ind):
         for cl in self.classif_freq:
@@ -185,14 +186,14 @@ class Clustering(object):
                 if (self.p[:,k] < 1.5).any():
                     if np.sum(self.classif_freq[j][:,k] > .5) < self.d:
                         # Not enough data points to estimate distance
-                        bhd[j][k,:] = 0
+                        bhd[j][k,:] = np.nan
                     else:
                         muk,Sigmak = discr.population_mu_Sigma(self.data[j],self.classif_freq[j][:,k])
                         for l in range(self.K):
                             if l != k and (self.p[:,l] < 1.5).any():
                                 if np.sum(self.classif_freq[j][:,l] > .5) < self.d:
                                     # Not enough data points to estimate distance
-                                    bhd[j][k,l] = 0
+                                    bhd[j][k,l] = np.nan
                                 else:
                                     mul,Sigmal = discr.population_mu_Sigma(self.data[j],self.classif_freq[j][:,l])
                                     bhd[j][k,l] = bhat.bhattacharyya_dist(muk,Sigmak,mul,Sigmal)   
@@ -281,7 +282,7 @@ class Clustering(object):
         K = len(self.pdiplist)
         pdipsummary = {'Median': np.empty((K,d)), '25th percentile': np.empty((K,d)), 'Minimum': np.empty((K,d))}
         for k in range(K):
-            pdk = np.ma.masked_array(self.pdiplist[k],np.isnan(self.pdiplist[k]))
+            pdk = self.pdiplist[k][~np.isnan(self.pdiplist[k][:,0]),:]#np.ma.masked_array(self.pdiplist[k],np.isnan(self.pdiplist[k]))
             pdipsummary['Median'][k,:] = np.median(pdk,0)
             pdipsummary['25th percentile'][k,:] = np.percentile(pdk,25,0)
             pdipsummary['Minimum'][k,:] = np.min(pdk,0)
@@ -303,15 +304,20 @@ class Clustering(object):
         return diptest.dip_pval_tabinterpol(dip,(self.p[j,k]+self.p[j,l])*self.classif_freq[j].shape[0])
         
     def okdiptest(self,ind,thr):
-        maxbelow = np.ceil(self.J/4) - 1
+        if not hasattr(self,'vacuous_komp'):
+            self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])
+            print "vacuous_komp = {}".format(self.vacuous_komp)
+        maxbelow = np.ceil((self.J-sum(self.vacuous_komp[:,ind[0]]+self.vacuous_komp[:,ind[1]]))/4) - 1
+        print "maxbelow = {}".format(maxbelow)
         for dim in [None]+range(self.d):
             below = 0
             for j in range(self.J):
-                if self.get_pdip_discr_jkl(j,ind[0],ind[1],dim) < thr:
-                    below += 1
-                    if below > maxbelow:
-                        print "For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim)
-                        return False
+                if not (self.vacuous_komp[j,ind[0]] or self.vacuous_komp[j,ind[1]]):
+                    if self.get_pdip_discr_jkl(j,ind[0],ind[1],dim) < thr:
+                        below += 1
+                        if below > maxbelow:
+                            print "For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim)
+                            return False
         print "Diptest ok for {} and {}".format(ind[0],ind[1])
         return True
         
@@ -376,7 +382,10 @@ class Components(object):
         dist = np.zeros((self.J,self.K))
         for k in range(self.K):
             for j in range(self.J):
-                dist[j,k] = np.linalg.norm(self.mupers[j,k,:] - self.mulat[k,:])
+                if self.active_komp[j,k] <= 0.05:
+                    dist[j,k] = np.nan
+                else:
+                    dist[j,k] = np.linalg.norm(self.mupers[j,k,:] - self.mulat[k,:])
         return dist
     
     def get_cov_dist(self,norm='F'):
@@ -388,10 +397,12 @@ class Components(object):
         covdist = np.zeros((self.J,self.K))
         for j in range(self.J):
             for k in range(self.K):
-                if norm == 'F':
-                    covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:])
-                elif norm == 2:
-                    covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:],ord=2)
+                if self.active_komp[j,k] <= 0.05:
+                    covdist[j,k] = np.nan
+                    if norm == 'F':
+                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:])
+                    elif norm == 2:
+                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:],ord=2)
         return covdist
 
         
@@ -410,6 +421,26 @@ class Components(object):
                     distquo[j,k] = wrongdist/corrdist
         return distquo
 
+class Components_hGMM(Components):
+    '''
+        Object containing information about mixture components
+    '''
+    
+    def __init__(self,hGMM):
+        self.K = hGMM.K
+        self.d = hGMM.d
+        self.mupers = hGMM.get_mus()
+        self.Sigmapers = hGMM.get_Sigmas()
+        self.mulat = hGMM.get_thetas()
+        nus = hGMM.get_nus()
+        Qs = hGMM.get_Qs()
+        self.Sigmalat = np.array((self.K,self.d,self.d))
+        for k in range(self.K):
+            self.Sigmalat[k,:,:] += Qs[k]/(nus[k]-self.d-1)
+        self.p = hGMM.get_ps()
+        #self.active_komp = 
+        self.J = self.mupers.shape[0]
+
 class BMres(object):
 
     def __init__(self,bmlog,bmlog_burn,data,meta_data):
@@ -424,6 +455,7 @@ class BMres(object):
                 self.p_noise = bmlog.prob_sim_mean[:,self.K] 
             else:
                 self.p_noise = None
+            self.active_komp = bmlog.active_komp
 
             self.meta_data = MetaData(meta_data)
             self.meta_data.sort(bmlog.names)
@@ -570,7 +602,9 @@ class BMres(object):
         med_prop = np.empty(prop[0].shape)
         for k in range(med_prop.shape[0]):
             for l in range(med_prop.shape[1]):
-                med_prop[k,l] = np.median([pr[k,l] for pr in prop])
+                prop_kl = np.array([pr[k,l] for pr in prop])
+                med_prop[k,l] = np.median(prop_kl[~np.isnan(prop_kl)])
+
         for ind in fixvalind:
             if len(ind) == 1:
                 med_prop[ind,:] = fixval
