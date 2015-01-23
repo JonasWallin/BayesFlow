@@ -1,4 +1,4 @@
-BaysFlow
+BayesFlow
 ========
 version 0.1
 
