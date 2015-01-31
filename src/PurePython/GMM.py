@@ -83,17 +83,20 @@ class mixture(object):
 	
 	"""
 	
-	def __init__(self, data = None, K = None,  prior = None, high_memory=True , name=None):
+	def __init__(self, data = None, K = None,  prior = None, high_memory=True , name=None, underSample = False):
 		"""
 			Startup
 		
-			data	-  nxd np.array
-			K	   -  the number of classes
-			prior   -  The prior parameters for mu, Sigma, prob
-					   list one element per class
-					   each element is dictionary with
-					   "mu", "sigma", "p"
+			data	   -  nxd np.array
+			K	       -  the number of classes
+			prior      -  The prior parameters for mu, Sigma, prob
+					   	  list one element per class
+					      each element is dictionary with
+					      "mu", "sigma", "p"
 			high_memoty - have large amount of memory avialble
+			
+			underSample - changes the Gibbs sample of x_i so that with probability underP[i]
+						  samples x_i otherwise keeps x_i 
 		"""
 		
 		self.mu  = []	 
@@ -118,7 +121,10 @@ class mixture(object):
 		self.lab =np.array([-1,-1])
 		
 		self.name=  name
-	
+		if underSample == True:
+			# need underP
+			# need method to add remove suff stats
+			pass
 	
 	
 	def load_param(self, params):
@@ -398,6 +404,7 @@ class mixture(object):
 		self.sample_p()
 		self.sample_active_komp()
 		self.lab = self.sample_labelswitch()
+		#TODO: stores the components the average componentes
 		
 	def updata_mudata(self):
 		
@@ -475,6 +482,7 @@ class mixture(object):
 		P = np.cumsum(self.prob_X,1)
 		U = npr.rand(self.n)
 		index_n = np.array(range(self.n),dtype=np.int)
+		#TODO: add things
 		for i in range(self.K + self.noise_class): 
 			index = U < P[:,i]
 			self.x[index_n[index]] = i
@@ -559,6 +567,9 @@ class mixture(object):
 			Draws the mean parameters
 			self.mu[k] - 
 		"""
+		#TODO: add subsampling opition
+		# where also the mean is stored!
+		# and futher only updates the correct component
 		for k in range(self.K):  
 			if self.active_komp[k] == True:
 				self.mu[k] = sample_mu(self.data[self.x == k ,:], self.sigma[k], self.prior[k]['mu']['theta'], self.prior[k]['mu']['Sigma'])
@@ -573,7 +584,9 @@ class mixture(object):
 			Draws the covariance parameters
 		
 		"""
-		
+		#TODO: add subsampling opition
+		# where also the mean is stored!
+		# and futher only updates the correct component		
 		if self.high_memory == True:
 			for k in range(self.K): 
 				if self.active_komp[k] == True: 
@@ -642,6 +655,9 @@ class mixture(object):
 		if active_komp == None:
 			active_komp = self.active_komp
 		
+		
+		#TODO: add index for sampling subsampling
+		# 
 		for k in range(self.K):
 			if active_komp[k] == True:
 				Q = np.linalg.inv(sigma[k])
