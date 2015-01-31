@@ -5,63 +5,6 @@ from rpy2.rinterface import RRuntimeError
 #from BayesFlow.utils import discriminant
 import matplotlib.pyplot as plt
 
-def get_pdip(classif_freq,p,data,diptabdir):
-    '''
-        Diptest p-values for each cluster/component, each dimension and each sample.
-        Input:
-            classif_freq    -  list of matrices with frequencies of classification into each component for each data point. Each matrix corresponds to one flow cytometry sample.
-            p               -   matrix with component weights across the samples
-            data            -   data set
-            diptabdir       -   directory with file qDiptab.txt containing tabulated p-values for dip tests.
-    '''
-    pdiplist = []
-    d = data[0].shape[1]
-    J = len(data)
-    K = classif_freq[0].shape[1]
-    for k in range(K):
-        pdip = np.zeros((J,d))
-        for j in range(J):
-            for dd in range(d):
-                xcum,ycum = cum_distr(data[j][:,dd],classif_freq[j][:,k])
-                dip = dip_from_cdf(xcum,ycum)
-                pdip[j,dd] = dip_pval_tabinterpol(dip,p[j,k]*classif_freq[j].shape[0],diptabdir)
-        print "Diptest computed for component {}".format(k)
-        pdiplist.append(np.copy(pdip))
-    return pdiplist
-    
-def get_pdip_summary(pdiplist):
-    '''
-        Medians, 25th percentiles and minima of diptest p-values for each cluster/component and each data dimension
-    '''
-    d = pdiplist[0].shape[1]
-    K = len(pdiplist)
-    pdipsummarylist = [np.empty((K,d)),np.empty((K,d)),np.empty((K,d))]
-    for k in range(K):
-        pdk = np.ma.masked_array(pdiplist[k],np.isnan(pdiplist[k]))
-        pdipsummarylist[0][k,:] = np.median(pdk,0)
-        pdipsummarylist[1][k,:] = np.percentile(pdk,25,0)
-        pdipsummarylist[2][k,:] = np.min(pdk,0)
-    return pdipsummarylist
-
-def get_pdip_discr_jkl(j,k,l,classif_freq,p,data,diptabdir,dim=None):
-    '''
-        p-value of diptest of unimodality for the merger of cluster k and l in flow cytometry sample j
-        
-        Input:
-            classif_freq    -  list of matrices with frequencies of classification into each component for each data point. Each matrix corresponds to one flow cytometry sample.
-            p               -   matrix with component weights across the samples
-            data            -   data set
-            diptabdir       -   directory with file qDiptab.txt containing tabulated p-values for dip tests.
-            dim             - dimension along which the test should be performed. If dim is None, the test will be performed on the projection onto Fisher's discriminant coordinate.
-    '''
-    if dim is None:
-        dataproj = discriminant.discriminant_projection(data[j],classif_freq[j][:,k],classif_freq[j][:,l])
-    else:
-        dataproj = data[j][:,dim]
-    xcum,ycum = cum_distr(dataproj,classif_freq[j][:,k] + classif_freq[j][:,l])
-    dip = dip_from_cdf(xcum,ycum)
-    return dip_pval_tabinterpol(dip,(p[j,k]+p[j,l])*classif_freq[j].shape[0],diptabdir)
-
     
 def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):
     '''

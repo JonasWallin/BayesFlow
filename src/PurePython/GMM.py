@@ -10,7 +10,7 @@ import numpy.random as npr
 import copy as cp
 from BayesFlow.PurePython.distribution import wishart
 import scipy.special as sps
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
@@ -180,12 +180,14 @@ class mixture(object):
 		"""
 		self.name = name
 		
-	def add_noiseclass(self, Sigma_scale  = 5.):
+	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None):
 		"""
 			adds a class that does not update and cant be deactiveted or label switch
 			the data need to be loaded first!
 			
-			Sigma_scale  - (double)  the scaling constants time the covariance matrix
+			Sigma_scale  - (double)  a scaling constant for the the covariance matrix (not used if Sigma supplied)
+			mu           - (d x 1 vector) mean value for the noise. If not supplied, the mean of the data is used.
+			Sigma        - (d x d matrix) covariance matrix fo the noise
 		"""
 		
 		
@@ -195,9 +197,11 @@ class mixture(object):
 		self.noise_class = 1
 		self.active_komp = np.hstack((self.active_komp,True))
 		self.p = np.hstack((self.p * (1- 0.01), 0.01))
-		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.)) 
-		Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
-		mu     = np.mean(self.data,0)
+		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.))
+		if Sigma is None:
+			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
+		if mu is None:
+			mu     = np.mean(self.data,0)
 			
 		self.prob_X = np.zeros((self.n, self.K + 1))
 		self.noise_sigma = Sigma
@@ -718,27 +722,41 @@ class mixture(object):
 		x = npr.choice(range(self.K),p = p)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
+	def deactivate_outlying_components(self):
+		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
+		for k in range(self.K):
+			dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+			if np.argmin(dist) != k:
+				self.deactivate_component(k)
 	
-	def plot_scatter(self, dim, ax=None):
-		'''
-			Plots the scatter plot of the data over dim
-			and assigning each class a different color
-		'''
-		
-		
-		if ax == None:
-			f = plt.figure()
-			ax = f.add_subplot(111)
-		else:
-			f = None
-			
-		data= self.data[:,dim]
-		cm = plt.get_cmap('gist_rainbow')
-		if len(dim) == 2:
-			for k in range(self.K):
-				ax.plot(data[self.x==k,dim[0]],data[self.x==k, dim[1]],'+',label='k = %d'%(k+1),color=cm(k/self.K))
-				
-		return f, ax
+	def deactivate_component(self,k_off):
+		self.active_komp[k_off] = False
+		p_off		       = self.p[k_off]
+		self.p				   = self.p/(1. - p_off)
+		self.p[k_off]	 	   = 0.
+		self.mu[k_off]		   = np.NAN * np.ones(self.d )
+		self.sigma[k_off] 	   = np.NAN * np.ones((self.d, self.d))
+	
+#	def plot_scatter(self, dim, ax=None):
+#		'''
+#			Plots the scatter plot of the data over dim
+#			and assigning each class a different color
+#		'''
+#		
+#		
+#		if ax == None:
+#			f = plt.figure()
+#			ax = f.add_subplot(111)
+#		else:
+#			f = None
+#			
+#		data= self.data[:,dim]
+#		cm = plt.get_cmap('gist_rainbow')
+#		if len(dim) == 2:
+#			for k in range(self.K):
+#				ax.plot(data[self.x==k,dim[0]],data[self.x==k, dim[1]],'+',label='k = %d'%(k+1),color=cm(k/self.K))
+#				
+#		return f, ax
 
 	def pickle(self, filename):
 		"""

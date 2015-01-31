@@ -31,14 +31,14 @@ class mixture(PurePython.GMM.mixture):
 			
 		
 		
-	def add_noiseclass(self, Sigma_scale = 5.):
+	def add_noiseclass(self, Sigma_scale = 5., mu = None, Sigma = None):
 		"""
 			adds a class that does not update and cant be deactiveted or label switch
 			the data need to be loaded first!
 			
 			Sigma_scale  - (double)  the scaling constants time the covariance matrix
 		"""
-		super(mixture,self).add_noiseclass(Sigma_scale)
+		super(mixture,self).add_noiseclass(Sigma_scale,mu,Sigma)
 		self.x_index = np.empty((self.n, self.K + 1),dtype=np.int) 
 		self.x_count = np.empty(self.K + 1,dtype=np.int)
 		
