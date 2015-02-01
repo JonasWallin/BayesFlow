@@ -83,7 +83,7 @@ class mixture(object):
 	
 	"""
 	
-	def __init__(self, data = None, K = None,  prior = None, high_memory=True , name=None, underSample = False):
+	def __init__(self, data = None, K = None,  prior = None, high_memory=True , name=None, AMCMC = False):
 		"""
 			Startup
 		
@@ -95,7 +95,7 @@ class mixture(object):
 					      "mu", "sigma", "p"
 			high_memoty - have large amount of memory avialble
 			
-			underSample - changes the Gibbs sample of x_i so that with probability underP[i]
+			AMCMC - changes the Gibbs sample of x_i so that with probability underP[i]
 						  samples x_i otherwise keeps x_i 
 		"""
 		
@@ -121,11 +121,9 @@ class mixture(object):
 		self.lab =np.array([-1,-1])
 		
 		self.name=  name
-		if underSample == True:
-			# need underP
-			# need method to add remove suff stats
-			pass
-	
+		self.AMCMC = False
+			
+
 	
 	def load_param(self, params):
 		"""
@@ -369,6 +367,7 @@ class mixture(object):
 		self.data = np.empty_like(data)
 		self.data[:] = data[:]
 		self.n = self.data.shape[0]
+		self.index_n = np.array(range(self.n),dtype=np.int)
 		self.d  = self.data.shape[1]
 		#just a stupied inital guess!!!
 		cov_data  = np.cov(data.transpose())
@@ -483,19 +482,19 @@ class mixture(object):
 		
 		"""
 		self.compute_ProbX()
-		P = np.cumsum(self.prob_X,1)
-		U = npr.rand(self.n)
-		index_n = np.array(range(self.n),dtype=np.int)
+		P = np.cumsum(self.slice_p ,1)
+		U = npr.rand(np.sum(self.index_AMCMC))
+		index_n = self.index_n[self.index_AMCMC].copy()
 		#TODO: add things
 		for i in range(self.K + self.noise_class): 
 			index = U < P[:,i]
 			self.x[index_n[index]] = i
+			index_F = index==False
+			P  = P.compress(index_F, axis= 0)
+			U  = U.compress(index_F,axis = 0)
 			
-			P = P[index == False]
-			U = U[index == False]
 			
-			
-			index_n = index_n[index == False] 
+			index_n = index_n[index_F] 
 			
 			if U.shape[0] == 0:
 				break
@@ -644,7 +643,26 @@ class mixture(object):
 		return l
 		
 				
-	
+	def set_AMCMC(self, n_AMCMC, min_p_AMCMC = 10**-6, p_rate_AMCMC = 0.66):
+		"""
+			Adapative MCMC parameters
+			
+			n_AMCMC     - expected number of samples in each iteration
+			
+			min_p_AMCMC - minum probabilility of sampling a class
+			
+			p_rate_AMCMC - rate on which we update the AMCMC
+			 
+		"""
+		self.AMCMC          = True
+		self.p_AMCMC        =  np.zeros((self.n, self.K + 1))
+		self.p_rate_AMCMC   = p_rate_AMCMC
+		self.p_count_AMCMC  = np.zeros(self.n)
+		self.p_max_AMCMC        = np.ones((self.n,1))
+		self.min_p_AMCMC    = min_p_AMCMC
+		self.n_AMCMC        = n_AMCMC
+		
+			
 	def compute_ProbX(self, norm =True, mu = None, sigma = None, p =None, active_komp = None):
 		"""
 			Computes the E[x=i|\mu,\Sigma,p,Y] 
@@ -659,34 +677,74 @@ class mixture(object):
 		if active_komp == None:
 			active_komp = self.active_komp
 		
-		
+		if self.AMCMC:
+			U = npr.rand(self.n,1)
+			self.index_AMCMC = U < self.p_max_AMCMC
+			
+		else:
+			self.index_AMCMC =	np.ones((self.n,1), dtype=bool)		
+		n_index = np.sum(self.index_AMCMC)
+		self.index_AMCMC = np.reshape(self.index_AMCMC,self.index_AMCMC.shape[0])
 		#TODO: add index for sampling subsampling
 		# 
+		slice_p = self.prob_X.compress(self.index_AMCMC ,axis=0)
+		
+		if high_memory == False:
+			X_slice  =self.data.compress(self.index_AMCMC,axis=0)
+		
 		for k in range(self.K):
 			if active_komp[k] == True:
 				Q = np.linalg.inv(sigma[k])
-				if high_memory == True:
-					self.prob_X[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
-					self.prob_X[:,k] -= np.sum(self.data_mu[k] * np.dot(self.data_mu[k],Q),1)/2.
-				else:
-					X_mu = self.data - mu[k]
-					self.prob_X[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
-					self.prob_X[:,k] -= np.sum(X_mu * np.dot(X_mu,Q),1)/2.
 				
-				self.prob_X[:,k] += np.log(p[k])
+				if high_memory == True:
+					temp_data = self.data_mu[k][self.index_AMCMC]
+					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
+					
+					slice[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
+				else:
+					X_mu = X_slice - mu[k]
+					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
+					slice_p[:,k] -= np.sum(X_mu * np.dot(X_mu,Q),1)/2.
+				slice_p[: ,k] += np.log(p[k])
 		
 		
 		
 		if self.noise_class:
-			self.prob_X[:,self.K] = self.l_noise + np.log(p[self.K])
+			slice_p[:, self.K] = self.l_noise + np.log(p[self.K])
 		if norm:
-			self.prob_X -= np.reshape(np.max(self.prob_X,1),(self.prob_X.shape[0],1))
-			self.prob_X = np.exp(self.prob_X)
-			self.prob_X /= np.reshape(np.sum(self.prob_X,1),(self.prob_X.shape[0],1))
+			slice_p -= np.reshape(np.max(slice_p,1),(n_index ,1))
+			slice_p[:] = np.exp(slice_p)
+			slice_p /= np.reshape(np.sum(slice_p,1),(n_index ,1))
+		
 		
 		for k in range(self.K):
 			if active_komp[k] == False:
-				self.prob_X[:,k] = 0.
+				slice_p[:,k] = 0.
+				
+		self.prob_X[self.index_AMCMC,:] = slice_p
+		self.slice_p = slice_p
+		
+		
+		
+		if self.AMCMC:
+			p_count_AMCMC_vec = self.p_count_AMCMC.compress(self.index_AMCMC, axis=0)
+			p_count_AMCMC_vec += 1
+			self.p_count_AMCMC[self.index_AMCMC] = p_count_AMCMC_vec
+			
+			weight = p_count_AMCMC_vec**(-self.p_rate_AMCMC)
+			one_minus_weight = 1 - weight
+			
+			p_AMCMC_vec = self.p_AMCMC.compress(self.index_AMCMC,axis=0)
+			p_AMCMC_vec *= one_minus_weight[:,np.newaxis]
+			p_AMCMC_vec[:,:(self.K  + self.noise_class)] += weight[:,np.newaxis] * slice_p
+			p_ = np.min(1-p_AMCMC_vec,1)
+			self.p_AMCMC[self.index_AMCMC,:] = p_AMCMC_vec
+			
+			
+			p_[p_ < self.min_p_AMCMC] = self.min_p_AMCMC
+			self.p_max_AMCMC[self.index_AMCMC] = p_[:,np.newaxis]
+			c = self.n_AMCMC / np.sum(self.p_max_AMCMC) 
+			self.p_max_AMCMC *= c 
 
 	def simulate_data(self,n):
 		"""
