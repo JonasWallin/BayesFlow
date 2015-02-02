@@ -2,9 +2,19 @@
 extern "C" {
 #endif
 #include <math.h>
+#ifdef MKL
+#include <mkl.h>
+#include <mkl_cblas.h>
+#define LAPACK_DPOTRF LAPACKE_dpotrf
+#define LAPACK_DPOTRI LAPACKE_dpotri
+#else
 #include "clapack.h"
 #include "cblas.h"
-#include <stdlib.h>
+#define LAPACK_DPOTRF clapack_dpotrf
+#define LAPACK_DPOTRI clapack_dpotri
+#endif
+#include <stdlib.h> 
+#include <string.h>
 
 void outer_Y(double* YYt, const double* Y, const int n, const int d)
 {
@@ -52,7 +62,7 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 		}
 	}
 
-	clapack_dpotrf( CblasRowMajor, CblasLower,d, Q_sample,d);
+	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
 	// ..., d (order of Q), Q, d (lda leading dimension), X , increment X
 	cblas_dtrsv(CblasRowMajor,CblasLower,CblasNoTrans,CblasNonUnit, d,Q_sample,d,mu_sample,1);
 
@@ -89,7 +99,7 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
 	*/
 	//choleksy
 	//triu(R)
-	clapack_dpotrf( CblasRowMajor, CblasUpper,d, phi,d);
+	LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, phi,d);
 
 		// R = chol(phi)
 	// R'* X_rand
@@ -121,8 +131,8 @@ void inv_c( double *X_inv, const double *X, const int d)
 			X_inv[d * i + j] = X[d * i + j];
 
 	}
-    clapack_dpotrf( CblasRowMajor, CblasLower,d, X_inv,d);
-    clapack_dpotri( CblasRowMajor, CblasLower,d, X_inv,d);
+    LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv,d);
+    LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv,d);
 
 
 	for( i = 0; i < d; i++)

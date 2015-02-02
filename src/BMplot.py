@@ -608,8 +608,7 @@ class CompPlot(object):
         if ks is None:
             ks = range(self.comp.K)
         ks = [self.comp_ord[k] for k in ks]            
-        okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
-        okcl = set.intersection(set(okcl),set(ks))
+        okcl = set.intersection(set(self.within_plim(plim)),set(ks))
         
         mus = [self.comp.mulat[k,:] for k in okcl]
         Sigmas = [self.comp.Sigmalat[k,:,:] for k in okcl]
@@ -643,8 +642,8 @@ class CompPlot(object):
         ks = [self.comp_ord[k] for k in ks]
         if js is None:
             js = range(self.comp.J)
-        okcl = np.nonzero((np.mean(self.comp.p,axis=0) > plim[0]) * (np.mean(self.comp.p,axis=0) < plim[1]))[0]
-        okcl = set.intersection(set(okcl),set(ks))
+
+        okcl = set.intersection(set(self.within_plim(plim)),set(ks))
         
         muspers = [[self.comp.mupers[j,k,:] for k in okcl] for j in js]
         Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in js]
@@ -655,6 +654,15 @@ class CompPlot(object):
             ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
+        
+    def within_plim(self,plim):
+        okp = np.array([True]*self.comp.K)
+        for suco in self.comp.mergeind:
+            p_suco = np.mean(np.sum(self.comp.p[:,suco],axis=1))
+            if p_suco < plim[0] or p_suco > plim[1]:
+                okp[suco] = False
+            okcl = np.nonzero(okp)[0]
+        return okcl
 
     def latent_allsamp(self,dimlist,fig=None,ks=None,plim=[0,1],js=None,plotlab=True):
         '''
@@ -824,7 +832,8 @@ class BMplot(object):
             individual component size) and colors to use for representing components.
             
             This gives canonical ordering and colors for other plots.
-        '''
+        '''      
+        maxnbrsucocol = 8
         for s,suco in enumerate(self.bmres.mergeind):
             sc_ord = np.argsort(-np.array(np.sum(self.bmres.p,axis=0)[suco]))
             self.bmres.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
@@ -834,10 +843,12 @@ class BMplot(object):
         print "mergeind_sort = {}".format(mergeind_sort)
         comp_ord = [ind for suco in mergeind_sort for ind in suco]
         cm = plt.get_cmap('gist_rainbow')
+        nbrsucocol = min(maxnbrsucocol,len(suco_ord))  
         suco_col = [(0,0,0)]*len(suco_ord)
         colors = [(0,0,0)]*len(comp_ord)
         for s,suco in enumerate(mergeind_sort):
-            suco_col[suco_ord[s]] = cm(s/len(suco_ord))
+            #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
+            suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
             for i,k in enumerate(suco):
                 colors[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
         return colors,suco_col,comp_ord,suco_ord

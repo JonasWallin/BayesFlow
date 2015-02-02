@@ -5,8 +5,17 @@ extern "C" {
 
 
 #include <math.h>
+#ifdef MKL
+#include <mkl.h>
+#include <mkl_cblas.h>
+#define LAPACK_DPOTRF LAPACKE_dpotrf
+#define LAPACK_DPOTRI LAPACKE_dpotri
+#else
 #include "clapack.h"
 #include "cblas.h"
+#define LAPACK_DPOTRF clapack_dpotrf
+#define LAPACK_DPOTRI clapack_dpotri
+#endif
 #include <stdlib.h> 
 #include <string.h>
 
@@ -71,7 +80,7 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
             sigma_inv[d * i + j] += sigma_mu_inv[d * i + j];
         }
     }
-    clapack_dpotrf( CblasColMajor, CblasUpper,d, sigma_inv,d);
+    LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasNoTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
 }
@@ -83,8 +92,8 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
 	for( j=0; j < (i + 1) ;j++)
 			sigma_inv[d * i + j] = sigma[d * i + j];
 	}
-    clapack_dpotrf( CblasColMajor, CblasUpper,d, sigma_inv,d);
-    clapack_dpotri( CblasColMajor, CblasUpper,d, sigma_inv,d);
+    LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
+    LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
 }
 
 
@@ -183,7 +192,7 @@ void chol_c( double *R, const double *X, const int d)
 
 	}
 
-    clapack_dpotrf( CblasRowMajor, CblasUpper,d, R,d);
+    LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, R,d);
 }
 
 /*

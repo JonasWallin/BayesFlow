@@ -131,7 +131,7 @@ class hierarical_mixture_mpi(object):
 				self.normal_p_wisharts[k].Sigma_class.set_prior(Sigmathprior)
 	            
 				Psiprior = {}
-				Psiprior['Qs'] = 1/prior.H[k]*np.eye(4)
+				Psiprior['Qs'] = 1/prior.H[k]*np.eye(self.d)
 				Psiprior['nus'] = prior.n_Psi[k]
 				self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
 

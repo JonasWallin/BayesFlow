@@ -421,26 +421,6 @@ class Components(object):
                     distquo[j,k] = wrongdist/corrdist
         return distquo
 
-class Components_hGMM(Components):
-    '''
-        Object containing information about mixture components
-    '''
-    
-    def __init__(self,hGMM):
-        self.K = hGMM.K
-        self.d = hGMM.d
-        self.mupers = hGMM.get_mus()
-        self.Sigmapers = hGMM.get_Sigmas()
-        self.mulat = hGMM.get_thetas()
-        nus = hGMM.get_nus()
-        Qs = hGMM.get_Qs()
-        self.Sigmalat = np.array((self.K,self.d,self.d))
-        for k in range(self.K):
-            self.Sigmalat[k,:,:] += Qs[k]/(nus[k]-self.d-1)
-        self.p = hGMM.get_ps()
-        #self.active_komp = 
-        self.J = self.mupers.shape[0]
-
 class BMres(object):
 
     def __init__(self,bmlog,bmlog_burn,data,meta_data):
@@ -604,6 +584,8 @@ class BMres(object):
             for l in range(med_prop.shape[1]):
                 prop_kl = np.array([pr[k,l] for pr in prop])
                 med_prop[k,l] = np.median(prop_kl[~np.isnan(prop_kl)])
+                if np.isnan(med_prop[k,l]):
+                    med_prop[k,l] = fixval
 
         for ind in fixvalind:
             if len(ind) == 1:
