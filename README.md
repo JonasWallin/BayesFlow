@@ -24,7 +24,9 @@ src/__init_mindep__
 src/utils/__init_mindep__  
 src/data/__init_mindep__
 ```
-for example do `mv src/__init_mindep__ src/__init__` et.c. rpy2 is needed for loading the healthyFlowData data set from R, and it is also needed for diptest computations.
+for example do `mv src/__init_mindep__ src/__init__` et.c. 
+
+rpy2 is needed for loading the healthyFlowData data set from R, and it is also needed for diptest computations.
 
 The dependecies can be obtained by following the instructions below.
 
