@@ -12,17 +12,17 @@ The package has the following dependencies:
 
 The dependence on rpy2 is not needed for core functionality, and if installation without this dependency is wanted, files
 
-src/__init__
-src/utils/__init__
-src/data/__init__
+src/\__init__ 
+src/utils/\__init__
+src/data/\__init__
 
 should be replaced by
 
-src/__init_mindep__
-src/utils/__init_mindep__
-src/data/__init_mindep__
+src/\__init_mindep__
+src/utils/\__init_mindep__
+src/data/\__init_mindep__
 
-(for example do mv src/__init_mindep__ src/__init__ et.c.)
+(for example do mv src/\__init_mindep__ src/\__init__ et.c.)
 
 The dependecies can be obtained by following the instructions below.
 
