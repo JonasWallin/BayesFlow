@@ -80,7 +80,12 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
             sigma_inv[d * i + j] += sigma_mu_inv[d * i + j];
         }
     }
+#ifdef MKL
+    LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
+#else
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#endif
+
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasNoTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
 }
@@ -92,8 +97,14 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
 	for( j=0; j < (i + 1) ;j++)
 			sigma_inv[d * i + j] = sigma[d * i + j];
 	}
+#ifdef MKL
+    LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
+    LAPACK_DPOTRI(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
+#else
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
     LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#endif
+
 }
 
 
@@ -191,8 +202,12 @@ void chol_c( double *R, const double *X, const int d)
 			R[d * j + i] = X[d * j + i];
 
 	}
-
+#ifdef MKL
+    LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, R,d);
+#else
     LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, R,d);
+#endif
+
 }
 
 /*

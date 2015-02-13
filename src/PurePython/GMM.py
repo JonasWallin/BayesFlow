@@ -781,11 +781,17 @@ class mixture(object):
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
 	def deactivate_outlying_components(self):
+		any_deactivated = 0
 		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
 		for k in range(self.K):
-			dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
-			if np.argmin(dist) != k:
-				self.deactivate_component(k)
+			if not np.isnan(self.mu[k]).any():
+				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+				if np.argmin(dist) != k:
+					self.deactivate_component(k)
+					any_deactivated = 1
+		if np.sum(self.active_komp) == 0:
+			print "All components deactivated"
+		return any_deactivated
 	
 	def deactivate_component(self,k_off):
 		self.active_komp[k_off] = False

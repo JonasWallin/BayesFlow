@@ -351,6 +351,17 @@ class Components(object):
         self.p = p
         self.active_komp = bmlog.active_komp
         
+    def classif(self,Y,j):
+        mus = self.mupers[j,:,:]
+        Sigmas = self.Sigmapers[j,:,:,:]
+        ps = self.p[j,:]
+        dens = np.empty((Y.shape[0],mus.shape[0]))
+        for k in range(mus.shape[0]):
+            Ycent = Y - mus[k,:]
+            dens[:,k] = np.log(ps[k]) - np.log(np.linalg.det(Sigmas[k]))/2 - np.log(np.sum(Ycent*np.linalg.solve(Sigmas[k],Ycent.T),axis=1))/2
+        dens[np.isnan(dens)] = -np.inf
+        return np.argmax(dens,axis=1)
+
     def get_bh_dist(self):
         '''
             Get bhattacharyya distance between components.

@@ -719,9 +719,10 @@ class CompPlot(object):
 
 class TracePlot(object):
     
-    def __init__(self,traces):
+    def __init__(self,traces,order):
         self.traces = traces
         self.traces.plot = self
+        self.order = order
         
     def all(self,fig = None):
         '''
@@ -742,7 +743,7 @@ class TracePlot(object):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        ax.plot(self.traces.ind, self.traces.get_mulat_k(k))
+        ax.plot(self.traces.ind, self.traces.get_mulat_k(self.order[k]))
         ax.set_xlim(0,self.traces.ind[-1])
         ax.set_ylim(-.2,1.2)
         ax.axes.yaxis.set_ticks([0.1,0.9])
@@ -778,17 +779,20 @@ class FCplot(object):
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
         
-    def histnd(self,Nsamp=None,bins=50,fig = None):
+    def histnd(self,Nsamp=None,bins=50,fig = None,xlim=None,ylim=None):
         '''
             Plot panel of 1D and 2D histograms of a given sample (synthetic or real).
         '''
         if fig == None:
             fig = plt.figure()
         histnd(self.fcsample.get_data(Nsamp),bins,[0, 100],[5,95],fig,self.marker_lab)
-#        for ax in fig.axes:
-#            ax.set_xlim((-.1,1.1))
-#        if ax.get_ylim()[1] < 5:
-#            ax.set_ylim(-.1,1.1)
+        if not xlim is None:
+            for ax in fig.axes:
+                ax.set_xlim(*xlim)
+        if not ylim is None:
+            for ax in fig.axes:
+                if ax.get_ylim()[1] < 5:
+                    ax.set_ylim(*ylim)
         
 class BMplot(object):
     
@@ -800,7 +804,7 @@ class BMplot(object):
         if hasattr(bmres,'clust_m'):
             self.clp_m = ClustPlot(bmres.clust_m,self.suco_colors,self.suco_ord)
         self.cop = CompPlot(bmres.components,self.comp_colors,self.comp_ord,self.suco_ord)
-        self.trp = TracePlot(bmres.traces)
+        self.trp = TracePlot(bmres.traces,self.comp_ord)
         
         self.mcsp = []
         for mimic_key in bmres.mimics:

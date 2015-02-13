@@ -18,6 +18,8 @@ class HMlogB(object):
         self.noise_class = hGMM.noise_class
         self.set_names(hGMM)
         self.active_komp_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
+        self.active_komp_curr_loc = np.ones((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
+        self.tmp_active_comp_curr_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.lab_sw = []
         self.i = -1
         if MPI.COMM_WORLD.Get_rank() == 0:
@@ -30,17 +32,29 @@ class HMlogB(object):
             Save burn-in iteration
         '''
         self.nextsim()
-        nus = hGMM.get_nus() 
+        rank = MPI.COMM_WORLD.Get_rank()
+        debug = False
+        nus = hGMM.get_nus()
         if self.i % self.savefrq == 0:
             thetas = hGMM.get_thetas()       
             if MPI.COMM_WORLD.Get_rank() == 0:
                 self.append_theta(thetas)
                 self.append_nu(nus)
+            
         for j,GMM in enumerate(hGMM.GMMs):
-            self.active_komp_loc[j,:] += GMM.active_komp
+            self.tmp_active_comp_curr_loc[j,:] = GMM.active_komp         
             if np.amax(GMM.lab) > -1:
-                self.lab_sw.append(GMM.lab)
-                print "Label switch: {}".format(GMM.lab)
+                self.lab_sw.append([GMM.lab])
+                print "Label switch iteration {}, sample {} at rank {}: {}".format(self.i,j,MPI.COMM_WORLD.Get_rank(), GMM.lab)
+        self.active_komp_loc += self.tmp_active_comp_curr_loc
+        on_or_off = np.nonzero(self.tmp_active_comp_curr_loc - self.active_komp_curr_loc)
+        if len(on_or_off[0]) > 0:
+            print "Components switched on or off at iteration {} rank {}, samples: {}, components {}".format(self.i,MPI.COMM_WORLD.Get_rank(),on_or_off[0],on_or_off[1])
+        self.active_komp_curr_loc = np.copy(self.tmp_active_comp_curr_loc)
+        if debug:
+            print "savesim ok at iter {} at rank {}".format(self.i,rank)
+
+
         return nus
         
     def cat(self,hmlog):
@@ -60,8 +74,13 @@ class HMlogB(object):
         '''
            Post-processing burn-in iterations
         '''
-        self.set_active_komp() 
+        debug = False        
+        self.set_active_komp()
+        if debug:
+            print "active komp set"
         self.set_lab_sw()
+        if debug:
+            print "lab switch set"
     
     def nextsim(self):
         self.i += 1
@@ -77,6 +96,7 @@ class HMlogB(object):
         
     def set_lab_sw(self):
         comm = MPI.COMM_WORLD
+        print "self.lab_sw = {}".format(self.lab_sw)
         if len(self.lab_sw) > 0:
             lab_sw_loc = np.array(np.vstack(self.lab_sw),dtype = 'i')
         else:
@@ -102,6 +122,7 @@ class HMlogB(object):
             counts = np.empty(comm.Get_size(),dtype = 'i')
         else:
             counts = 0
+        print "self.active_komp_loc at rank {}: \n {}".format(comm.Get_rank(),self.active_komp_loc)
         comm.Gather(sendbuf=[np.array(self.active_komp_loc.shape[0] * self.active_komp_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
 
         if comm.Get_rank() == 0:

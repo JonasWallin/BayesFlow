@@ -534,8 +534,22 @@ class hierarical_mixture_mpi(object):
 			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
 
 	def deactivate_outlying_components(self):
+		any_deactivated = 0
 		for GMM in self.GMMs:
-			GMM.deactivate_outlying_components()
+			any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components())
+			
+		if self.comm.Get_rank() == 0:
+			any_deactivated_all = np.empty(self.comm.Get_size(),dtype = 'i')
+		else:
+			any_deactivated_all = 0
+		self.comm.Gather(sendbuf=[np.array(any_deactivated,dtype='i'), MPI.INT], recvbuf=[any_deactivated_all, MPI.INT], root=0)
+		if self.comm.Get_rank() == 0:
+			any_deactivated = np.array([max(any_deactivated_all)])
+		else:
+			any_deactivated = np.array([any_deactivated])
+		self.comm.Bcast([any_deactivated, MPI.INT],root=0)
+		
+		return any_deactivated
 
 	def get_thetas(self):
 		"""
@@ -791,6 +805,7 @@ class hierarical_mixture_mpi(object):
 		
 
 	def simulate(self,simpar,name='simulation',printfrq=100):
+		debug = False
 		iterations = np.int(simpar['iterations'])
 		self.set_simulation_param(simpar)
 		hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
@@ -798,8 +813,13 @@ class hierarical_mixture_mpi(object):
 			if i%printfrq == 0 and self.comm.Get_rank() == 0:
 				print "{} iteration = {}".format(name,i)
 			self.sample()
-			hmlog.savesim(self) 
+			hmlog.savesim(self)
+			#print "iterations = {} at rank {}".format(iterations,MPI.COMM_WORLD.Get_rank())
+		if debug:
+			print "Iterations done at rank {}".format(MPI.COMM_WORLD.Get_rank())
 		hmlog.postproc()
+		if debug:
+			print "Postproc done"
 		
 		return hmlog
 

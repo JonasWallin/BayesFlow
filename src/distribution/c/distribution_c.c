@@ -62,7 +62,11 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 		}
 	}
 
+#ifdef MKL
+	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, Q_sample,d);
+#else
 	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
+#endif
 	// ..., d (order of Q), Q, d (lda leading dimension), X , increment X
 	cblas_dtrsv(CblasRowMajor,CblasLower,CblasNoTrans,CblasNonUnit, d,Q_sample,d,mu_sample,1);
 
@@ -99,8 +103,11 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
 	*/
 	//choleksy
 	//triu(R)
+#ifdef MKL
+	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, phi,d);
+#else
 	LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, phi,d);
-
+#endif
 		// R = chol(phi)
 	// R'* X_rand
 	// M(d) N(d), alpha (1), A (phi), leading dim of A (d),B (X_rand), leading dim of B (d)
@@ -131,9 +138,13 @@ void inv_c( double *X_inv, const double *X, const int d)
 			X_inv[d * i + j] = X[d * i + j];
 
 	}
+#ifdef MKL
+    LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
+    LAPACK_DPOTRI(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
+#else
     LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv,d);
     LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv,d);
-
+#endif
 
 	for( i = 0; i < d; i++)
 	{
