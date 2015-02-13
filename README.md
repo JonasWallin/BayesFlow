@@ -2,47 +2,57 @@ BayesFlow
 ========
 version 0.1
 
-The package depends on python (including packages numpy, scipy, mpi4py...), openmpi, gfortran and BLAS.
+Dependencies
+------------------
+The package has the following dependencies:
+- Python, including packages numpy, cython, matplotlib, mpi4py and rpy2
+- openmpi
+- C libraries for linear algebra computations, e.g. cblas and clapack or mkl. 
+- gfortran
 
-Obtaining dependencies
-===========================
+The dependence on rpy2 is not needed for core functionality, and if installation without this dependency is wanted, files
+
+src/__init__
+src/utils/__init__
+src/data/__init__
+
+should be replaced by
+
+src/__init_mindep__
+src/utils/__init_mindep__
+src/data/__init_mindep__
+
+(for example do mv src/__init_mindep__ src/__init__ et.c.)
+
+The dependecies can be obtained by following the instructions below.
 
 Ubuntu
 -----------
 
-sudo apt-get install python, openmpi, gcc
+sudo apt-get install gcc, python, openmpi
 
-
-sudo pip install numpy
-
-sudo pip install scipy
-
-sudo pip install mpi4py
+sudo pip install numpy, cython, matplotlib, mpi4py, rpy2
 
 Mac
 ----------------
-### Using homebrew (can be installed from brew.sh)
+Python can be installed either using homebrew (http://brew.sh) or MacPorts (https://www.macports.org/). If you do not already have installed any of them, we recommend installing homebrew.
 
-brew install python
+For linear algebra c libraries, you can use the BLAS and LAPACK distributions provided in the Accelerate veclib framework.
 
-brew install openmpi
+### Install Python and openmpi
 
-brew install gcc
+#### Using homebrew
 
+brew install python, openmpi
 
-#### Install python packages
+#### Using MacPorts
 
-pip install numpy
+To be written.
 
-pip install scipy
+### Install Python packages
 
-pip install mpi4py
+pip install numpy, cython, matplotlib, mpi4py, rpy2
 
-
-You can use the BLAS installed in the Accelerate veclib framework.
-
-
-### Using MacPorts
 
 
 TODO
