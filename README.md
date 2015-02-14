@@ -6,9 +6,8 @@ version 0.1
 
 The package has the following dependencies:
 - Python, including packages numpy, cython, matplotlib, mpi4py and rpy2
-- openmpi
-- C libraries for linear algebra computations, e.g. cblas and clapack or mkl. 
-- gfortran
+- Openmpi
+- Libraries for linear algebra computations with c interfaces, e.g. cblas and clapack or mkl. 
 
 The dependence on rpy2 is not needed for core functionality, and if installation without this dependency is wanted, files
 
