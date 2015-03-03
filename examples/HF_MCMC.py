@@ -11,22 +11,13 @@ import timer
 
 timer = timer.Timer()
 
-'''
-    Define home directory
-'''
-
-if 0:
-    homedir = '/Users/johnsson/'
-else:
-    homedir = '/home/johnsson/'
-
 
 '''
     Define file with experimental setup and directory where results are saved
 '''
 setupfile = 'exp_setup_HF.py'
 
-expdir = homedir+'Forskning/Experiments/FlowCytometry/BHM/HF/informed/'
+expdir = '../results/HF/'
 
 '''
     Load experimental setup

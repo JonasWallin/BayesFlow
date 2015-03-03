@@ -43,7 +43,7 @@ class mixture(PurePython.GMM.mixture):
 		self.x_count = np.empty(self.K + 1,dtype=np.int)
 		
 	def set_data(self, data):
-		if data != None:
+		if not data is None:
 			super(mixture,self).set_data(data)
 			self.x_index = np.empty((self.n, self.K),dtype=np.int)
 		
@@ -80,16 +80,16 @@ class mixture(PurePython.GMM.mixture):
 			if np.isnan(mu[0]) == 1:
 					return 0, None, None, None
 			
-			if R_S_mu == None:
+			if R_S_mu is None:
 					R_S_mu = GMM_util.cholesky(self.prior[k]['mu']['Sigma'])
 					#R_S_mu = sla.cho_factor(self.prior[k]['mu']['Sigma'],check_finite = False)
 					
 			
 			
-			if log_det_Q == None:
+			if log_det_Q is None:
 					log_det_Q = GMM_util.log_det(self.prior[k]['sigma']['Q'])
 			
-			if R_S == None:
+			if R_S is None:
 					R_S = GMM_util.cholesky(Sigma)
 					#R_S = sla.cho_factor(Sigma,check_finite = False)
 			
@@ -143,10 +143,10 @@ class mixture(PurePython.GMM.mixture):
 	def calc_lik_vec(self, mu = None, sigma = None, p = None, active_komp = None):
 		
 		self.compute_ProbX(norm=False, mu = mu, sigma = sigma,p = p, active_komp =  active_komp)
-		if p == None:
+		if p is None:
 			p = self.p
 		
-		if active_komp == None:
+		if active_komp is None:
 			active_komp = self.active_komp
 			
 		
@@ -162,7 +162,7 @@ class mixture(PurePython.GMM.mixture):
 		"""
 			Computes the E[x=i|\mu,\Sigma,p,Y] 
 		"""
-		if mu == None:
+		if mu is None:
 			mu = self.mu
 			sigma = self.sigma
 			high_memory = self.high_memory
@@ -170,7 +170,7 @@ class mixture(PurePython.GMM.mixture):
 		else:
 			high_memory = False
 			
-		if active_komp == None:
+		if active_komp is None:
 			active_komp = self.active_komp
 		l = np.empty(self.n, order='C' )
 		for k in range(self.K):

@@ -44,7 +44,7 @@ class nu_class(object):
 		
 		self.sigma = 5
 		self.iterations =  5
-		if prior_func == None:
+		if prior_func is None:
 			self.prior = {'nu':0.01}
 			self.prior_func = f_prior_nu
 	
@@ -61,7 +61,7 @@ class nu_class(object):
 		
 		self.calc_lik = False
 		self.d = d
-		if self.nu == None:
+		if self.nu is None:
 			self.nu = 2*self.d
 		self.ln_gamma_d = ln_gamma_d(self.d)
 		
@@ -94,7 +94,7 @@ class nu_class(object):
 		"""
 		self.calc_lik = False	
 		self.logDetSigma = 0
-		if det_data == None:
+		if det_data is None:
 			self.n  = len(data)
 			for Sigma in data:
 				self.logDetSigma += np.log(np.linalg.det(Sigma))

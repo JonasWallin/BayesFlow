@@ -23,7 +23,7 @@ class SimulationParam(object):
 
         self.seed = 15
         
-        nbriter = 200000
+        nbriter = 2000
         self.nbriter = nbriter
         self.printfrq = 100
         

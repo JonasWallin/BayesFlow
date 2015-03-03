@@ -1,6 +1,6 @@
 .PHONY: default, article
 
-MPIEXEC=mpiexec -n 10
+MPIEXEC=mpiexec -n 4
 PYTHON=python
 
 article:
@@ -11,3 +11,6 @@ default:
 	
 example:
 	${MPIEXEC} ${PYTHON} example_hGMM_simulated_MPI.py
+
+HF:
+	echo 100 | ${MPIEXEC} ${PYTHON} HF_MCMC.py

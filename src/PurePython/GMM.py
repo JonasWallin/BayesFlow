@@ -105,7 +105,7 @@ class mixture(object):
 			
 		self.high_memory = high_memory
 		self.prior = cp.deepcopy(prior)
-		if data != None:
+		if not data is None:
 			self.set_data(data)
 
 
@@ -189,7 +189,7 @@ class mixture(object):
 		"""
 		
 		
-		if self.data  == None:
+		if self.data  is None:
 				raise ValueError, 'need data to be loaded first'
 		
 		self.noise_class = 1
@@ -384,7 +384,7 @@ class mixture(object):
 		mu_prior = {"theta":np.zeros((self.d ,1)),"Sigma":np.diag(np.diag(cov_data))*10**4 }
 		sigma_prior = {"nu":self.d, "Q":np.eye(self.d )*10**-6}
 		self.alpha_vec = 0.5*np.ones(self.K) 
-		if self.prior == None:
+		if self.prior is None:
 			self.prior =[]
 			for i in range(self.K):  # @UnusedVariable
 				self.prior.append({"mu":cp.deepcopy(mu_prior), "sigma": cp.deepcopy(sigma_prior),"p": 1/2.})
@@ -538,15 +538,15 @@ class mixture(object):
 			if np.isnan(mu[0]) == 1:
 					return 0, None, None, None
 			
-			if R_S_mu == None:
+			if R_S_mu is None:
 					R_S_mu = sla.cho_factor(self.prior[k]['mu']['Sigma'],check_finite = False)
 			log_det_Sigma_mu = 2 * np.sum(np.log(np.diag(R_S_mu[0])))
 			
-			if log_det_Q == None:
+			if log_det_Q is None:
 					R_Q = sla.cho_factor(self.prior[k]['sigma']['Q'],check_finite = False)
 					log_det_Q = 2 * np.sum(np.log(np.diag(R_Q[0])))
 			
-			if R_S == None:
+			if R_S is None:
 					R_S = sla.cho_factor(Sigma,check_finite = False)
 			log_det_Sigma	= 2 * np.sum(np.log(np.diag(R_S[0])))
 			
@@ -634,7 +634,7 @@ class mixture(object):
 		
 		
 		self.compute_ProbX(norm=False, mu = mu, sigma = sigma,p = p, active_komp =  active_komp)
-		if active_komp == None:
+		if active_komp is None:
 			active_komp = self.active_komp
 		l = np.zeros(self.n)
 		for k in range(self.K + self.noise_class): 
@@ -667,14 +667,14 @@ class mixture(object):
 		"""
 			Computes the E[x=i|\mu,\Sigma,p,Y] 
 		"""
-		if mu == None:
+		if mu is None:
 			mu = self.mu
 			sigma = self.sigma
 			high_memory = self.high_memory
 			p = self.p
 		else:
 			high_memory = False
-		if active_komp == None:
+		if active_komp is None:
 			active_komp = self.active_komp
 		
 		if self.AMCMC:
