@@ -152,7 +152,13 @@ class Clustering(object):
         
     def hclean(self):
         removed_comp = self.p[0,:] == 2
-        self.classif_freq = [clf[:,~removed_comp] for clf in self.classif_freq]
+        #print "removed_comp.shape = {}".format(removed_comp.shape)
+        #print "np.hstack([removed_comp,True]) = {}".format(np.hstack([removed_comp,True]))
+        if self.p.shape[1] < self.classif_freq[0].shape[1]:
+            removed_comp_freq = np.hstack([removed_comp,False])
+        else:
+            removed_comp_freq = removed_comp
+        self.classif_freq = [clf[:,~removed_comp_freq] for clf in self.classif_freq]
         self.p = self.p[:,~removed_comp]
         self.K = self.p.shape[1]
         print "Sizes of merged clusters: {}".format(self.p)
@@ -351,14 +357,30 @@ class Components(object):
         self.p = p
         self.active_komp = bmlog.active_komp
         
-    def classif(self,Y,j):
-        mus = self.mupers[j,:,:]
-        Sigmas = self.Sigmapers[j,:,:,:]
-        ps = self.p[j,:]
+    def classif(self,Y,j,p_noise = None,mu_noise=0.5*np.ones((1,4)),Sigma_noise = 0.5**2*np.eye(4)):
+        '''
+            Classify data points according to highest likelihood by mixture model.
+            Input:
+            
+                Y (Nxd)     -   data
+                j           -   sample number
+                p_noise     -   noise component probability
+                mu_noise    -   noise component mean
+                Sigma_noise -   noise component covariance matrix
+        '''
+        if not p_noise is None:
+            mus = np.vstack([self.mupers[j,:,:],mu_noise.reshape(1,self.d)])
+            Sigmas = np.vstack([self.Sigmapers[j,:,:,:],Sigma_noise.reshape(1,self.d,self.d)])
+            ps = np.vstack([self.p[j,:].reshape(-1,1),np.array(p_noise[j]).reshape(1,1)])
+        else:
+            mus = self.mupers[j,:,:]
+            Sigmas = self.Sigmapers[j,:,:,:]
+            ps = self.p[j,:]
+            
         dens = np.empty((Y.shape[0],mus.shape[0]))
         for k in range(mus.shape[0]):
             Ycent = Y - mus[k,:]
-            dens[:,k] = np.log(ps[k]) - np.log(np.linalg.det(Sigmas[k]))/2 - np.log(np.sum(Ycent*np.linalg.solve(Sigmas[k],Ycent.T),axis=1))/2
+            dens[:,k] = np.log(ps[k]) - np.log(np.linalg.det(Sigmas[k,:,:]))/2 - np.sum(Ycent*np.linalg.solve(Sigmas[k,:,:],Ycent.T).T,axis=1)/2
         dens[np.isnan(dens)] = -np.inf
         return np.argmax(dens,axis=1)
 
@@ -410,6 +432,7 @@ class Components(object):
             for k in range(self.K):
                 if self.active_komp[j,k] <= 0.05:
                     covdist[j,k] = np.nan
+                else:
                     if norm == 'F':
                         covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:])
                     elif norm == 2:
@@ -542,8 +565,8 @@ class BMres(object):
         self.clust_m.hclean()
         print "self.mergeind = {}".format(self.mergeind)
         
-        left_comp = np.array([suco[0] for suco in self.mergeind])
-        print "left_comp = {}".format(left_comp)
+        #left_comp = np.array([suco[0] for suco in self.mergeind])
+        #print "left_comp = {}".format(left_comp)
 
     def gclean(self):
         self.clust_m.gclean(self.mergeind)

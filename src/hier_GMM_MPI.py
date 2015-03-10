@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr
 import os
 import glob
+import time
 
 #TODO: change to geomtrical median instead of mean!!
 def distance_sort(hGMM):
@@ -110,37 +111,6 @@ class hierarical_mixture_mpi(object):
 			self.set_prior(prior,init=True)
 		if not sim_param is None:
 			self.set_simulation_param(sim_param)
-
-	def set_prior(self, prior, init = False):
-		
-		self.set_prior_param0()
-		if prior.noise_class:
-			self.add_noise_class(mu = prior.noise_mu, Sigma = prior.noise_Sigma)
-		
-		rank = self.comm.Get_rank()
-		if rank == 0:
-			for k in range(self.K):
-				thetaprior = {}
-				thetaprior['mu'] = prior.t[k,:]
-				thetaprior['Sigma'] = np.diag(prior.S[k,:])
-				self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
-	            
-				Sigmathprior = {}
-				Sigmathprior['Q'] = prior.Q[k]*np.eye(self.d)
-				Sigmathprior['nu'] = prior.n_theta[k]
-				self.normal_p_wisharts[k].Sigma_class.set_prior(Sigmathprior)
-	            
-				Psiprior = {}
-				Psiprior['Qs'] = 1/prior.H[k]*np.eye(self.d)
-				Psiprior['nus'] = prior.n_Psi[k]
-				self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
-
-		for GMM in self.GMMs:
-			GMM.alpha_vec = prior.a
-			
-		if init:
-			self.set_latent_init(prior)
-			self.set_GMM_init()
 	
 	def save_prior_to_file(self,dirname):
 		"""
@@ -502,7 +472,51 @@ class hierarical_mixture_mpi(object):
 		
 		#storing the size of the data used later when sending data
 		self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
+
+	def set_prior(self, prior, init = False):
 		
+		self.set_prior_param0()
+		if prior.noise_class:
+			self.add_noise_class(mu = prior.noise_mu, Sigma = prior.noise_Sigma)
+
+		self.set_location_prior(prior)
+		self.set_var_prior(prior)
+
+		for GMM in self.GMMs:
+			GMM.alpha_vec = prior.a
+			
+		if init:
+			self.set_latent_init(prior)
+			self.set_GMM_init()
+
+	def set_location_prior(self,prior):
+		if self.comm.Get_rank() == 0:
+			for k in range(self.K):
+				thetaprior = {}
+				thetaprior['mu'] = prior.t[k,:]
+				thetaprior['Sigma'] = np.diag(prior.S[k,:])
+				self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
+				
+	def set_var_prior(self,prior):
+		self.set_Sigma_theta_prior(prior.Q,prior.n_theta)
+		self.set_Psi_prior(prior.H,prior.n_Psi)
+
+	def set_Sigma_theta_prior(self,Q,n_theta):
+		if self.comm.Get_rank() == 0:
+			for k in range(self.K):
+				Sigmathprior = {}
+				Sigmathprior['Q'] = Q[k]*np.eye(self.d)
+				Sigmathprior['nu'] = n_theta[k]
+				self.normal_p_wisharts[k].Sigma_class.set_prior(Sigmathprior)
+				
+	def set_Psi_prior(self,H,n_Psi):
+		if self.comm.Get_rank() == 0:
+			for k in range(self.K):	            
+				Psiprior = {}
+				Psiprior['Qs'] = 1/H[k]*np.eye(self.d)
+				Psiprior['nus'] = n_Psi[k]
+				self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
+				
 	def set_latent_init(self,prior):
 		rank = self.comm.Get_rank()
 		if rank == 0:
@@ -532,6 +546,7 @@ class hierarical_mixture_mpi(object):
 		for GMM in self.GMMs:
 			GMM.set_param(param)
 			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
+			GMM.active_komp = np.ones(self.K+self.noise_class,dtype='bool')
 
 	def deactivate_outlying_components(self):
 		any_deactivated = 0
@@ -823,3 +838,53 @@ class hierarical_mixture_mpi(object):
 		
 		return hmlog
 
+	def simulate_timed(self,simpar,name='simulation',printfrq=100):
+		t_GMM = 0
+		t_load = 0
+		t_rest = 0
+		t_save = 0
+		debug = False
+		iterations = np.int(simpar['iterations'])
+		self.set_simulation_param(simpar)
+		hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
+		for i in range(iterations):
+			if i%printfrq == 0 and self.comm.Get_rank() == 0:
+				print "{} iteration = {}".format(name,i)
+				print("hgmm GMM  %.4f sec/sim"%(t_GMM/(i+1)))
+				print("hgmm load  %.4f sec/sim"%(t_load/(i+1)))
+				print("hgmm rank=0  %.4f sec/sim"%(t_rest/(i+1)))
+				print("save  %.4f sec/sim"%(t_save/(i+1)))
+			if  self.comm.Get_rank() == 0:
+				t0 = time.time()
+        		for GMM in self.GMMs:
+        			GMM.sample() 
+											
+			if  self.comm.Get_rank() == 0:
+				t1 = time.time()
+				t_GMM += np.double(t1-t0) 
+        		self.update_prior()
+										
+			if  self.comm.Get_rank() == 0:
+				t2 = time.time()
+				t_load += np.double(t2-t1) 
+        		if self.comm.Get_rank() == 0:
+        			for k in range(self.K):
+        				self.normal_p_wisharts[k].sample()
+        				self.wishart_p_nus[k].sample()
+        		self.comm.Barrier()
+        		self.update_GMM()
+			if  self.comm.Get_rank() == 0:
+				t3 = time.time()
+				t_rest += np.double(t3-t2) 
+  
+			hmlog.savesim(self)
+			if  self.comm.Get_rank() == 0:
+				t4 = time.time()
+				t_save += np.double(t4-t3) 
+		if debug:
+			print "Iterations done at rank {}".format(MPI.COMM_WORLD.Get_rank())
+		hmlog.postproc()
+		if debug:
+			print "Postproc done"
+		
+		return hmlog

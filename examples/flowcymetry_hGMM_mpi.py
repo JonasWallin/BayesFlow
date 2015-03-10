@@ -93,7 +93,7 @@ if hGMM.comm.Get_rank() == 0:
 	print    ('all tasks, max:  %8.2f seconds' % max(wct))
 	print    ('all tasks, sum:  %8.2f seconds' % sum(wct))
 	print("sim = %d"%sim)
-hGMM.plot_GMM_scatter_all([0, 1])
+bm.plot.plot_GMM_scatter_all(hGMM,[0, 1])
 #plt.show()
 
 for k, GMM in enumerate(hGMM.GMMs):

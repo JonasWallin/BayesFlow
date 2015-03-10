@@ -24,13 +24,15 @@ setup(name='BayesFlow',
                                library_dirs = [os.environ['MKLROOT']+'/lib/intel64'],
                                libraries=['mkl_intel_lp64', 'mkl_core', 'mkl_sequential', 'pthread', 'm'],
                                include_dirs = [get_include(),os.environ['MKLROOT']+'/include'],
-                               extra_compile_args=['-DMKL'],
+                               extra_compile_args=['-m64','-Wl,--no-as-needed','-DMKL'],
+                               extra_link_args = ['-Wl,--no-as-needed'],
                                language='c')
                 ,Extension("BayesFlow.distribution.distribution_cython",sources=["src/distribution/distribution_cython.pyx","src/distribution/c/distribution_c.c"],
                                library_dirs = [os.environ['MKLROOT']+'/lib/intel64'],
                                libraries=['mkl_intel_lp64', 'mkl_core', 'mkl_sequential', 'pthread', 'm'],
                                include_dirs = [get_include(),os.environ['MKLROOT']+'/include'],
-                               extra_compile_args=['-DMKL'],
+                               extra_compile_args=['-m64','-DMKL'],
+                               extra_link_args = ['-Wl,--no-as-needed'],
                                language='c')],
       )
 

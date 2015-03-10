@@ -495,13 +495,13 @@ class ClustPlot(object):
         if len(dim) == 2:
             for k in range(self.clust.K):
                 ax.plot(data[x==k,0],data[x==k, 1],'+',label='k = %d'%(k+1),color=self.colors[k])
-            ax.plot(data[x==self.clust.K,0],data[x==self.clust.K,1],label='outliers',color='black')
+            ax.plot(data[x==self.clust.K,0],data[x==self.clust.K,1],'+',label='outliers',color='black')
         
         elif len(dim) == 3:
             ax = fig.gca(projection='3d')
             for k in range(self.clust.K):
                 ax.plot(data[x==k,0],data[x==k,1],data[x==k,2],'+',label='k = %d'%(k+1),color=self.colors[k])
-            ax.plot(data[x==self.clust.K,0],data[x==self.clust.K,1],data[x==self.clust.K,2],label='outliers',color='black')
+            ax.plot(data[x==self.clust.K,0],data[x==self.clust.K,1],data[x==self.clust.K,2],'+',label='outliers',color='black')
     						
         return fig, ax
         
