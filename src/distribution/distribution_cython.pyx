@@ -48,10 +48,10 @@ cdef class  multivariatenormal:
 			prior['Sigma'] = np.array(dim=2)
 		'''
 		self.n = 0
-		if prior != None:
+		if not prior is None:
 			self.set_prior(prior)
 		
-		if param != None:
+		if not param is None:
 			self.set_parameter(param)
 
 
@@ -199,10 +199,10 @@ cdef class invWishart:
 		'''
 		self.d = 0
 		self.n = 0 
-		if prior != None:
+		if not prior is None:
 			self.set_prior(prior)
 		
-		if param != None:
+		if not param is None:
 			self.set_parameter(param)
 		
 		
@@ -276,7 +276,7 @@ cdef class invWishart:
 			Y - (nxd) numpy vector
 		"""
 		self.n = Y.shape[0]
-		if sumY == None:
+		if sumY is None:
 			sum_Y( <double *> self.sumY.data, &Y[0,0], self.n, self.d)
 		else:
 			self.sumY = sumY 
@@ -354,10 +354,10 @@ cdef class Wishart:
 		self.d   = 0
 		self.nu  = 0
 		self.nu_s = 0
-		if param != None:
+		if not param is None:
 			self.set_parameter(param)
 		
-		if prior != None:
+		if not prior is None:
 			self.set_prior(prior)
 
 
@@ -419,7 +419,7 @@ cdef class Wishart:
 			Sigma is a list containg sigmas
 		"""
 		
-		if Qs == None:
+		if Qs is None:
 			self.n = len(Sigmas)
 			self.Q = np.zeros((self.d, self.d))
 			for Sigma in Sigmas:
