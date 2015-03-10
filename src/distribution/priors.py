@@ -35,10 +35,10 @@ class normal_p_wishart(object):
 		self.theta_class = multivariatenormal()
 		self.Sigma_class = invWishart() 
 		self.param = {}
-		if prior != None:
+		if not prior is None:
 			self.set_prior(prior)
 		
-		if param != None:
+		if not param is None:
 			self.set_parameter(param)
 			
 			
@@ -144,10 +144,10 @@ class Wishart_p_nu(object):
 		self.nu_class = nu_class()
 		self.Q_class  = Wishart()
 		self.param = {}
-		if prior != None:
+		if not prior is None:
 			self.set_prior(prior)
 		
-		if param != None:
+		if not param is None:
 			self.set_parameter(param)
 		
 	def set_MH_param(self, sigma = 5, iterations = 5):	
@@ -200,7 +200,7 @@ class Wishart_p_nu(object):
 			data - list of np.array[dim = 2]
 		"""
 		
-		if Qs == None:
+		if Qs is None:
 			self.Q_class.set_data(Sigmas = Sigmas)
 			self.nu_class.set_data(data = Sigmas)
 	
