@@ -58,6 +58,13 @@ class HMlogB(object):
         return nus
         
     def cat(self,hmlog):
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            if self.noise_class and not hmlog.noise_class:
+                hmlog.active_komp = np.hstack([hmlog.active_komp,np.zeros((hmlog.active_komp.shape[0],1))])
+                hmlog.noise_class = 1
+            if not self.noise_class and hmlog.noise_class:
+                self.active_komp = np.hstack([self.active_komp,np.zeros((self.active_komp.shape[0],1))])
+                self.noise_class = 1
         if self.savefrq != hmlog.savefrq:
             warnings.warn('Savefrq not compatible: {} vs {}'.format(self.savefrq,hmlog.savefrq))
         if MPI.COMM_WORLD.Get_rank() == 0:

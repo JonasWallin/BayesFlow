@@ -749,15 +749,15 @@ class mixture(object):
 	def simulate_data(self,n):
 		"""
 			simulates data using current Sigma, mu, p
-			if there exists noise class it will not be used
+			if there exists noise class it __will__ be used
 		"""
 		
 		p = np.zeros_like(self.p)
 		p[:] = self.p[:]
 		p[np.isnan(p)] = 0 
-		if self.noise_class:
-			p = p[:-1]
-			p /= np.sum(p)		
+		#if self.noise_class:
+		#	p = p[:-1]
+		#	p /= np.sum(p)		
 		x_ = npr.multinomial(1, p, size=n)
 		_, x = np.where(x_)  
 		X =np.zeros((n,self.d))
@@ -765,19 +765,25 @@ class mixture(object):
 			n_count = np.sum(x == k)
 			x_ = npr.multivariate_normal(self.mu[k], self.sigma[k],size = n_count)
 			X[x == k,:] = x_
+		if self.noise_class:
+			n_count = np.sum(x == self.K)
+			x_ = npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = n_count)
+			X[x == self.K,:] = x_
 		return X
 	
 	def simulate_one_obs(self):
 		"""
-			if there exists noise class it will not be used
+			if there exists noise class it __will__ be used
 		"""
 		p = np.zeros_like(self.p)
 		p[:] = self.p[:]
 		p[np.isnan(p)] = 0 
-		if self.noise_class:
-			p = p[:-1]
-			p /= np.sum(p)
-		x = npr.choice(range(self.K),p = p)
+		#if self.noise_class:
+		#	p = p[:-1]
+		#	p /= np.sum(p)
+		x = npr.choice(range(self.K+self.noise_class),p = p)
+		if x == self.K:
+			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
 	def deactivate_outlying_components(self):

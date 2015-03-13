@@ -16,6 +16,7 @@ import numpy.random as npr
 import os
 import glob
 import time
+import warnings
 
 #TODO: change to geomtrical median instead of mean!!
 def distance_sort(hGMM):
@@ -76,6 +77,16 @@ def load_hGMM(dirname):
 	hGMM.load_from_file(dirname)
 	return hGMM
 
+class SimulationError(Exception):
+	def __init__(self,msg,name='',it=0):
+		self.msg = msg
+		self.name = name
+		self.iteration = it
+
+#class NoClusterError(Exception):
+#	def __init__(self,msg):
+#		self.msg = msg
+		
 class hierarical_mixture_mpi(object):
 	"""	
 		Comment about noise_class either all mpi hier class are noise class or none!
@@ -369,6 +380,7 @@ class hierarical_mixture_mpi(object):
 		send_obj = np.array([[np.hstack([GMM.mu[k].flatten(),GMM.sigma[k].flatten()]) for k in range(self.K) ]  for GMM in self.GMMs ],dtype='d')
 		self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, (self.counts * self.d * (self.d+1), None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
 
+		cl_off = np.array([0],dtype='i')
 		if rank == 0:
 			mu_k = np.empty((self.n_all,self.d)) 
 			Sigma_k = np.empty((self.n_all,self.d,self.d)) 
@@ -376,11 +388,17 @@ class hierarical_mixture_mpi(object):
 			for k in range(self.K):
 				mu_k[:] = recv_obj[:,k,:self.d]
 				index = np.isnan(mu_k[:,0])==False
+				if np.sum(index) == 0:
+					cl_off = np.array([1],dtype='i')
 				#if k <2:
 				#	print("mu[%d] = %s"%(k, mu_k))
 				Sigma_k[:] = recv_obj[:,k,self.d:].reshape((self.n_all,self.d, self.d))
 				self.normal_p_wisharts[k].set_data(mu_k[index,:])
 				self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
+
+		self.comm.Bcast([cl_off, MPI.INT])
+		if cl_off[0]:
+			warnings.warn('One cluster turned off in all samples')
 
 	def set_simulation_param(self,sim_par):
 		self.set_p_labelswitch(sim_par['p_sw'])
@@ -819,22 +837,64 @@ class hierarical_mixture_mpi(object):
 		self.update_GMM()
 		
 
-	def simulate(self,simpar,name='simulation',printfrq=100):
-		debug = False
+	def simulate(self,simpar,name='simulation',printfrq=100,timed=False,stop_if_cl_off=True):
+		if stop_if_cl_off:
+			warnings.filterwarnings("error",'One cluster turned off in all samples')
+		else:
+			warnings.filterwarnings("default",'One cluster turned off in all samples')			
+		if timed:
+			t_GMM = 0
+			t_load = 0
+			t_rest = 0
+			t_save = 0
 		iterations = np.int(simpar['iterations'])
 		self.set_simulation_param(simpar)
 		hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
 		for i in range(iterations):
 			if i%printfrq == 0 and self.comm.Get_rank() == 0:
 				print "{} iteration = {}".format(name,i)
-			self.sample()
-			hmlog.savesim(self)
-			#print "iterations = {} at rank {}".format(iterations,MPI.COMM_WORLD.Get_rank())
-		if debug:
-			print "Iterations done at rank {}".format(MPI.COMM_WORLD.Get_rank())
+				if timed:
+					print "{} iteration = {}".format(name,i)
+					print("hgmm GMM  %.4f sec/sim"%(t_GMM/(i+1)))
+					print("hgmm load  %.4f sec/sim"%(t_load/(i+1)))
+					print("hgmm rank=0  %.4f sec/sim"%(t_rest/(i+1)))
+					print("save  %.4f sec/sim"%(t_save/(i+1)))					
+			try:
+				if not timed:
+					self.sample()
+					hmlog.savesim(self)
+				else:
+					if  self.comm.Get_rank() == 0:
+						t0 = time.time()
+		        		for GMM in self.GMMs:
+		        			GMM.sample() 
+													
+					if  self.comm.Get_rank() == 0:
+						t1 = time.time()
+						t_GMM += np.double(t1-t0) 
+		        		self.update_prior()
+												
+					if  self.comm.Get_rank() == 0:
+						t2 = time.time()
+						t_load += np.double(t2-t1) 
+		        		if self.comm.Get_rank() == 0:
+		        			for k in range(self.K):
+		        				self.normal_p_wisharts[k].sample()
+		        				self.wishart_p_nus[k].sample()
+		        		self.comm.Barrier()
+		        		self.update_GMM()
+					if  self.comm.Get_rank() == 0:
+						t3 = time.time()
+						t_rest += np.double(t3-t2) 
+		  
+					hmlog.savesim(self)
+					if  self.comm.Get_rank() == 0:
+						t4 = time.time()
+						t_save += np.double(t4-t3)
+
+			except UserWarning as w:
+				raise SimulationError(str(w),name=name,it=i)
 		hmlog.postproc()
-		if debug:
-			print "Postproc done"
 		
 		return hmlog
 
