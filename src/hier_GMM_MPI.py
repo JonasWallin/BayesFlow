@@ -92,7 +92,7 @@ class hierarical_mixture_mpi(object):
 		Comment about noise_class either all mpi hier class are noise class or none!
 		either incosistency can occuer when loading
 	"""
-	def __init__(self, K = None, data = None, sampnames = None, prior = None, sim_param = None ):
+	def __init__(self, K = None, data = None, sampnames = None, prior = None, thetas = None ):
 		"""
 			starting up the class and defning number of classes
 			
@@ -119,9 +119,8 @@ class hierarical_mixture_mpi(object):
 			
 		self.set_data(data,sampnames)
 		if not prior is None:
-			self.set_prior(prior,init=True)
-		if not sim_param is None:
-			self.set_simulation_param(sim_param)
+			self.set_prior(prior,init=True,thetas=thetas)
+
 	
 	def save_prior_to_file(self,dirname):
 		"""
@@ -484,14 +483,14 @@ class hierarical_mixture_mpi(object):
 		self.n = len(dat)
 		for Y, name in zip(dat,names_dat):
 			if self.d != Y.shape[1]:
-				raise ValueError('dimension missmatch in thet data')
+				raise ValueError('dimension mismatch in the data')
 			self.GMMs.append(GMM.mixture(data= Y, K = self.K, name = name))
 		#print "mpi = %d, len(GMMs) = %d"%(MPI.COMM_WORLD.rank, len(self.GMMs))  # @UndefinedVariable
 		
 		#storing the size of the data used later when sending data
 		self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
 
-	def set_prior(self, prior, init = False):
+	def set_prior(self, prior, init = False, thetas = None):
 		
 		self.set_prior_param0()
 		if prior.noise_class:
@@ -504,7 +503,7 @@ class hierarical_mixture_mpi(object):
 			GMM.alpha_vec = prior.a
 			
 		if init:
-			self.set_latent_init(prior)
+			self.set_latent_init(prior,thetas)
 			self.set_GMM_init()
 
 	def set_location_prior(self,prior):
@@ -535,16 +534,18 @@ class hierarical_mixture_mpi(object):
 				Psiprior['nus'] = n_Psi[k]
 				self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
 				
-	def set_latent_init(self,prior):
+	def set_latent_init(self,prior,thetas=None):
 		rank = self.comm.Get_rank()
 		if rank == 0:
 			for k in range(self.K):
 				npw = self.normal_p_wisharts[k]
 				npwparam = {}
-				npwparam['theta'] = npw.theta_class.mu_p
-				npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
-				if k >= prior.K_inf:
-					npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
+				if thetas is None:
+					npwparam['theta'] = npw.theta_class.mu_p
+					if k >= prior.K_inf:
+						npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
+				else:
+					npwparam['theta'] = thetas[k]
 				npwparam['Sigma'] = npw.Sigma_class.Q/(npw.Sigma_class.nu-self.d-1)
 				npw.set_parameter(npwparam)
 	
@@ -556,20 +557,37 @@ class hierarical_mixture_mpi(object):
 				wpn.nu_class.set_val(wpn.Q_class.nu_s)
 
 	def set_GMM_init(self):
+		self.set_GMMs_mu_Sigma_from_prior()
+		for GMM in self.GMMs:
+			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
+			GMM.active_komp = np.ones(self.K+self.noise_class,dtype='bool')
+
+	def set_theta_to_median(self):
+		mus = self.get_mus()
+		if self.comm.Get_rank() == 0:
+			medians = np.median(mus,axis=0)
+			for k in range(self.K):
+				npw = self.normal_p_wisharts[k]
+				npwparam = {}
+				npwparam['theta'] = medians[k,:]
+				npwparam['Sigma'] = npw.param['Sigma']
+				npw.set_parameter(npwparam)			
+		self.comm.Barrier()
+		self.update_GMM()
+
+	def set_GMMs_mu_Sigma_from_prior(self):
 		param = [None]*self.K
 		for k in range(self.K):
 			param[k] = {}
 			param[k]['mu'] = self.GMMs[0].prior[k]['mu']['theta'].reshape(self.d)
 			param[k]['sigma'] = self.GMMs[0].prior[k]['sigma']['Q']/(self.GMMs[0].prior[k]['sigma']['nu']-self.d-1)
 		for GMM in self.GMMs:
-			GMM.set_param(param)
-			GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
-			GMM.active_komp = np.ones(self.K+self.noise_class,dtype='bool')
-
-	def deactivate_outlying_components(self):
+			GMM.set_param(param,active_only=True)
+			
+	def deactivate_outlying_components(self,aquitted=None):
 		any_deactivated = 0
 		for GMM in self.GMMs:
-			any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components())
+			any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components(aquitted))
 			
 		if self.comm.Get_rank() == 0:
 			any_deactivated_all = np.empty(self.comm.Get_size(),dtype = 'i')

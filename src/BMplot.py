@@ -25,8 +25,11 @@ def black_ip(color,n,N):
         r,g,b,al = color
     else:
         r,g,b = color
+        al = 1
     h,s,v = colorsys.rgb_to_hsv(r, g, b)
-    return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
+    r,g,b = colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
+    return r,g,b,al
+    #return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
     
 def drawbox(quantiles,boxloc,boxw,ms,ax):
     '''
@@ -47,8 +50,14 @@ def drawbox(quantiles,boxloc,boxw,ms,ax):
     plt.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
 
 def visualEigen(Sigma, mu, dim):
+    if np.isnan(Sigma[0,0]) or np.isinf(Sigma[0,0]):
+        return None
     Sigma = Sigma[np.ix_(dim,dim)]
-    E, V = np.linalg.eig(Sigma)
+    try:
+        E, V = np.linalg.eig(Sigma)
+    except np.linalg.LinAlgError:
+        print "Exception caught, Sigma = {}".format(Sigma)
+        return None
     t = np.linspace(0,2*np.pi,100)
     e = np.array([np.cos(t), np.sin(t)])
     V2 = np.sqrt(E)*V
@@ -70,7 +79,9 @@ def component_plot(mus,Sigmas,dim,ax,colors=None):
         colors = ['black']*K
     for k in range(K):
         if not np.isnan(mus[k][0]):
-            plres = visualEigen(Sigmas[k], mus[k], [dim[0],dim[1]]) 
+            plres = visualEigen(Sigmas[k], mus[k], [dim[0],dim[1]])
+            if plres is None:
+                continue
             q_res = np.percentile(plres[:,0], 50)
             q_x[0] = min(q_x[0],q_res)
             q_x[1] = max(q_x[1],q_res)
@@ -587,7 +598,7 @@ class CompPlot(object):
             
         return ax
 
-    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False):
+    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False,plot_new_th=True):
         '''
             Plot visualization with ellipses of the latent components.
             Canonical colors are used (see BMplot).
@@ -615,12 +626,16 @@ class CompPlot(object):
         colors = [self.comp_colors[k] for k in okcl]
 
         q = component_plot(mus,Sigmas,dim,ax,colors=colors)
+        
+        if hasattr(self.comp,'new_thetas') and plot_new_th:
+            ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
+        
         if plotlab:
             ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False):
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False,plot_new_th=True):
         '''
             Plot visualization of mixture components for all samples.
             Canonical colors are used (see BMplot).
@@ -650,6 +665,10 @@ class CompPlot(object):
         colors = [self.comp_colors[k] for k in okcl]
 
         q = pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
+ 
+        if hasattr(self.comp,'new_thetas') and plot_new_th:
+            ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
+
         if plotlab:
             ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
@@ -853,6 +872,8 @@ class BMplot(object):
         for s,suco in enumerate(mergeind_sort):
             #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
             suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
+            if s > maxnbrsucocol:
+                suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
             for i,k in enumerate(suco):
                 colors[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
         return colors,suco_col,comp_ord,suco_ord

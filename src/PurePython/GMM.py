@@ -14,7 +14,6 @@ import scipy.special as sps
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
-#import bayesianmixture.mixture_util.GMM_util as GMM_util
 
 
 #TODO: remove noise class, should be fairly easy to add an usefull
@@ -462,7 +461,7 @@ class mixture(object):
 			self.prior[k]['mu']['theta'][:]   = prior[k]['theta'].reshape(self.prior[k]['mu']['theta'].shape)
 			self.prior[k]['mu']['Sigma'][:]   = prior[k]['Sigma'][:] 
 				
-	def set_param(self, param):
+	def set_param(self, param, active_only=False):
 		
 		if len(self.mu) == 0 :
 			for k in range(self.K):
@@ -470,8 +469,9 @@ class mixture(object):
 				self.sigma.append((np.empty_like(param[k]['sigma'])))
 			
 		for k in range(self.K):
-			self.mu[k][:] = param[k]['mu'][:]
-			self.sigma[k][:] = param[k]['sigma'][:]
+			if not active_only or self.active_komp[k]:
+				self.mu[k][:] = param[k]['mu'][:]
+				self.sigma[k][:] = param[k]['sigma'][:]
 			
 		self.updata_mudata()
 
@@ -786,13 +786,22 @@ class mixture(object):
 			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
-	def deactivate_outlying_components(self):
+	def deactivate_outlying_components(self,aquitted=None):
 		any_deactivated = 0
 		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
 		for k in range(self.K):
+			aquitted_k = [k]
+			if not aquitted is None:
+				for aqu in aquitted:
+					if k in aqu:
+						aquitted_k = aqu
+						break
 			if not np.isnan(self.mu[k]).any():
 				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
-				if np.argmin(dist) != k:
+				if not np.argmin(dist) in aquitted_k:
+					print "thetas = {}".format(thetas)
+					print "mu = {}".format(self.mu)
+					print "aquitted = {}".format(aquitted)
 					self.deactivate_component(k)
 					any_deactivated = 1
 		if np.sum(self.active_komp) == 0:

@@ -9,11 +9,30 @@ import numpy as np
 from mpi4py import MPI
 import copy as cp
 import warnings
+from sklearn import mixture as skmixture
 
 import utils.Bhattacharyya as bhat
 from utils import diptest
 import utils.discriminant as discr
 import BMplot as bmp
+
+def GMM_means_for_best_BIC(data,Ks,n_init=10,n_iter=100,covariance_type='full'):
+    data = data[~np.isnan(data[:,0]),:]
+    data = data[~np.isinf(data[:,0]),:] 
+    bestbic = np.inf
+    for K in Ks:
+        g = skmixture.GMM(n_components=K,covariance_type=covariance_type,n_init=n_init,n_iter=n_iter)
+        g.fit(data)
+        bic = g.bic(data)
+        print "BIC for {} clusters: {}".format(K,bic)
+        if bic < bestbic:
+            means = g.means_
+            bestbic = bic
+    if means.shape[0] == np.max(Ks):
+        warnings.warn("Best BIC obtained for maximum K")
+    if means.shape[0] == np.min(Ks):
+        warnings.warn("Best BIC obtained for minimum K")
+    return means
 
 def quantile(y,w,alpha):
     '''
@@ -356,6 +375,14 @@ class Components(object):
         self.Sigmalat = bmlog.Sigmaexp_sim_mean
         self.p = p
         self.active_komp = bmlog.active_komp
+
+    def new_thetas_from_GMM_fit(self,Ks=None,n_init=10,n_iter=100,covariance_type='full'):
+        if Ks is None:
+            Ks = range(int(self.K/4),self.K*2)
+        allmus = np.vstack([self.mupers[j,:,:] for j in range(self.mupers.shape[0])])
+        thetas = GMM_means_for_best_BIC(allmus,Ks,n_init,n_iter,covariance_type)
+        self.new_thetas = thetas
+        return thetas
         
     def classif(self,Y,j,p_noise = None,mu_noise=0.5*np.ones((1,4)),Sigma_noise = 0.5**2*np.eye(4)):
         '''
@@ -479,6 +506,7 @@ class BMres(object):
 
             self.traces = Traces(bmlog_burn,bmlog)
             self.mimics = {}
+            print "bmlog.savesapnames = {}".format(bmlog.savesampnames)
             for i,name in enumerate(bmlog.savesampnames):
                 j = bmlog.names.index(name)
                 self.mimics[name] = MimicSample(self.data[j],name,bmlog.Y_sim[i],'BHM_MCMC')
@@ -514,8 +542,10 @@ class BMres(object):
                 self.hierarchical_merge(self.get_median_bh_dt_dist,thr,**mmfArgs)
                 self.hierarchical_merge(self.get_median_bh_dt_dist_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
                 self.hclean()
+            elif method == 'no_merging':
+                self.mergeind = [[k] for k in range(self.K)]
             else:
-                raise ValueError, 'Unknown method for merging'
+                raise NameError, 'Unknown method for merging'
             del self.complist
             self.merged = True
             self.mergeMeth = method

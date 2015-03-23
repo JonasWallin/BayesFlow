@@ -1,31 +1,96 @@
-from __future__ import division
+#from __future__ import division
 from mpi4py import MPI
 import numpy as np
 import collections
 import warnings
 
+warnings.filterwarnings('ignore',message='using a non-integer number.*',category= DeprecationWarning)
+
+def collect_arrays(data,nbr_col,nptype,mpitype):
+
+    nbr_row = collect_data_1d([dat.shape[0] for dat in data],'i',MPI.INT)
+    
+    if len(data) > 0:
+        data_stack = np.vstack([np.array(dat,dtype=nptype).reshape((-1,nbr_col)) for dat in data])
+    else:
+        data_stack = np.empty((0,nbr_col),dtype=nptype)
+
+    data_all_stack = collect_array_(data_stack,nbr_col,nptype,mpitype)
+    
+    if not data_all_stack is None:
+        if len(nbr_row) > 0:
+            data_all = np.split(data_all_stack, np.cumsum(nbr_row[0:-1]))
+        else:
+            data_all = data_all_stack
+    else:
+        data_all = None
+        
+    return data_all
+
+def collect_data(data,nbr_col,nptype,mpitype):
+
+    if len(data) > 0:
+        data_array = np.array(data,dtype=nptype).reshape((-1,nbr_col))
+    else:
+        data_array = np.empty((0,nbr_col),dtype=nptype)
+        
+    data_all = collect_array_(data_array,nbr_col,nptype,mpitype)
+    return data_all
+
+def collect_data_1d(data,nptype,mpitype):
+
+    data_all = collect_data(data,1,nptype,mpitype)
+    if not data_all is None:
+        data_all = data_all.reshape((-1,))    
+    return data_all
+
+def collect_array_(data_array,nbr_col,nptype,mpitype):
+    comm = MPI.COMM_WORLD
+    #rank = comm.Get_rank()
+
+    if comm.Get_rank() == 0:
+        nbr_row = np.empty(comm.Get_size(),dtype = 'i')
+    else:
+        nbr_row = 0
+    comm.Gather(sendbuf=[np.array(data_array.shape[0],dtype='i'), MPI.INT], recvbuf=[nbr_row, MPI.INT], root=0)
+    counts = nbr_row*nbr_col
+    #print "counts = {} at rank {}".format(counts,rank)    
+    
+    if comm.Get_rank() == 0:
+        data_all_array = np.empty((sum(nbr_row),nbr_col),dtype = nptype)
+    else:
+        data_all_array = None
+    comm.Gatherv(sendbuf=[data_array,mpitype],recvbuf=[data_all_array,(counts,None),mpitype],root=0)
+    return data_all_array
+
 class HMlogB(object):
     '''
         Class for saving burn-in iterations from sampling of posterior distribution
     '''
-    def __init__(self,hGMM,sim,nbrsave=None):
-        if nbrsave is None:
-            nbrsave = sim
-        self.nbrsave = nbrsave
+    def __init__(self,hGMM,sim,nbrsave=None,savefrq=None):
+        if not savefrq is None:
+            self.savefrq = savefrq
+        else:
+            if nbrsave is None:
+                nbrsave = sim
+            self.savefrq = max(int(sim/nbrsave),1)
+        self.nbrsave = int(np.ceil(sim/self.savefrq))
         self.sim = sim
-        self.savefrq = max(np.floor(sim/(nbrsave-1)),1)
         self.K = hGMM.K
+        self.d = hGMM.d
         self.noise_class = hGMM.noise_class
         self.set_names(hGMM)
         self.active_komp_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.active_komp_curr_loc = np.ones((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.tmp_active_comp_curr_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
-        self.lab_sw = []
+        self.lab_sw_loc = []
         self.i = -1
         if MPI.COMM_WORLD.Get_rank() == 0:
-            self.d = hGMM.d
-            self.theta_sim = np.empty((np.ceil(sim/self.savefrq),self.K,self.d))
-            self.nu_sim = np.empty((np.ceil(sim/self.savefrq),self.K))
+            self.theta_sim = np.empty((self.nbrsave,self.K,self.d))
+            self.nu_sim = np.empty((self.nbrsave,self.K))
+            print "log nbrsave = {}".format(self.nbrsave)
+            print "log savefrq = {}".format(self.savefrq)
+            print "log iterations = {}".format(self.sim)
 
     def savesim(self,hGMM):
         '''
@@ -36,6 +101,9 @@ class HMlogB(object):
         debug = False
         nus = hGMM.get_nus()
         if self.i % self.savefrq == 0:
+            #print "self.i/self.savefrq = {}".format(self.i/self.savefrq)
+            #print "self.i = {}".format(self.i)
+            #print "self.savefrq = {}".format(self.savefrq)
             thetas = hGMM.get_thetas()       
             if MPI.COMM_WORLD.Get_rank() == 0:
                 self.append_theta(thetas)
@@ -44,7 +112,7 @@ class HMlogB(object):
         for j,GMM in enumerate(hGMM.GMMs):
             self.tmp_active_comp_curr_loc[j,:] = GMM.active_komp         
             if np.amax(GMM.lab) > -1:
-                self.lab_sw.append([GMM.lab])
+                self.lab_sw_loc.append([GMM.lab])
                 print "Label switch iteration {}, sample {} at rank {}: {}".format(self.i,j,MPI.COMM_WORLD.Get_rank(), GMM.lab)
         self.active_komp_loc += self.tmp_active_comp_curr_loc
         on_or_off = np.nonzero(self.tmp_active_comp_curr_loc - self.active_komp_curr_loc)
@@ -93,95 +161,138 @@ class HMlogB(object):
         self.i += 1
         
     def append_theta(self,theta):
-        self.theta_sim[self.i/self.savefrq,:,:] = theta
+        self.theta_sim[int(self.i/self.savefrq),:,:] = theta
         
     def append_nu(self,nus):
-        self.nu_sim[self.i/self.savefrq,:] = nus
+        self.nu_sim[int(self.i/self.savefrq),:] = nus
         
     def get_last_nus(self):
-        return self.nu_sim[self.i/self.savefrq,:]
-        
+        return self.nu_sim[int(self.i/self.savefrq),:]
+
     def set_lab_sw(self):
-        comm = MPI.COMM_WORLD
-        print "self.lab_sw = {}".format(self.lab_sw)
-        if len(self.lab_sw) > 0:
-            lab_sw_loc = np.array(np.vstack(self.lab_sw),dtype = 'i')
-        else:
-            lab_sw_loc = np.empty((0,2))    
-            
-        if comm.Get_rank() == 0:
-            counts = np.empty(comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        comm.Gather(sendbuf=[np.array(lab_sw_loc.shape[0] * lab_sw_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+        lab_sw_all = collect_data(self.lab_sw_loc,2,'i',MPI.INT)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            self.lab_sw = lab_sw_all
+        del self.lab_sw_loc
         
-        if comm.Get_rank() == 0:
-            lab_sw_all = np.empty((sum(counts)/lab_sw_loc.shape[1],lab_sw_loc.shape[1]),dtype = 'i')
-        else:
-            lab_sw_all = None
-        comm.Gatherv(sendbuf=[lab_sw_loc,MPI.INT],recvbuf=[lab_sw_all,(counts,None),MPI.INT],root=0)
-        if comm.Get_rank() == 0:
-            self.lab_sw = lab_sw_all  
+#    def set_lab_sw_old(self):
+#        comm = MPI.COMM_WORLD
+#        print "self.lab_sw = {}".format(self.lab_sw)
+#        if len(self.lab_sw) > 0:
+#            lab_sw_loc = np.array(np.vstack(self.lab_sw),dtype = 'i')
+#        else:
+#            lab_sw_loc = np.empty((0,2))    
+#            
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype = 'i')
+#        else:
+#            counts = 0
+#        comm.Gather(sendbuf=[np.array(lab_sw_loc.shape[0] * lab_sw_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+#        
+#        if comm.Get_rank() == 0:
+#            lab_sw_all = np.empty((sum(counts)/lab_sw_loc.shape[1],lab_sw_loc.shape[1]),dtype = 'i')
+#        else:
+#            lab_sw_all = None
+#        comm.Gatherv(sendbuf=[lab_sw_loc,MPI.INT],recvbuf=[lab_sw_all,(counts,None),MPI.INT],root=0)
+#        if comm.Get_rank() == 0:
+#            self.lab_sw = lab_sw_all  
 
     def set_active_komp(self):
-        comm = MPI.COMM_WORLD
-        if comm.Get_rank() == 0:
-            counts = np.empty(comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        print "self.active_komp_loc at rank {}: \n {}".format(comm.Get_rank(),self.active_komp_loc)
-        comm.Gather(sendbuf=[np.array(self.active_komp_loc.shape[0] * self.active_komp_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
-
-        if comm.Get_rank() == 0:
-            active_komp_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
-        else:
-            active_komp_all = None
-        comm.Gatherv(sendbuf=[self.active_komp_loc,MPI.INT],recvbuf=[active_komp_all,(counts,None),MPI.INT],root=0)
-        if comm.Get_rank() == 0:
+        active_komp_all = collect_data(self.active_komp_loc,self.K+self.noise_class,'i',MPI.INT)
+        if MPI.COMM_WORLD.Get_rank() == 0:
             self.active_komp = active_komp_all/self.sim
-            
-    def set_names(self,hGMM):
-        comm = MPI.COMM_WORLD
-        names_loc = ":".join([GMM.name for GMM in hGMM.GMMs])
-        names_loc += ':'
-        if comm.Get_rank() == 0:
-            counts = np.empty(comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        comm.Gather(sendbuf=[np.array(len(names_loc),dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+        del self.active_komp_loc
 
-        if comm.Get_rank() == 0:
-            names_all = np.chararray(sum(counts))
-        else:
-            names_all = None
-        comm.Gatherv(sendbuf=[np.array(list(names_loc)),MPI.CHAR],recvbuf=[names_all,(counts,None),MPI.CHAR],root=0)
-        if comm.Get_rank() == 0:
-            names_all = "".join(names_all)
-            self.names = names_all.split(':')[0:-1]
+#    def set_active_komp_old(self):
+#        comm = MPI.COMM_WORLD
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype = 'i')
+#        else:
+#            counts = 0
+#        print "self.active_komp_loc at rank {}: \n {}".format(comm.Get_rank(),self.active_komp_loc)
+#        comm.Gather(sendbuf=[np.array(self.active_komp_loc.shape[0] * self.active_komp_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+#
+#        if comm.Get_rank() == 0:
+#            active_komp_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
+#        else:
+#            active_komp_all = None
+#        comm.Gatherv(sendbuf=[self.active_komp_loc,MPI.INT],recvbuf=[active_komp_all,(counts,None),MPI.INT],root=0)
+#        if comm.Get_rank() == 0:
+#            self.active_komp = active_komp_all/self.sim
+
+    def set_names(self,hGMM):
+        name_data = [np.array([ch for ch in GMM.name]) for GMM in hGMM.GMMs]
+        name_all = collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            self.names = [''.join(nam.reshape((-1,))) for nam in name_all]
+            
+#    def set_names_old(self,hGMM):
+#        comm = MPI.COMM_WORLD
+#        names_loc = ":".join([GMM.name for GMM in hGMM.GMMs])
+#        names_loc += ':'
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype = 'i')
+#        else:
+#            counts = 0
+#        comm.Gather(sendbuf=[np.array(len(names_loc),dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+#
+#        if comm.Get_rank() == 0:
+#            names_all = np.chararray(sum(counts))
+#        else:
+#            names_all = None
+#        comm.Gatherv(sendbuf=[np.array(list(names_loc)),MPI.CHAR],recvbuf=[names_all,(counts,None),MPI.CHAR],root=0)
+#        if comm.Get_rank() == 0:
+#            names_all = "".join(names_all)
+#            self.names = names_all.split(':')[0:-1]
 
 class HMlog(HMlogB):
 
     '''
         Class for saving results from sampling of posterior distribution
-        NB! Does not save classification frequencies or sample names. If this is needed, use class BMEresult below.
+        NB! Does not save classification frequencies. If this is needed, use class HMElog below.
     '''
     
-    def __init__(self,hGMM,sim,savesamp = [],nbrsave=None,nbrsavey=None):
-        super(HMlog,self).__init__(hGMM,sim,nbrsave)
-        if nbrsavey is None:
-            nbrsavey = sim
-        self.savefrqy = max(np.floor((sim/nbrsavey)),1)
+    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None):
+        super(HMlog,self).__init__(hGMM,sim,nbrsave,savefrq)
+        
+        if not savefrqy is None:
+            self.savefrqy = savefrqy
+        else:
+            if nbrsavey is None:
+                nbrsavey = sim
+            self.savefrqy = max(np.floor((sim/nbrsavey)),1)
+        self.nbrsavey = np.ceil(sim/self.savefrqy)
         self.J_loc = len(hGMM.GMMs)
         self.set_J(hGMM)
+        
+        if savesamp is None:
+            self.savesamp_loc = []
+            if not savesampnames is None:
+                if savesampnames == 'all':
+                    self.savesamp_loc = range(len(hGMM.GMMs))
+                else:
+                    for j,GMM in enumerate(hGMM.GMMs):
+                        if GMM.name in savesampnames:
+                            self.savesamp_loc.append(j)
+            print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,MPI.COMM_WORLD.Get_rank())
+            print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),MPI.COMM_WORLD.Get_rank())
+            self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                self.savesamp_loc = savesamp
+                self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
+            else:
+                self.savesamp_loc = []
+                self.savesampnames_loc = []
+        self.Y_sim_loc = [np.empty((np.ceil(sim/self.savefrqy),self.d)) for i in range(len(self.savesamp_loc))]
+
+                
         if MPI.COMM_WORLD.Get_rank() == 0:
-            self.Y_sim = [np.empty((np.ceil(sim/self.savefrqy),self.d)) for i in range(len(savesamp))]
             self.Y_pooled_sim = np.empty((np.ceil(sim/self.savefrqy),self.d))
             self.theta_sim_mean = np.zeros((self.K,self.d))
             self.Sigmaexp_sim_mean = np.zeros((self.K,self.d,self.d))
             self.mupers_sim_mean = np.zeros((self.J,self.K,self.d))
             self.Sigmapers_sim_mean = np.zeros((self.J,self.K,self.d,self.d))
-            self.savesamp = savesamp
-            self.savesampnames = [hGMM.GMMs[savesamp[j]].name for j in self.savesamp]
             self.prob_sim_mean = np.zeros((self.J,self.K+self.noise_class))
 
         
@@ -195,11 +306,14 @@ class HMlog(HMlogB):
         mus = hGMM.get_mus()
         Sigmas = hGMM.get_Sigmas()
         ps = hGMM.get_ps()
-        Y_pooled = hGMM.sampleY()        
+
+        if self.i % self.savefrqy == 0:
+            for j in range(len(self.savesamp_loc)):
+                self.append_Y(hGMM.GMMs[self.savesamp_loc[j]].simulate_one_obs(),j)        
+            Y_pooled = hGMM.sampleY()
+            
         if MPI.COMM_WORLD.Get_rank() == 0:
             if self.i % self.savefrqy == 0:
-                for j in range(len(self.savesamp)):
-                    self.append_Y(hGMM.GMMs[self.savesamp[j]].simulate_one_obs(),j)
                 self.append_pooled_Y(Y_pooled)
             self.add_theta(thetas)
             self.add_Sigmaexp(Qs,self.get_last_nus())
@@ -222,30 +336,29 @@ class HMlog(HMlogB):
             self.Sigmapers_sim_mean /= self.sim
             self.prob_sim_mean /= self.sim
 
-            nonnoise_active_komp = self.active_komp[:,0:-1]
+            if self.noise_class:
+                nonnoise_active_komp = self.active_komp[:,:-1]
+            else:
+                nonnoise_active_komp = self.active_komp
             for dd in range(self.mupers_sim_mean.shape[2]):
                 self.mupers_sim_mean[:,:,dd] /= nonnoise_active_komp
+                self.mupers_sim_mean[~nonnoise_active_komp.astype('bool'),dd] = np.nan
                 for ddd in range(self.mupers_sim_mean.shape[2]):
+                    self.Sigmapers_sim_mean[~nonnoise_active_komp.astype('bool'),dd,ddd] = np.nan
                     self.Sigmapers_sim_mean[:,:,dd,ddd] /= nonnoise_active_komp
+            self.prob_sim_mean[~self.active_komp.astype('bool')] = np.nan
             self.prob_sim_mean /= self.active_komp
             self.prob_sim_mean[np.isnan(self.prob_sim_mean)] = 0
-             
-
-    def set_J(self,hGMM):
-        self.J_loc = np.array(self.J_loc,dtype = 'i')
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            J_locs = np.empty(MPI.COMM_WORLD.Get_size(),dtype='i')
-        else:
-            J_locs = None
-        MPI.COMM_WORLD.Gather(sendbuf=[self.J_loc,MPI.INT],recvbuf=[J_locs,MPI.INT],root=0)
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            self.J = sum(J_locs)
+            
+        self.set_savesampnames()
+        self.set_savesamp()
+        self.set_Y_sim()
          
     def append_Y(self,Y,j):
-        self.Y_sim[j][self.i/self.savefrqy,:] = Y
+        self.Y_sim_loc[j][int(self.i/self.savefrqy),:] = Y
         
     def append_pooled_Y(self,Y):
-        self.Y_pooled_sim[self.i/self.savefrqy,:] = Y
+        self.Y_pooled_sim[int(self.i/self.savefrqy),:] = Y
 
     def add_theta(self,thetas):
         self.theta_sim_mean += thetas
@@ -266,17 +379,107 @@ class HMlog(HMlogB):
         prob[np.isnan(prob)] = 0
         self.prob_sim_mean += prob
 
+    def set_J(self,hGMM):
+        self.J_loc = np.array(self.J_loc,dtype = 'i')
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            J_locs = np.empty(MPI.COMM_WORLD.Get_size(),dtype='i')
+        else:
+            J_locs = None
+        MPI.COMM_WORLD.Gather(sendbuf=[self.J_loc,MPI.INT],recvbuf=[J_locs,MPI.INT],root=0)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            self.J = sum(J_locs)
+
+    def set_Y_sim(self):
+        self.Y_sim = collect_arrays(self.Y_sim_loc,self.d,'d',MPI.DOUBLE)
+
+    def set_savesampnames(self):
+        #print "self.savesampnames_loc at rank {}: {}".format(MPI.COMM_WORLD.Get_rank(),self.savesampnames_loc)
+        name_data = [np.array([ch for ch in name]) for name in self.savesampnames_loc]
+        #print "name_data at rank {}".format(name_data,MPI.COMM_WORLD.Get_rank())
+        name_all = collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            self.savesampnames = [''.join(nam.reshape((-1,))) for nam in name_all]
+            #print "self.savesampnames at rank 0: {}".format(self.savesampnames)
+         
+    def set_savesamp(self):
+        if MPI.COMM_WORLD == 0:
+            self.savesamp = [self.names.index(name) for name in self.savesampnames]
+
+#    def set_Y_sim_old(self):
+#        comm = MPI.COMM_WORLD
+#        self.set_save_ns()
+#        if len(self.Y_sim_loc) > 0:
+#            Y_sim_loc_array = np.array(np.vstack(self.Y_sim_loc),dtype = 'i')
+#        else:
+#            Y_sim_loc_array = np.empty((0,self.d),dtype='i')
+#        #classif_freq_loc = classif_freq_loc[0:100,:]
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype = 'i')
+#        else:
+#            counts = 0
+#        comm.Gather(sendbuf=[np.array(Y_sim_loc_array.shape[0] * Y_sim_loc_array.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+#        
+#        if comm.Get_rank() == 0:
+#            Y_sim_all = np.empty((sum(counts)/(self.d),self.d),dtype = 'd')
+#            #print "classif_all.shape = {}".format(classif_all.shape)
+#        else:
+#            Y_sim_all = None
+#        comm.Gatherv(sendbuf=[Y_sim_loc_array,MPI.DOUBLE],recvbuf=[Y_sim_all,(counts,None),MPI.DOUBLE],root=0)
+#        if comm.Get_rank() == 0:
+#            self.Y_sim = np.split(self.Y_sim_all, np.cumsum(self.save_ns[0:-1]))
+#            
+#    def set_savesampnames_old(self):
+#        comm = MPI.COMM_WORLD
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype='i')
+#        else:
+#            counts = 0
+#        comm.Gather(sendbuf=[np.array(sum([len(name) for name in self.savesampnames_loc])),MPI.INT],recvbuf=[counts,MPI.INT],root=0)
+#
+#        if len(self.savesampnames_loc) > 0:
+#            namearray = np.vstack(self.savesampnames_loc)
+#        else:
+#            namearray = np.array([])
+#            
+#        if comm.Get_rank() == 0:
+#            savesampnames_ = np.empty(sum(counts),dtype='S')
+#        else:
+#            savesampnames_ = None
+#        comm.Gatherv(sendbuf=[namearray,MPI.UNSIGNED_CHAR],recvbuf=[savesampnames_,(counts,None),MPI.UNSIGNED_CHAR],root=0)
+#        if comm.Get_rank() == 0:
+#            savesampnames = np.split(savesampnames_,np.cumsum(counts[:-1]))
+#            self.savesampnames = [''.join(name) for name in savesampnames]
+#         
+#    def set_save_ns(self):
+#        '''
+#            Obsolete
+#        '''
+#        comm = MPI.COMM_WORLD
+#        ns_loc = np.array([ysim.shape[0] for ysim in self.Y_sim_loc],dtype='i')
+#        if comm.Get_rank() == 0:
+#            counts = np.empty(comm.Get_size(),dtype = 'i')
+#        else:
+#            counts = 0
+#        comm.Gather(sendbuf=[np.array(len(ns_loc),dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+#        
+#        if comm.Get_rank() == 0:
+#            ns = np.empty(sum(ns_loc),dtype = 'i')
+#        else:
+#            ns = None
+#        comm.Gatherv(sendbuf=[ns_loc,MPI.INT],recvbuf=[ns,(counts,None),MPI.INT],root=0)
+#        if comm.Get_rank() == 0:
+#            self.save_ns = ns
 
 class HMElog(HMlog):
 
     '''
         Class for saving results from sampling of posterior distribution
-        NB! Does save classification frequencies and sample names and
+        NB! Does save classification frequencies and
         thus makes it possible to create Clustering object.
     '''
     
-    def __init__(self,hGMM,sim,savesamp = [],nbrsave=None,nbrsavey=None):
-        super(HMElog,self).__init__(hGMM,sim,savesamp,nbrsave,nbrsavey)
+    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None):
+        super(HMElog,self).__init__(hGMM,sim,savesamp,savesampnames,nbrsave,savefrq,nbrsavey,savefrqy)
         self.batch = 1000
         self.ii = -1
         self.init_classif(hGMM)
@@ -305,12 +508,12 @@ class HMElog(HMlog):
             Post-processing production iterations
         '''
         super(HMElog,self).postproc()
-        self.add_classif_fr()
+        if not self.ii == self.batch:
+            self.add_classif_fr()
         del self.classif
         if MPI.COMM_WORLD.Get_rank() == 0:
             self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
-            del self.classif_freq_all
-    
+            del self.classif_freq_all        
         
     def add_classif_fr(self):
         comm = MPI.COMM_WORLD
