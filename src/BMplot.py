@@ -341,7 +341,7 @@ class ClustPlot(object):
         boxw = (boxloc[1] - boxloc[0])/3.5
         ms = 10
         for k in range(self.clust.K):
-            if not np.isnan(quantiles[k,0,0]):
+            if not np.isnan(quantiles[self.order[k],0,0]):
                 ax = fig.add_subplot(self.clust.K,nbr_cols,k*nbr_cols + col_start+1)
                 for dd in range(self.clust.d):
                     drawbox(quantiles[self.order[k],:,dd],boxloc[dd],boxw,ms,ax)

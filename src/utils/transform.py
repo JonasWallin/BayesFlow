@@ -21,4 +21,8 @@ def percentilescale(data, q = (1.,99.)):
             data[j][:,m] = (data[j][:,m]-datq[0][m])/(datq[1][m]-datq[0][m])
     return datq
 
-            
+def maxminscale(data):
+    d = data[0].shape[1]
+    for j in range(len(data)):
+        for m in range(d):
+            data[j][:,m] = (data[j][:,m]-np.min(data[j][:,m]))/(np.max(data[j][:,m])-np.min(data[j][:,m]))        
