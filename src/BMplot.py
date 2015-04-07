@@ -8,282 +8,283 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import matplotlib.colors as colors
-import matplotlib.gridspec as gridspec
-import colorsys
+#import matplotlib.ticker as ticker
+#import matplotlib.colors as colors
+#import matplotlib.gridspec as gridspec
+#import colorsys
+import plot
 
-def black_ip(color,n,N):
-    '''
-        Interpolate between a color and black.
-        
-        color   -   color
-        n       -   shade rank
-        N       -   total number of possible shades
-    '''
-    if len(color) == 4:
-        r,g,b,al = color
-    else:
-        r,g,b = color
-        al = 1
-    h,s,v = colorsys.rgb_to_hsv(r, g, b)
-    r,g,b = colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
-    return r,g,b,al
-    #return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
+#def black_ip(color,n,N):
+#    '''
+#        Interpolate between a color and black.
+#        
+#        color   -   color
+#        n       -   shade rank
+#        N       -   total number of possible shades
+#    '''
+#    if len(color) == 4:
+#        r,g,b,al = color
+#    else:
+#        r,g,b = color
+#        al = 1
+#    h,s,v = colorsys.rgb_to_hsv(r, g, b)
+#    r,g,b = colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
+#    return r,g,b,al
+#    #return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
     
-def drawbox(quantiles,boxloc,boxw,ms,ax):
-    '''
-        Draw box in boxplot
-        
-        quantiles   -   quantiles to use for box
-        boxloc      -   x-values where to draw box
-        boxw        -   width of box
-        ms          -   size of whiskers
-    '''
-    low = quantiles[0]
-    blow = quantiles[1]
-    bmid = quantiles[2]
-    bupp = quantiles[3]
-    upp = quantiles[4]
-    plt.plot([boxloc,boxloc],[low,upp],marker = '_',color='blue',ms=ms)
-    plt.plot([boxloc-boxw/2,boxloc+boxw/2,boxloc+boxw/2,boxloc-boxw/2,boxloc-boxw/2],[blow,blow,bupp,bupp,blow],color='blue')
-    plt.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
-
-def visualEigen(Sigma, mu, dim):
-    if np.isnan(Sigma[0,0]) or np.isinf(Sigma[0,0]):
-        return None
-    Sigma = Sigma[np.ix_(dim,dim)]
-    try:
-        E, V = np.linalg.eig(Sigma)
-    except np.linalg.LinAlgError:
-        print "Exception caught, Sigma = {}".format(Sigma)
-        return None
-    t = np.linspace(0,2*np.pi,100)
-    e = np.array([np.cos(t), np.sin(t)])
-    V2 = np.sqrt(E)*V
-    VV = np.dot(e.transpose(),V2.transpose()) + mu[dim].transpose()
-    return VV
+#def drawbox(quantiles,boxloc,boxw,ms,ax):
+#    '''
+#        Draw box in boxplot
+#        
+#        quantiles   -   quantiles to use for box
+#        boxloc      -   x-values where to draw box
+#        boxw        -   width of box
+#        ms          -   size of whiskers
+#    '''
+#    low = quantiles[0]
+#    blow = quantiles[1]
+#    bmid = quantiles[2]
+#    bupp = quantiles[3]
+#    upp = quantiles[4]
+#    plt.plot([boxloc,boxloc],[low,upp],marker = '_',color='blue',ms=ms)
+#    plt.plot([boxloc-boxw/2,boxloc+boxw/2,boxloc+boxw/2,boxloc-boxw/2,boxloc-boxw/2],[blow,blow,bupp,bupp,blow],color='blue')
+#    plt.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
+#
+#def visualEigen(Sigma, mu, dim):
+#    if np.isnan(Sigma[0,0]) or np.isinf(Sigma[0,0]):
+#        return None
+#    Sigma = Sigma[np.ix_(dim,dim)]
+#    try:
+#        E, V = np.linalg.eig(Sigma)
+#    except np.linalg.LinAlgError:
+#        print "Exception caught, Sigma = {}".format(Sigma)
+#        return None
+#    t = np.linspace(0,2*np.pi,100)
+#    e = np.array([np.cos(t), np.sin(t)])
+#    V2 = np.sqrt(E)*V
+#    VV = np.dot(e.transpose(),V2.transpose()) + mu[dim].transpose()
+#    return VV
+#    
+#def component_plot(mus,Sigmas,dim,ax,colors=None):
+#    '''
+#        Viusalize mixture component
+#        
+#        mu,Sigma    -   mixture component parameters
+#        dim         -   dimensions for projection
+#    '''
+#    
+#    q_y = [np.inf,-np.inf]
+#    q_x = [np.inf,-np.inf]
+#    K = len(mus)
+#    if colors is None:
+#        colors = ['black']*K
+#    for k in range(K):
+#        if not np.isnan(mus[k][0]):
+#            plres = visualEigen(Sigmas[k], mus[k], [dim[0],dim[1]])
+#            if plres is None:
+#                continue
+#            q_res = np.percentile(plres[:,0], 50)
+#            q_x[0] = min(q_x[0],q_res)
+#            q_x[1] = max(q_x[1],q_res)
+#            q_res = np.percentile(plres[:,1], 50)
+#            q_y[0] = min(q_y[0],q_res)
+#            q_y[1] = max(q_y[1],q_res)
+#            ax.plot(plres[:,0],plres[:,1],'-',color = colors[k],linewidth=2)    
+#    return {'q_x': q_x, 'q_y': q_y}
+#    
+#def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
+#    '''
+#        Visualize mixture components for all samples
+#    '''
+#    q_y = [np.inf,-np.inf]
+#    q_x = [np.inf,-np.inf]
+#    q = {'q_x': q_x, 'q_y': q_y}
+#    for j in range(len(muspers)):
+#        qnew = component_plot(muspers[j],Sigmaspers[j],dim,ax,colors)
+#        q = mergeQ(q,qnew)
+#    return q
+#
+#def set_component_plot_tics(axlist,q):
+#    q_x = q['q_x']
+#    q_y = q['q_y']
+#    for ax in axlist:
+#        ax.axes.yaxis.set_ticks(np.linspace(q_y[0], q_y[1],num=3))
+#        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+#        ax.axes.xaxis.set_ticks(np.linspace(q_x[0], q_x[1],num=3))
+#        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+#
+#def mergeQ(q1,q2):
+#    q_x = [0, 0]
+#    q_y = [0, 0]
+#    q_x[0] = min(q1['q_x'][0],q2['q_x'][0])
+#    q_x[1] = max(q1['q_x'][1],q2['q_x'][1])
+#    q_y[0] = min(q1['q_y'][0],q2['q_y'][0])
+#    q_y[1] = max(q1['q_y'][1],q2['q_y'][1])
+#    return {'q_x': q_x, 'q_y': q_y}
+#
+#def plot_diagnostics(diagn,ymin,ymax,ybar = None,order=None,name = '',log=False,fig=None,totplots=1,plotnbr=1):
+#    if fig is None:
+#        fig = plt.figure()
+#    J = diagn.shape[0]
+#    K = diagn.shape[1]
+#    if order is None:
+#        order = range(K)
+#    nbr_cols = 2*totplots - 1
+#    col_start = 2*(plotnbr - 1) 
+#    xloc = np.arange(J) + .5
+#    bar_width = .35
+#    for k in range(K):
+#        ax = fig.add_subplot(K,nbr_cols,k*nbr_cols + col_start + 1)
+#        if k == 0:
+#            plt.title(name)
+#        ax.bar(xloc,diagn[:,order[k]],bar_width,log=log)
+#        ax.set_ylim(ymin,ymax)
+#        if not ybar is None:
+#            ax.plot([xloc[0],xloc[-1]],[ybar,ybar])
+#        ax.axes.yaxis.set_ticks([])
+#        ax.axes.xaxis.set_ticks([])
+#    return fig
+#    
+#def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sampleid=None,sampmarkers=None):
+#    '''
+#        PCA biplot
+#        
+#        data        -   data which to use
+#        comp        -   which two principal components to display
+#        ax          -   where to plot
+#        varcol      -   colors for variables
+#        varlabels   -   labels for variables
+#        varlabsh    -   shift for labels for variables
+#        sampleid    -   which group does each sample belong to?
+#        sampmarkers -   which plotmarkers shoud be used for the samples
+#    '''
+#    
+#    if ax == None:
+#    	f = plt.figure()
+#    	ax = f.add_subplot(111)
+#    else:
+#    	f = None
+#     
+#    K = data.shape[1]
+#    print "K = {}".format(K)
+#    if varcol is None:
+#        varcol = [(0,0,0)]*K
+#    if varlabels is None:
+#        varlabels = ['']*K
+#    if varlabsh is None:
+#        varlabsh = [0,0]*K
+#    if sampleid is None:
+#        if sampmarkers is None:
+#            sampmarkers = [(4,2)]
+#        sampleid = [0]*data.shape[0]
+#    else:
+#        sampleids = list(set(sampleid))
+#        iddict = dict(zip(sampleids,range(len(sampleids))))
+#        sampleid_new = [iddict[sid] for sid in sampleid]
+#        sampleid = sampleid_new
+#        if sampmarkers is None:
+#            sampmarkers = [(k,2) for k in range(3,(len(set(sampleids)))+3)]
+#        
+#    # Compute plot data
+#    data = data - np.mean(data,0)
+#    u, s, v = np.linalg.svd(data,full_matrices=0)
+#    s /= np.max(s) #Normalizing to make plot nicer
+#    sw = np.dot(u[:,comp],np.diag(s[comp]))
+#    vw = v[comp,:].transpose()
+#
+#    # Compute variance contained in two first components
+#    lam = s * s
+#    lam /= sum(lam) 
+#    print "Proportion of variance by components in biplot: {}".format(sum(lam[comp]))
+#
+#    ax.axis('off')
+#
+#    # Plot sample data
+#    for j in range(data.shape[0]):
+#        ax.scatter(sw[j,0],sw[j,1],marker=sampmarkers[sampleid[j]],edgecolors='black',facecolors='none',s=80)
+#
+#    # Plot variable data
+#    for k in range(data.shape[1]):
+#        ax.plot([0,vw[k,0]],[0,vw[k,1]],color=black_ip(varcol[k],6,10))
+#        ax.scatter(vw[k,0],vw[k,1],s=40,color=varcol[k])
+#        shift = 0.04*np.sign(vw[k,:])
+#        shift += varlabsh[k]
+#        ax.annotate(varlabels[k],vw[k,:]+shift,ha='center',va='center')
+#
+#    # Set plot limits
+#    sc = 1.15
+#    ax.set_xlim([sc*min(min(vw[:,0]),min(sw[:,0])),sc*max(max(vw[:,0]),max(sw[:,0]))])
+#    ax.set_ylim([sc*min(min(vw[:,1]),min(sw[:,1])),sc*max(max(vw[:,1]),max(sw[:,1]))])   
+#    plt.plot()
+#    return f,ax
+#    
+#def pca_screeplot(data,ax=None):
+#    if ax == None:
+#        f = plt.figure()
+#        ax = f.add_subplot(111)
+#    else:
+#        f = None
+#    data = data - np.mean(data,0)
+#    u, s, v = np.linalg.svd(data,full_matrices=0)
+#    lam = s * s
+#    lam /= sum(lam) 
+#    ax.bar(np.arange(len(lam)) + 0.5, lam)
+#    ax.set_ylim(0,1)
     
-def component_plot(mus,Sigmas,dim,ax,colors=None):
-    '''
-        Viusalize mixture component
-        
-        mu,Sigma    -   mixture component parameters
-        dim         -   dimensions for projection
-    '''
-    
-    q_y = [np.inf,-np.inf]
-    q_x = [np.inf,-np.inf]
-    K = len(mus)
-    if colors is None:
-        colors = ['black']*K
-    for k in range(K):
-        if not np.isnan(mus[k][0]):
-            plres = visualEigen(Sigmas[k], mus[k], [dim[0],dim[1]])
-            if plres is None:
-                continue
-            q_res = np.percentile(plres[:,0], 50)
-            q_x[0] = min(q_x[0],q_res)
-            q_x[1] = max(q_x[1],q_res)
-            q_res = np.percentile(plres[:,1], 50)
-            q_y[0] = min(q_y[0],q_res)
-            q_y[1] = max(q_y[1],q_res)
-            ax.plot(plres[:,0],plres[:,1],'-',color = colors[k],linewidth=2)    
-    return {'q_x': q_x, 'q_y': q_y}
-    
-def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
-    '''
-        Visualize mixture components for all samples
-    '''
-    q_y = [np.inf,-np.inf]
-    q_x = [np.inf,-np.inf]
-    q = {'q_x': q_x, 'q_y': q_y}
-    for j in range(len(muspers)):
-        qnew = component_plot(muspers[j],Sigmaspers[j],dim,ax,colors)
-        q = mergeQ(q,qnew)
-    return q
-
-def set_component_plot_tics(axlist,q):
-    q_x = q['q_x']
-    q_y = q['q_y']
-    for ax in axlist:
-        ax.axes.yaxis.set_ticks(np.linspace(q_y[0], q_y[1],num=3))
-        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
-        ax.axes.xaxis.set_ticks(np.linspace(q_x[0], q_x[1],num=3))
-        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
-
-def mergeQ(q1,q2):
-    q_x = [0, 0]
-    q_y = [0, 0]
-    q_x[0] = min(q1['q_x'][0],q2['q_x'][0])
-    q_x[1] = max(q1['q_x'][1],q2['q_x'][1])
-    q_y[0] = min(q1['q_y'][0],q2['q_y'][0])
-    q_y[1] = max(q1['q_y'][1],q2['q_y'][1])
-    return {'q_x': q_x, 'q_y': q_y}
-
-def plot_diagnostics(diagn,ymin,ymax,ybar = None,order=None,name = '',log=False,fig=None,totplots=1,plotnbr=1):
-    if fig is None:
-        fig = plt.figure()
-    J = diagn.shape[0]
-    K = diagn.shape[1]
-    if order is None:
-        order = range(K)
-    nbr_cols = 2*totplots - 1
-    col_start = 2*(plotnbr - 1) 
-    xloc = np.arange(J) + .5
-    bar_width = .35
-    for k in range(K):
-        ax = fig.add_subplot(K,nbr_cols,k*nbr_cols + col_start + 1)
-        if k == 0:
-            plt.title(name)
-        ax.bar(xloc,diagn[:,order[k]],bar_width,log=log)
-        ax.set_ylim(ymin,ymax)
-        if not ybar is None:
-            ax.plot([xloc[0],xloc[-1]],[ybar,ybar])
-        ax.axes.yaxis.set_ticks([])
-        ax.axes.xaxis.set_ticks([])
-    return fig
-    
-def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sampleid=None,sampmarkers=None):
-    '''
-        PCA biplot
-        
-        data        -   data which to use
-        comp        -   which two principal components to display
-        ax          -   where to plot
-        varcol      -   colors for variables
-        varlabels   -   labels for variables
-        varlabsh    -   shift for labels for variables
-        sampleid    -   which group does each sample belong to?
-        sampmarkers -   which plotmarkers shoud be used for the samples
-    '''
-    
-    if ax == None:
-    	f = plt.figure()
-    	ax = f.add_subplot(111)
-    else:
-    	f = None
-     
-    K = data.shape[1]
-    print "K = {}".format(K)
-    if varcol is None:
-        varcol = [(0,0,0)]*K
-    if varlabels is None:
-        varlabels = ['']*K
-    if varlabsh is None:
-        varlabsh = [0,0]*K
-    if sampleid is None:
-        if sampmarkers is None:
-            sampmarkers = [(4,2)]
-        sampleid = [0]*data.shape[0]
-    else:
-        sampleids = list(set(sampleid))
-        iddict = dict(zip(sampleids,range(len(sampleids))))
-        sampleid_new = [iddict[sid] for sid in sampleid]
-        sampleid = sampleid_new
-        if sampmarkers is None:
-            sampmarkers = [(k,2) for k in range(3,(len(set(sampleids)))+3)]
-        
-    # Compute plot data
-    data = data - np.mean(data,0)
-    u, s, v = np.linalg.svd(data,full_matrices=0)
-    s /= np.max(s) #Normalizing to make plot nicer
-    sw = np.dot(u[:,comp],np.diag(s[comp]))
-    vw = v[comp,:].transpose()
-
-    # Compute variance contained in two first components
-    lam = s * s
-    lam /= sum(lam) 
-    print "Proportion of variance by components in biplot: {}".format(sum(lam[comp]))
-
-    ax.axis('off')
-
-    # Plot sample data
-    for j in range(data.shape[0]):
-        ax.scatter(sw[j,0],sw[j,1],marker=sampmarkers[sampleid[j]],edgecolors='black',facecolors='none',s=80)
-
-    # Plot variable data
-    for k in range(data.shape[1]):
-        ax.plot([0,vw[k,0]],[0,vw[k,1]],color=black_ip(varcol[k],6,10))
-        ax.scatter(vw[k,0],vw[k,1],s=40,color=varcol[k])
-        shift = 0.04*np.sign(vw[k,:])
-        shift += varlabsh[k]
-        ax.annotate(varlabels[k],vw[k,:]+shift,ha='center',va='center')
-
-    # Set plot limits
-    sc = 1.15
-    ax.set_xlim([sc*min(min(vw[:,0]),min(sw[:,0])),sc*max(max(vw[:,0]),max(sw[:,0]))])
-    ax.set_ylim([sc*min(min(vw[:,1]),min(sw[:,1])),sc*max(max(vw[:,1]),max(sw[:,1]))])   
-    plt.plot()
-    return f,ax
-    
-def pca_screeplot(data,ax=None):
-    if ax == None:
-        f = plt.figure()
-        ax = f.add_subplot(111)
-    else:
-        f = None
-    data = data - np.mean(data,0)
-    u, s, v = np.linalg.svd(data,full_matrices=0)
-    lam = s * s
-    lam /= sum(lam) 
-    ax.bar(np.arange(len(lam)) + 0.5, lam)
-    ax.set_ylim(0,1)
-    
-def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None, labels = None):
-
-    nv = np.shape(dat)[1]
-    count = 0
-
-    if f == None:
-        f = plt.figure()
-
-    gs = gridspec.GridSpec(nv, nv)
-    for i in range(nv):
-        ax =  f.add_subplot(gs[nv*i + i])
-        count += 1	 
-        index_i = (dat[:,i] > np.percentile(dat[:,i], quan[0])) * (dat[:,i] < np.percentile(dat[:,i], quan[1]))
-        q1 = np.percentile(dat[index_i ,i], quan_plot[0])
-        q2 = np.percentile(dat[index_i ,i], quan_plot[1])
-        ax.hist(dat[index_i ,i], bins = bins)
-        n_bins = ax.hist(dat[index_i ,i], bins = bins,facecolor='black',edgecolor='black')[0]
-        ax.axes.xaxis.set_ticks(np.linspace(q1,q2,num=4))
-        ax.axes.yaxis.set_ticks(np.ceil(np.linspace(0,np.max(n_bins),num=4)))
-        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
-        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
-        ax.tick_params(axis='both', which='major', labelsize=8)
-        xlims = np.percentile(dat[:,i], quan)
-        ax.set_xlim(xlims[0],xlims[1])
-        if not labels is None:
-            ax.set_xlabel(labels[i])
-        for j in range(i+1,nv):
-            index_j = (dat[:,j] > np.percentile(dat[:,j], quan[0]) ) * (dat[:,j] < np.percentile(dat[:,j], quan[1]))
-            q1_y = np.percentile(dat[index_j*index_i ,j], quan_plot[0])
-            q2_y = np.percentile(dat[index_j*index_i ,j], quan_plot[1])
-            q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
-            q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
-            ax = f.add_subplot(gs[nv*i + j])
-            count += 1
-            dat_j  = dat[index_i*index_j ,j]
-			#dat_j[dat_j == 0] = 1.
-            dat_i  = dat[index_i*index_j ,i]
-			#dat_i[dat_i == 0] = 1.
-            
-            ax.hist2d(dat_j, dat_i, bins = bins, norm=colors.LogNorm(),vmin=1)
-            ax.patch.set_facecolor('white')
-            ax.axes.xaxis.set_ticks(np.linspace(q1_y, q2_y,num=4))
-            ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
-            ax.axes.yaxis.set_ticks(np.linspace(q1_x, q2_x,num=4))
-            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
-            ax.tick_params(axis='both', which='major', labelsize=8)
-            if (not (labels is None)) and (j == (nv-1)):
-                ax.yaxis.set_label_position("right")
-                ax.set_ylabel(labels[i])
-                
-    f.subplots_adjust(wspace = .25)
-    f.subplots_adjust(hspace = .25)	
-    
-    return f
+#def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None, labels = None):
+#
+#    nv = np.shape(dat)[1]
+#    count = 0
+#
+#    if f == None:
+#        f = plt.figure()
+#
+#    gs = gridspec.GridSpec(nv, nv)
+#    for i in range(nv):
+#        ax =  f.add_subplot(gs[nv*i + i])
+#        count += 1	 
+#        index_i = (dat[:,i] > np.percentile(dat[:,i], quan[0])) * (dat[:,i] < np.percentile(dat[:,i], quan[1]))
+#        q1 = np.percentile(dat[index_i ,i], quan_plot[0])
+#        q2 = np.percentile(dat[index_i ,i], quan_plot[1])
+#        ax.hist(dat[index_i ,i], bins = bins)
+#        n_bins = ax.hist(dat[index_i ,i], bins = bins,facecolor='black',edgecolor='black')[0]
+#        ax.axes.xaxis.set_ticks(np.linspace(q1,q2,num=4))
+#        ax.axes.yaxis.set_ticks(np.ceil(np.linspace(0,np.max(n_bins),num=4)))
+#        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+#        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%d'))
+#        ax.tick_params(axis='both', which='major', labelsize=8)
+#        xlims = np.percentile(dat[:,i], quan)
+#        ax.set_xlim(xlims[0],xlims[1])
+#        if not labels is None:
+#            ax.set_xlabel(labels[i])
+#        for j in range(i+1,nv):
+#            index_j = (dat[:,j] > np.percentile(dat[:,j], quan[0]) ) * (dat[:,j] < np.percentile(dat[:,j], quan[1]))
+#            q1_y = np.percentile(dat[index_j*index_i ,j], quan_plot[0])
+#            q2_y = np.percentile(dat[index_j*index_i ,j], quan_plot[1])
+#            q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
+#            q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
+#            ax = f.add_subplot(gs[nv*i + j])
+#            count += 1
+#            dat_j  = dat[index_i*index_j ,j]
+#			#dat_j[dat_j == 0] = 1.
+#            dat_i  = dat[index_i*index_j ,i]
+#			#dat_i[dat_i == 0] = 1.
+#            
+#            ax.hist2d(dat_j, dat_i, bins = bins, norm=colors.LogNorm(),vmin=1)
+#            ax.patch.set_facecolor('white')
+#            ax.axes.xaxis.set_ticks(np.linspace(q1_y, q2_y,num=4))
+#            ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+#            ax.axes.yaxis.set_ticks(np.linspace(q1_x, q2_x,num=4))
+#            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+#            ax.tick_params(axis='both', which='major', labelsize=8)
+#            if (not (labels is None)) and (j == (nv-1)):
+#                ax.yaxis.set_label_position("right")
+#                ax.set_ylabel(labels[i])
+#                
+#    f.subplots_adjust(wspace = .25)
+#    f.subplots_adjust(hspace = .25)	
+#    
+#    return f
     
 class ClustPlot(object):
     
@@ -344,7 +345,7 @@ class ClustPlot(object):
             if not np.isnan(quantiles[self.order[k],0,0]):
                 ax = fig.add_subplot(self.clust.K,nbr_cols,k*nbr_cols + col_start+1)
                 for dd in range(self.clust.d):
-                    drawbox(quantiles[self.order[k],:,dd],boxloc[dd],boxw,ms,ax)
+                    plot.drawbox(quantiles[self.order[k],:,dd],boxloc[dd],boxw,ms,ax)
                 ax.axes.xaxis.set_ticks(boxloc)
                 xlim = ax.get_xlim()
                 ax.plot([xlim[0],xlim[1]],[.5, .5],color='grey')
@@ -625,7 +626,7 @@ class CompPlot(object):
         Sigmas = [self.comp.Sigmalat[k,:,:] for k in okcl]
         colors = [self.comp_colors[k] for k in okcl]
 
-        q = component_plot(mus,Sigmas,dim,ax,colors=colors)
+        q = plot.component_plot(mus,Sigmas,dim,ax,colors=colors)
         
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
@@ -664,7 +665,7 @@ class CompPlot(object):
         Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in js]
         colors = [self.comp_colors[k] for k in okcl]
 
-        q = pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
+        q = plot.pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
  
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
@@ -712,7 +713,7 @@ class CompPlot(object):
                 ax2.set_xlabel(self.marker_lab[dimlist[m][0]],fontsize=16)
             ax1.set_ylabel(self.marker_lab[dimlist[m][1]],fontsize=16)
 
-            set_component_plot_tics([ax1,ax2],mergeQ(ql,qa))
+            plot.set_component_plot_tics([ax1,ax2],plot.mergeQ(ql,qa))
         return fig
     
     def center_distance_quotient(self,fig=None,totplots=1,plotnbr=1):
@@ -723,7 +724,7 @@ class CompPlot(object):
         if fig is None:
             fig = plt.figure()
         distquo = self.comp.get_center_distance_quotient()
-        fig = plot_diagnostics(distquo,0,3,1,self.comp_ord,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
+        fig = plot.plot_diagnostics(distquo,0,3,1,self.comp_ord,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
         return fig
     
     def cov_dist(self,norm='F',fig=None,totplots=1,plotnbr=1):
@@ -734,7 +735,7 @@ class CompPlot(object):
             norm    -   which norm to use for computing the distance
         '''
         distF = self.comp.get_cov_dist(norm)
-        plot_diagnostics(np.log10(distF),-5,0,-3,self.comp_ord,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
+        plot.plot_diagnostics(np.log10(distF),-5,0,-3,self.comp_ord,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
 
 class TracePlot(object):
     
@@ -798,13 +799,14 @@ class FCplot(object):
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
         
-    def histnd(self,Nsamp=None,bins=50,fig = None,xlim=None,ylim=None):
+    def histnd(self,Nsamp=None,bins=50,fig=None,xlim=None,ylim=None):
         '''
             Plot panel of 1D and 2D histograms of a given sample (synthetic or real).
         '''
         if fig == None:
             fig = plt.figure()
-        histnd(self.fcsample.get_data(Nsamp),bins,[0, 100],[5,95],fig,self.marker_lab)
+        plot.histnd(self.fcsample.get_data(Nsamp),bins,[0, 100],[5,95],fig,
+               labels=self.marker_lab)
         if not xlim is None:
             for ax in fig.axes:
                 ax.set_xlim(*xlim)
@@ -875,7 +877,7 @@ class BMplot(object):
             if s > maxnbrsucocol:
                 suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
             for i,k in enumerate(suco):
-                colors[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
+                colors[k] = plot.black_ip(suco_col[suco_ord[s]],i,len(suco))
         return colors,suco_col,comp_ord,suco_ord
 
     def pca_biplot(self,comp,ax=None,poplabsh=None,sampmarkers=None):
@@ -894,11 +896,11 @@ class BMplot(object):
         #    poplabsh = [[0,0],[0,-.02],[0,0],[-.1,0],[.22,0],[.06,-.06]]
         if not hasattr(self,'pop_lab'):
             self.pop_lab = None
-        pca_biplot(self.bmres.clust_m.p,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
+        plot.pca_biplot(self.bmres.clust_m.p,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
                    varlabsh=poplabsh,sampleid=self.bmres.meta_data.samp['donorid'],sampmarkers=sampmarkers)        
 
     def pca_screeplot(self,ax=None):
-        pca_screeplot(self.bmres.p,ax)
+        plot.pca_screeplot(self.bmres.p,ax)
 
 
 
