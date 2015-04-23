@@ -858,27 +858,29 @@ class BMplot(object):
             
             This gives canonical ordering and colors for other plots.
         '''      
-        maxnbrsucocol = 8
-        for s,suco in enumerate(self.bmres.mergeind):
-            sc_ord = np.argsort(-np.array(np.sum(self.bmres.p,axis=0)[suco]))
-            self.bmres.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
-        prob_mer = [np.sum(self.bmres.p[:,scind]) for scind in self.bmres.mergeind]
-        suco_ord = np.argsort(-np.array(prob_mer))
-        mergeind_sort = [self.bmres.mergeind[i] for i in suco_ord]
-        print "mergeind_sort = {}".format(mergeind_sort)
-        comp_ord = [ind for suco in mergeind_sort for ind in suco]
-        cm = plt.get_cmap('gist_rainbow')
-        nbrsucocol = min(maxnbrsucocol,len(suco_ord))  
-        suco_col = [(0,0,0)]*len(suco_ord)
-        colors = [(0,0,0)]*len(comp_ord)
-        for s,suco in enumerate(mergeind_sort):
-            #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
-            suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
-            if s > maxnbrsucocol:
-                suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
-            for i,k in enumerate(suco):
-                colors[k] = plot.black_ip(suco_col[suco_ord[s]],i,len(suco))
-        return colors,suco_col,comp_ord,suco_ord
+        comp_col,suco_col,comp_ord,suco_ord = self.bmres.get_colors_and_order()
+        
+        #maxnbrsucocol = 8
+        ##for s,suco in enumerate(self.bmres.mergeind):
+        ##    sc_ord = np.argsort(-np.array(np.sum(self.bmres.p,axis=0)[suco]))
+        ##    self.bmres.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
+        ##prob_mer = [np.sum(self.bmres.p[:,scind]) for scind in self.bmres.mergeind]
+        ##suco_ord = np.argsort(-np.array(prob_mer))
+        #mergeind_sort = [self.bmres.mergeind[i] for i in suco_ord]
+        ##print "mergeind_sort = {}".format(mergeind_sort)
+        ##comp_ord = [ind for suco in mergeind_sort for ind in suco]
+        #cm = plt.get_cmap('gist_rainbow')
+        #nbrsucocol = min(maxnbrsucocol,len(suco_ord))  
+        #suco_col = [(0,0,0)]*len(suco_ord)
+        #colors = [(0,0,0)]*len(comp_ord)
+        #for s,suco in enumerate(mergeind_sort):
+        #    #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
+        #    suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
+        #    if s > maxnbrsucocol:
+        #        suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
+        #    for i,k in enumerate(suco):
+        #        colors[k] = plot.black_ip(suco_col[suco_ord[s]],i,len(suco))
+        return comp_col,suco_col,comp_ord,suco_ord
 
     def pca_biplot(self,comp,ax=None,poplabsh=None,sampmarkers=None):
         '''

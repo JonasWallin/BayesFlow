@@ -3,6 +3,7 @@ import numpy as np
 import warnings
 import copy as cp
 from sklearn import mixture as skmixture
+import plot
 
 import utils.Bhattacharyya as bhat
 from utils import diptest
@@ -96,7 +97,23 @@ class Mres(object):
         self.merged = False
         self.mergeMeth = ''
         self.mergeind = [[k] for k in range(self.K)]
-                     
+        
+    def get_order(self):
+        for s,suco in enumerate(self.mergeind):
+            sc_ord = np.argsort(-np.array(np.sum(self.p,axis=0)[suco]))
+            self.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
+        prob_mer = [np.sum(self.p[:,scind]) for scind in self.mergeind]
+        suco_ord = np.argsort(-np.array(prob_mer))
+        mergeind_sort = [self.mergeind[i] for i in suco_ord]
+        print "mergeind_sort = {}".format(mergeind_sort)
+        comp_ord = [ind for suco in mergeind_sort for ind in suco]
+        return comp_ord,suco_ord
+
+    def get_colors_and_order(self,maxnbrsucocol = 8):
+        comp_ord,suco_ord = self.get_order()
+        comp_col,suco_col = plot.get_colors(self.mergeind,suco_ord,comp_ord,maxnbrsucocol)      
+        return comp_col,suco_col,comp_ord,suco_ord    
+            
     def merge(self,method,thr,**mmfArgs):
 
         self.clust_m = Clustering(self.data, cp.deepcopy(self.clust_nm.classif_freq),np.copy(self.clust_nm.p),self.p_noise)
@@ -325,6 +342,7 @@ class Clustering(object):
     
     def get_median_bh_dt_dist(self,fixvalind=[],fixval=-1):
         bhd = self.get_bh_dist_data()
+        print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
         return get_medprop_pers(bhd,fixvalind,fixval)
 
     def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
@@ -367,8 +385,14 @@ class Clustering(object):
                                     bhd[j][k,l] = np.nan
                                 else:
                                     mul,Sigmal = discr.population_mu_Sigma(self.data[j],self.classif_freq[j][:,l])
+                                    #print "muk = {}".format(muk)
+                                    #print "mul = {}".format(mul)
+                                    #print "Sigmak = {}".format(Sigmak)
+                                    #print "Sigmal = {}".format(Sigmal)
                                     bhd[j][k,l] = bhat.bhattacharyya_dist(muk,Sigmak,mul,Sigmal)   
-                bhd[j][k,k] = 0             
+                bhd[j][k,k] = 0
+            print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
+            print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
         return bhd
         
     def get_quantiles(self,alpha,j=None,ks=None,dds=None):

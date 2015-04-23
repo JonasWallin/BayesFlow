@@ -3,6 +3,7 @@ Created on Aug 10, 2014
 
 @author: jonaswallin
 '''
+from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -126,7 +127,22 @@ def black_ip(color,n,N):
     r,g,b = colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
     return r,g,b,al
     #return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
-    
+
+def get_colors(sucos,suco_ord,comp_ord,maxcol=8):
+        nbrsucocol = min(maxcol,len(suco_ord))  
+        suco_col = [(0,0,0)]*len(suco_ord)
+        comp_col = [(0,0,0)]*len(comp_ord)
+        sucos_sort = [sucos[i] for i in suco_ord]
+        cm = plt.get_cmap('gist_rainbow')
+        for s,suco in enumerate(sucos_sort):
+            #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
+            suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
+            if s > maxcol:
+                suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
+            for i,k in enumerate(suco):
+                comp_col[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
+        return comp_col,suco_col    
+            
 def drawbox(quantiles,boxloc,boxw,ms,ax):
     '''
         Draw box in boxplot
@@ -144,6 +160,43 @@ def drawbox(quantiles,boxloc,boxw,ms,ax):
     plt.plot([boxloc,boxloc],[low,upp],marker = '_',color='blue',ms=ms)
     plt.plot([boxloc-boxw/2,boxloc+boxw/2,boxloc+boxw/2,boxloc-boxw/2,boxloc-boxw/2],[blow,blow,bupp,bupp,blow],color='blue')
     plt.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
+    
+def drawboxes(quantiles,ax=None,std_ylim=True):
+
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    d = len(quantiles[0])
+    boxloc = (np.array(range(d)) + .5)/(d+1)
+    boxw = (boxloc[1] - boxloc[0])/3.5
+    ms = 10
+    for dd in range(d):
+        quan_dd = [quan[dd] for quan in quantiles]
+        drawbox(quan_dd,boxloc[dd],boxw,ms,ax)
+    ax.axes.xaxis.set_ticks(boxloc)
+    if std_ylim:
+        xlim = ax.get_xlim()
+        ax.plot([xlim[0],xlim[1]],[.5, .5],color='grey')
+        ax.set_ylim(-.1,1.1)
+        ax.axes.yaxis.set_ticks([.2,.8])
+
+    return ax
+
+def probscatter(p,ax):
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    J = len(p)
+    ax.scatter(range(J), p)
+    ax.set_yscale('log')
+    ax.set_ylim(1e-3,1)
+    ax.axes.yaxis.set_ticks([1e-2,1e-1])
+    xlim = ax.get_xlim()
+    ax.plot([xlim[0],xlim[1]],[1e-2,1e-2],color='grey')
+    ax.plot([xlim[0],xlim[1]],[1e-1,1e-1],color='grey')
+    ax.axes.xaxis.set_ticks([])
+    ax.set_xlim(-1,J)
+
 
 def visualEigen(Sigma, mu, dim):
     if np.isnan(Sigma[0,0]) or np.isinf(Sigma[0,0]):
