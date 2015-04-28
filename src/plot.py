@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as colors
-import colorsys
+from utils.plot_util import black_ip
 
 def autocorr(x_in, lag=100):
     """
@@ -110,39 +110,6 @@ def plot_GMM_scatter(GMM, ax ,dim):
         for k in range(GMM.K):
             plt.plot(data[x==k,0],data[x==k,1],'+',label='k = %d'%(k+1))
             
-def black_ip(color,n,N):
-    '''
-        Interpolate between a color and black.
-        
-        color   -   color
-        n       -   shade rank
-        N       -   total number of possible shades
-    '''
-    if len(color) == 4:
-        r,g,b,al = color
-    else:
-        r,g,b = color
-        al = 1
-    h,s,v = colorsys.rgb_to_hsv(r, g, b)
-    r,g,b = colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
-    return r,g,b,al
-    #return colorsys.hsv_to_rgb(h,s,(N+3-n)/(N+3)*v)
-
-def get_colors(sucos,suco_ord,comp_ord,maxcol=8):
-        nbrsucocol = min(maxcol,len(suco_ord))  
-        suco_col = [(0,0,0)]*len(suco_ord)
-        comp_col = [(0,0,0)]*len(comp_ord)
-        sucos_sort = [sucos[i] for i in suco_ord]
-        cm = plt.get_cmap('gist_rainbow')
-        for s,suco in enumerate(sucos_sort):
-            #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
-            suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
-            if s > maxcol:
-                suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
-            for i,k in enumerate(suco):
-                comp_col[k] = black_ip(suco_col[suco_ord[s]],i,len(suco))
-        return comp_col,suco_col    
-            
 def drawbox(quantiles,boxloc,boxw,ms,ax):
     '''
         Draw box in boxplot
@@ -152,14 +119,17 @@ def drawbox(quantiles,boxloc,boxw,ms,ax):
         boxw        -   width of box
         ms          -   size of whiskers
     '''
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
     low = quantiles[0]
     blow = quantiles[1]
     bmid = quantiles[2]
     bupp = quantiles[3]
     upp = quantiles[4]
-    plt.plot([boxloc,boxloc],[low,upp],marker = '_',color='blue',ms=ms)
-    plt.plot([boxloc-boxw/2,boxloc+boxw/2,boxloc+boxw/2,boxloc-boxw/2,boxloc-boxw/2],[blow,blow,bupp,bupp,blow],color='blue')
-    plt.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
+    ax.plot([boxloc,boxloc],[low,upp],marker = '_',color='blue',ms=ms)
+    ax.plot([boxloc-boxw/2,boxloc+boxw/2,boxloc+boxw/2,boxloc-boxw/2,boxloc-boxw/2],[blow,blow,bupp,bupp,blow],color='blue')
+    ax.plot([boxloc-boxw/2,boxloc+boxw/2],[bmid,bmid],color='blue')
     
 def drawboxes(quantiles,ax=None,std_ylim=True):
 

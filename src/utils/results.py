@@ -3,11 +3,12 @@ import numpy as np
 import warnings
 import copy as cp
 from sklearn import mixture as skmixture
-import plot
+import matplotlib.pyplot as plt
 
-import utils.Bhattacharyya as bhat
-from utils import diptest
-import utils.discriminant as discr
+import Bhattacharyya as bhat
+import diptest
+import discriminant as discr
+from plot_util import get_colors 
 
 def get_medprop_pers(prop,fixvalind=[],fixval=-1):
     med_prop = np.empty(prop[0].shape)
@@ -111,7 +112,7 @@ class Mres(object):
 
     def get_colors_and_order(self,maxnbrsucocol = 8):
         comp_ord,suco_ord = self.get_order()
-        comp_col,suco_col = plot.get_colors(self.mergeind,suco_ord,comp_ord,maxnbrsucocol)      
+        comp_col,suco_col = get_colors(self.mergeind,suco_ord,comp_ord,maxnbrsucocol)      
         return comp_col,suco_col,comp_ord,suco_ord    
             
     def merge(self,method,thr,**mmfArgs):
@@ -342,7 +343,7 @@ class Clustering(object):
     
     def get_median_bh_dt_dist(self,fixvalind=[],fixval=-1):
         bhd = self.get_bh_dist_data()
-        print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
+        #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
         return get_medprop_pers(bhd,fixvalind,fixval)
 
     def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
@@ -391,8 +392,8 @@ class Clustering(object):
                                     #print "Sigmal = {}".format(Sigmal)
                                     bhd[j][k,l] = bhat.bhattacharyya_dist(muk,Sigmak,mul,Sigmal)   
                 bhd[j][k,k] = 0
-            print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
-            print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
+            #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
+            #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
         return bhd
         
     def get_quantiles(self,alpha,j=None,ks=None,dds=None):
@@ -478,9 +479,14 @@ class Clustering(object):
         pdipsummary = {'Median': np.empty((K,d)), '25th percentile': np.empty((K,d)), 'Minimum': np.empty((K,d))}
         for k in range(K):
             pdk = self.pdiplist[k][~np.isnan(self.pdiplist[k][:,0]),:]#np.ma.masked_array(self.pdiplist[k],np.isnan(self.pdiplist[k]))
-            pdipsummary['Median'][k,:] = np.median(pdk,0)
-            pdipsummary['25th percentile'][k,:] = np.percentile(pdk,25,0)
-            pdipsummary['Minimum'][k,:] = np.min(pdk,0)
+            if len(pdk) == 0:
+                pdipsummary['Median'][k,:] = np.nan
+                pdipsummary['25th percentile'][k,:] = np.nan
+                pdipsummary['Minimum'][k,:] = np.nan
+            else:
+                pdipsummary['Median'][k,:] = np.median(pdk,0)
+                pdipsummary['25th percentile'][k,:] = np.percentile(pdk,25,0)
+                pdipsummary['Minimum'][k,:] = np.min(pdk,0)
         return pdipsummary
     
     def get_pdip_discr_jkl(self,j,k,l,dim=None):

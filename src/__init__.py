@@ -9,10 +9,8 @@ from .GMM import mixture  # @UnresolvedImport
 from hier_GMM import hierarical_mixture
 from hier_GMM_MPI import hierarical_mixture_mpi  
 from hier_GMM_MPI import distance_sort as distance_sort_MPI
-from hier_GMM_MPI import load_hGMM
-from hier_GMM_MPI import SimulationError
-from HMlog import HMlogB
-from HMlog import HMlog
-from HMlog import HMElog
-from BMres import BMres
-__all__ = ['mixture','hierarical_mixture','hierarical_mixture_mpi','load_hGMM','HMlogB','HMlog','HMElog','BMres','SimulationError']
+from hier_GMM_MPI import load_hGMM,SimulationError
+from .HMlog import HMlogB,HMlog,HMElog
+from .HMres import HMres
+from setup_simulation import Prior,SimPar,PostProcPar,setup_sim
+__all__ = ['mixture','hierarical_mixture','hierarical_mixture_mpi','load_hGMM','HMlogB','HMlog','HMElog','HMres','SimulationError','Prior','SimPar','PostProcPar','setup_sim']

@@ -129,7 +129,8 @@ def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):
             bax.set_xlim(xF[L]-.1*(xF[U]-xF[L]),xF[U]+.1*(xF[U]-xF[L]))
 
         if xF[U0]-xF[L0] < eps:
-            print "Modal interval zero length"
+            if verbose:
+                print "Modal interval zero length"
             break
 
 
