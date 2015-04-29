@@ -9,7 +9,7 @@ import numpy as np
 from rpy2.robjects.packages import importr
 from rpy2.rinterface import RRuntimeError
 import rpy2.robjects as robjects
-import BayesFlow.utils.transform as transform
+from BayesFlow.utils.dat_util import percentilescale
 
 def load(Nsamp = None,scale = True):
     '''
@@ -45,7 +45,7 @@ def load(Nsamp = None,scale = True):
     metasamp = {'names':sampnames,'donorid': donorids}
     metadata = {'samp':metasamp,'marker_lab':marker_lab}
     if scale:
-        transform.percentilescale(data)
+        percentilescale(data)
         
     return data,metadata
         

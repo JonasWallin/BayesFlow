@@ -17,6 +17,9 @@ import os
 import glob
 import time
 import warnings
+import traceback
+import pdb
+import sys
 
 #TODO: change to geomtrical median instead of mean!!
 def distance_sort(hGMM):
@@ -121,6 +124,12 @@ class hierarical_mixture_mpi(object):
 		if not prior is None:
 			self.set_prior(prior,init=True,thetas=thetas)
 
+		self.timing = False
+
+	def mpiexceptabort(self,type, value, tb):
+	    traceback.print_exception(type, value, tb)
+	    pdb.pm()
+	    self.comm.Abort(1)
 	
 	def save_prior_to_file(self,dirname):
 		"""
@@ -515,8 +524,9 @@ class hierarical_mixture_mpi(object):
 				self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
 				
 	def set_var_prior(self,prior):
-		self.set_Sigma_theta_prior(prior.Q,prior.n_theta)
-		self.set_Psi_prior(prior.H,prior.n_Psi)
+		if self.comm.Get_rank() == 0:
+			self.set_Sigma_theta_prior(prior.Q,prior.n_theta)
+			self.set_Psi_prior(prior.H,prior.n_Psi)
 
 	def set_Sigma_theta_prior(self,Q,n_theta):
 		if self.comm.Get_rank() == 0:
@@ -854,13 +864,19 @@ class hierarical_mixture_mpi(object):
 		self.comm.Barrier()
 		self.update_GMM()
 		
+	def toggle_timing(on=True):
+		if on:
+			self.timing = True
+		else:
+			self.timing = False
 
-	def simulate(self,simpar,name='simulation',printfrq=100,timed=False,stop_if_cl_off=True):
+	def simulate(self,simpar,name='simulation',printfrq=100,stop_if_cl_off=True):
+		sys.excepthook = self.mpiexceptabort
 		if stop_if_cl_off:
 			warnings.filterwarnings("error",'One cluster turned off in all samples')
 		else:
 			warnings.filterwarnings("default",'One cluster turned off in all samples')			
-		if timed:
+		if self.timing:
 			t_GMM = 0
 			t_load = 0
 			t_rest = 0
@@ -871,14 +887,14 @@ class hierarical_mixture_mpi(object):
 		for i in range(iterations):
 			if i%printfrq == 0 and self.comm.Get_rank() == 0:
 				print "{} iteration = {}".format(name,i)
-				if timed:
+				if self.timing:
 					print "{} iteration = {}".format(name,i)
 					print("hgmm GMM  %.4f sec/sim"%(t_GMM/(i+1)))
 					print("hgmm load  %.4f sec/sim"%(t_load/(i+1)))
 					print("hgmm rank=0  %.4f sec/sim"%(t_rest/(i+1)))
 					print("save  %.4f sec/sim"%(t_save/(i+1)))					
 			try:
-				if not timed:
+				if not self.timing:
 					self.sample()
 					hmlog.savesim(self)
 				else:
