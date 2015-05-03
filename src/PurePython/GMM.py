@@ -177,7 +177,7 @@ class mixture(object):
 		"""
 		self.name = name
 		
-	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None):
+	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None,a = 1):
 		"""
 			adds a class that does not update and cant be deactiveted or label switch
 			the data need to be loaded first!
@@ -185,16 +185,21 @@ class mixture(object):
 			Sigma_scale  - (double)  a scaling constant for the the covariance matrix (not used if Sigma supplied)
 			mu           - (d x 1 vector) mean value for the noise. If not supplied, the mean of the data is used.
 			Sigma        - (d x d matrix) covariance matrix fo the noise
+			a 			 - (double) Dirichlet distribution parameter corresponding to noise cluster
 		"""
 		
 		
 		if self.data  is None:
 				raise ValueError, 'need data to be loaded first'
 		
-		self.noise_class = 1
-		self.active_komp = np.hstack((self.active_komp,True))
-		self.p = np.hstack((self.p * (1- 0.01), 0.01))
-		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.))
+		if not self.noise_class:
+			self.noise_class = 1
+			self.active_komp = np.hstack((self.active_komp,True))
+			self.p = np.hstack((self.p * (1- 0.01), 0.01))
+			self.alpha_vec =  np.hstack((self.alpha_vec,a))
+		else:
+			print "Noise class already present"
+
 		if Sigma is None:
 			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
 		if mu is None:
@@ -799,9 +804,9 @@ class mixture(object):
 			if not np.isnan(self.mu[k]).any():
 				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
 				if not np.argmin(dist) in aquitted_k:
-					print "thetas = {}".format(thetas)
-					print "mu = {}".format(self.mu)
-					print "aquitted = {}".format(aquitted)
+					#print "thetas = {}".format(thetas)
+					#print "mu = {}".format(self.mu)
+					#print "aquitted = {}".format(aquitted)
 					self.deactivate_component(k)
 					any_deactivated = 1
 		if np.sum(self.active_komp) == 0:

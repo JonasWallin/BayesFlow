@@ -10,5 +10,8 @@ import Hellinger
 import Bhattacharyya
 import transform
 import discriminant
+from timer import Timer
+import dat_util
+from seed import get_seed
 
-__all__ = ['gammad','Hellinger','Bhattacharyya','transform','discriminant']
+__all__ = ['gammad','Hellinger','Bhattacharyya','transform','discriminant','Timer','dat_util','get_seed']
