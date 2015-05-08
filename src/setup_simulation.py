@@ -35,9 +35,9 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
             if not os.path.exists(dr):
                 os.makedirs(dr)
         simfile = inspect.getouterframes(inspect.currentframe())[1][1]
-        os.system("cp "+simfile+" "+savedir)
+        os.system("cp \""+simfile+"\" "+savedir)
         if not setupfile is None:
-            os.system("cp "+setupfile+" "+savedir)
+            os.system("cp \""+setupfile+"\" "+savedir)
         for kw in kws:
             if not kw is None:
                 with open(savedir+kw+'.dat','w') as f:
@@ -234,7 +234,7 @@ class SimPar(object):
         self.qprod = 1 - qburn            
         
         self.nbrsaveit = min(nbrsaveit,nbriter)
-        self.nbrsimy = min(nbrsimy,int(nbriter*self.qprod))      
+        self.nbrsimy = min(nbrsimy,int(np.round(nbriter*self.qprod)))    
 
         self.tightinitfac = tightinit
 
@@ -295,7 +295,7 @@ class SimPar(object):
         phase['p_sw'] = 0
         phase['p_on_off'] = [0, 0]
         phase['nu_MH_par'] = None
-        phase['logpar']['savesamp'] = self.simsamp
+        phase['logpar']['savesampnames'] = self.simsampnames
         self.phases[name] = phase
         
     def new_trialphase(self,nbrit,name='T'):
