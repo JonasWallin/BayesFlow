@@ -42,7 +42,9 @@ def setup(J,n_J,testrun=False):
             iteration=5)
     simpar.new_prodphase(last_burnphase='B')
 						
-    postproc = PostProcPar(True,'bhat_hier_dip',thr=0.47,lowthr=0.08,dipthr=0.28)
+    postproc = setup_postproc()
 
     return prior,simpar,postproc
 
+def setup_postproc():
+    return PostProcPar(True,'bhat_hier_dip',thr=0.47,lowthr=0.08,dipthr=0.28)

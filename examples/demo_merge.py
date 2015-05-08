@@ -3,7 +3,7 @@ from BayesFlow.utils import Timer
 from BayesFlow import PostProcPar
 from BayesFlow.utils import load_and_save as ls
 
-from setup_util import fcdata,get_dir_setup_HF_art
+from example_util import fcdata,get_dir_setup_HF_art
 
 dataset = 'HF'
 Nevent = 2000

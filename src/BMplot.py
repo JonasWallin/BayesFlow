@@ -325,7 +325,7 @@ class CompPlot(object):
             
         return ax
 
-    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False,plot_new_th=True):
+    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False,plot_new_th=True,lw=2):
         '''
             Plot visualization with ellipses of the latent components.
             Canonical colors are used (see BMplot).
@@ -352,7 +352,7 @@ class CompPlot(object):
         Sigmas = [self.comp.Sigmalat[k,:,:] for k in okcl]
         colors = [self.comp_colors[k] for k in okcl]
 
-        q = plot.component_plot(mus,Sigmas,dim,ax,colors=colors)
+        q = plot.component_plot(mus,Sigmas,dim,ax,colors=colors,lw=lw)
         
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
@@ -362,7 +362,7 @@ class CompPlot(object):
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False,plot_new_th=True):
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False,plot_new_th=True,lw=1):
         '''
             Plot visualization of mixture components for all samples.
             Canonical colors are used (see BMplot).
@@ -391,7 +391,7 @@ class CompPlot(object):
         Sigmaspers = [[self.comp.Sigmapers[j,k,:,:] for k in okcl] for j in js]
         colors = [self.comp_colors[k] for k in okcl]
 
-        q = plot.pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors)
+        q = plot.pers_component_plot(muspers,Sigmaspers,dim,ax,colors=colors,lw=lw)
  
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
