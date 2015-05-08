@@ -11,7 +11,7 @@ NB! If you use MKL, in addition to the usual arguments to the compiler, you also
 - Go to the main directory (BayesFlow/) and run `python setup.py install`.
 
 ## Examples
-
+- demo_HF.py: Demonstration of how to use BayesFlow for healthyFlowData dataset. 
 
 ## Dependencies
 
