@@ -5,7 +5,9 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 '''
-    Experiment parameters
+    Experiment parameters.
+    'setupdir' and 'setupno' specify which file to look for experiment parameters,
+    namely the file setupdir+setupno+.py. Edit this file as needed for your experiment.
 '''
 dataset = 'HF'
 hGMMtiming = False
