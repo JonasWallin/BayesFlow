@@ -8,6 +8,7 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import plot
 
 class ClustPlot(object):
@@ -254,6 +255,9 @@ class CompPlot(object):
         
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
+
+    def set_sampnames(self,names):
+        self.sampnames = names
         
     def center(self,suco=True,fig=None,totplots=1,plotnbr=1,yscale=False):
         '''
@@ -362,7 +366,8 @@ class CompPlot(object):
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
         return q
 
-    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,plotlab=False,plot_new_th=True,lw=1):
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,names=None,plotlab=False,plot_new_th=True,lw=1):
+
         '''
             Plot visualization of mixture components for all samples.
             Canonical colors are used (see BMplot).
@@ -371,6 +376,8 @@ class CompPlot(object):
             ax     -   where to plot
             ks      -   which components to plot
             plim    -   only components with size within plim are plotted
+            js      -   which flow cytometry samples to plot
+            name    -   sampname of flow cytometry sample to plot
             plotlab -   should labels be shown?
         '''
         if ax is None:
@@ -382,8 +389,11 @@ class CompPlot(object):
         if ks is None:
             ks = range(self.comp.K)
         ks = [self.comp_ord[k] for k in ks]
-        if js is None:
-            js = range(self.comp.J)
+        if not names is None:
+            js = [self.sampnames.index(name) for name in names]
+        else:
+            if js is None:
+                js = range(self.comp.J)
 
         okcl = set.intersection(set(self.within_plim(plim)),set(ks))
         
@@ -524,12 +534,27 @@ class FCplot(object):
         
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
-        
+
+    def hist2d(self,dim,Nsamp=None,bins=50,ax=None,xlim=None,ylim=None):
+        '''
+            Plot 2D histograms of a given sample (synthetic or real).
+        '''
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        data = self.fcsample.get_data(Nsamp)
+        ax.hist2d(data[:,dim[0]],data[:,dim[1]],bins = bins,norm=colors.LogNorm(),vmin=1)
+        ax.patch.set_facecolor('white')
+        if not xlim is None:
+            ax.set_xlim(*xlim)
+        if not ylim is None:
+            ax.set_ylim(*ylim)     
+
     def histnd(self,Nsamp=None,bins=50,fig=None,xlim=None,ylim=None):
         '''
             Plot panel of 1D and 2D histograms of a given sample (synthetic or real).
         '''
-        if fig == None:
+        if fig is None:
             fig = plt.figure()
         plot.histnd(self.fcsample.get_data(Nsamp),bins,[0, 100],[5,95],fig,
                labels=self.marker_lab)
@@ -553,14 +578,19 @@ class BMplot(object):
         self.cop = CompPlot(bmres.components,self.comp_colors,self.comp_ord,self.suco_ord)
         self.trp = TracePlot(bmres.traces,self.comp_ord)
         
-        self.mcsp = []
+        self.mcsp = {}
         for mimic_key in bmres.mimics:
             mimic = bmres.mimics[mimic_key]
-            self.mcsp.append(MimicPlot(mimic))
+            self.mcsp[mimic_key] = MimicPlot(mimic)
+            #self.mcsp.append(MimicPlot(mimic))
             
         if marker_lab is None:
-            marker_lab = ['']*bmres.d
+            try:
+                marker_lab = bmres.meta_data.marker_lab
+            except:
+                marker_lab = ['']*bmres.d
         self.set_marker_lab(marker_lab)
+        self.set_sampnames(bmres.meta_data.samp['names'])
         
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
@@ -569,7 +599,11 @@ class BMplot(object):
             self.clp_m.set_marker_lab(marker_lab)
         self.cop.set_marker_lab(marker_lab)
         for mc in self.mcsp:
-            mc.set_marker_lab(marker_lab)
+            self.mcsp[mc].set_marker_lab(marker_lab)
+
+    def set_sampnames(self,names):
+        self.sampnames = names
+        self.cop.set_sampnames(names)
 
     def set_population_lab(self,pop_lab):
         order = np.argsort(self.suco_ord)
@@ -630,8 +664,42 @@ class BMplot(object):
     def pca_screeplot(self,ax=None):
         plot.pca_screeplot(self.bmres.p,ax)
 
+    def component_fit(self,plotdim,name='pooled',lim=[-.2,1.2],bins=100):
+        fig = plt.figure()
+        labels = self.bmres.meta_data.marker_lab
+        if name == 'pooled':
+            names = self.sampnames
+        else:
+            names = [name]
+        for m in range(len(plotdim)):
+            ax = plt.subplot2grid((len(plotdim), 4), (m, 0))
+            ql = self.cop.latent(plotdim[m],ax=ax)
+            ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
+            ax.set_ylabel(labels[plotdim[m][1]],fontsize=16)
+            ax.set_xlim(*lim)
+            ax.set_ylim(*lim)
+            
+            ax = plt.subplot2grid((len(plotdim), 4), (m, 1))
+            qa = self.cop.allsamp(plotdim[m],names=names,ax=ax)
+            ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
+            ax.set_xlim(*lim)
+            ax.set_ylim(*lim)
+            
+            ax = plt.subplot2grid((len(plotdim), 4), (m, 2))
+            self.mcsp[name].realplot.hist2d(plotdim[m],bins=bins,ax=ax,xlim=lim,ylim=lim)
+            if m == 0:
+                ax.set_title(name+'(real)')
+            #ax.set_xlim(*lim)
+            #ax.set_ylim(*lim)
+            
+            ax = plt.subplot2grid((len(plotdim), 4), (m, 3))
+            self.mcsp[name].synplot.hist2d(plotdim[m],bins=bins,ax=ax,xlim=lim,ylim=lim)
+            if m == 0:
+                ax.set_title(name+'(synthetic)')
+            #ax.set_xlim(*lim)
+            #ax.set_ylim(*lim)
 
-
+        return fig
 
 
 

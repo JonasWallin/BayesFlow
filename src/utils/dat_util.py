@@ -79,7 +79,7 @@ def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
         
     data = []
     sampnames = []
-    print "J = {} samples loaded".format(J)
+    print "J = {} samples will be loaded".format(J)
     for j in range(J):
         sampnames.append(datafiles[j].replace(datadir,'').replace(' ','').replace(ext,''))
         data.append(loadfilef(datafiles[j])[startrow:,startcol:])
@@ -134,6 +134,8 @@ def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
         maxminscale(data)
     elif scale == 'percentilescale':
         percentilescale(data)
+    elif not scale is None:
+        raise ValueError, "Scaling {} is unsupported".format(scale)
 
     return data,metadata
     

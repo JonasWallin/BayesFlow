@@ -45,7 +45,7 @@ class HMres(Mres):
                 
             self.components = Components(bmlog,self.p)                   
             
-            self.plot = bmp.BMplot(self,self.meta_data.marker_lab)
+            #self.plot = bmp.BMplot(self)
                 
     def merge(self,method,thr,**mmfArgs):
         if rank == 0:
