@@ -4,9 +4,9 @@ version 0.1
 ## Installation
 - Ensure that you have obtained the dependencies listed below.
 - Update the configuration file setup.cfg: 
-  - Specify which libraries you are using for linear algebra (e.g. library = cblas, clapack)
+  - Specify which libraries you are using for linear algebra (e.g. libraries = cblas, clapack)
   - Specify library directories and header file directories for the listed libraries.
-  - If needed, specify additional arguments that should be passed to the compiler (e.g. if you use MKL)
+  - If needed, specify additional arguments that should be passed to the compiler (e.g. if you use MKL).
 NB! If you use MKL, in addition to the usual arguments to the compiler, you also need to pass the argument -DMKL.
 - Go to the main directory (BayesFlow/) and run `python setup.py install`.
 
