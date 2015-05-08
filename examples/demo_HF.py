@@ -1,4 +1,8 @@
+from mpi4py import MPI
 from BayesFlow.utils.seed import get_seed
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 '''
     Experiment parameters
@@ -6,7 +10,7 @@ from BayesFlow.utils.seed import get_seed
 dataset = 'HF'
 hGMMtiming = False
 Nevent = 2000
-testrun = False
+testrun = True
 
 expname = 'test'
 setupno = '0'
@@ -26,8 +30,8 @@ setupdir = 'exp_setup/HF/'
 '''
 if 1:
     execfile('demo_HF_MCMC.py',globals())
-
-# run = 1
+else:
+    run = 1
     
 '''
     Post-processing: merging components and computing pdip
@@ -52,5 +56,5 @@ toplot = ['conv','marg','diagn']
 #toplot = ['overlap']
 #toplot = ['scatter']
 
-if 1:
+if 1 and rank == 0:
     execfile('demo_HF_plot.py',globals())
