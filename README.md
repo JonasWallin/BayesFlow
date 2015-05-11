@@ -20,7 +20,7 @@ The package has the following dependencies:
 - OpenMPI
 - Libraries for linear algebra computations with c interfaces, e.g. CBLAS and CLAPACK or MKL. 
 
-The dependence on rpy2 is only needed for computing dip test and loading data from R package healhtyFlowData.
+The dependence on rpy2 is only needed for computing dip test and loading data from R package healthyFlowData.
 If installation without this dependency is wanted, files
 
 ```
