@@ -74,16 +74,16 @@ Note that you need to pass the extra argument `-DMKL` to the compiler.
 
 Python and OpenMPI can be installed using homebrew.
 First install homebrew following the instructions at http://brew.sh.
-Then install pyhon and OpenMPI:
+Then install Python and OpenMPI:
 ```
 brew install python, openmpi
 ```
-Then python packages can be installed using
+Then Python packages can be installed using
 ```
 pip install numpy, cython, matplotlib, mpi4py, json, pyyaml, rpy2
 ```
 For linear algebra c libraries, you can use the BLAS and LAPACK distributions provided in the Accelerate veclib framework.
-Then put
+To do this, put
 ```
 [build_ext]
 include_dirs = /usr/include:/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/Headers/
