@@ -27,9 +27,6 @@ def save_object(obj, savedir, filename=None, objtype=None):
         if not filename is None:
             save_object_to_file(obj,savedir+filename)
             return
-        if objtype == 'thetas':
-            save_thetas(obj,savedir)
-            return
         if objtype == 'eventind':
             save_eventind(obj,savedir)
         defaultnames = {'HMlogB':'blog','HMlog':'log_ne','HMElog':'log',
@@ -41,6 +38,7 @@ def save_object(obj, savedir, filename=None, objtype=None):
         if hasattr(obj,'mergeMeth'):
             filename += obj.mergeMeth
         filename += '.pkl'
+        print "saving file {}".format(filename)
         save_object_to_file(obj,savedir+filename)
 
 def eventfilename(savedir,Nevent,i):

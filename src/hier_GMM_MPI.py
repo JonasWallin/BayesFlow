@@ -976,7 +976,7 @@ class hierarical_mixture_mpi(object):
 				t4 = time.time()
 				t_save += np.double(t4-t3) 
 		if debug:
-			print "Iterations done at rank {}".format(MPI.COMM_WORLD.Get_rank())
+			print "Iterations done at rank {}".format(self.comm.Get_rank())
 		hmlog.postproc()
 		if debug:
 			print "Postproc done"

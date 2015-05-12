@@ -18,10 +18,11 @@ def setup(J,n_J,testrun=False):
     if rank == 0:
         print "setup with J = {} and n_J = {}".format(J,n_J)
 
-    t_inf = np.loadtxt('/Users/johnsson/Forskning/Experiments/FlowCytometry/BHM/HF/t_inf_1.txt')
-    Sk_inf = np.loadtxt('/Users/johnsson/Forskning/Experiments/FlowCytometry/BHM/HF/Sk_inf_1.txt')
-    print "Informative prior locations: {}".format(t_inf)
-    print "Informative prior variances: {}".format(Sk_inf)
+    t_inf = np.loadtxt('exp_setup/HF/t_inf_1.txt')
+    Sk_inf = np.loadtxt('exp_setup/HF/Sk_inf_1.txt')
+    if rank == 0:
+        print "Informative prior locations: {}".format(t_inf)
+        print "Informative prior variances: {}".format(Sk_inf)
 
     prior = Prior(J,n_J,d=4,K=17)
     prior.latent_cluster_means(t_inf=t_inf,t_ex=0.5,Sk_inf=Sk_inf,Sk_ex=1e6)
@@ -42,7 +43,9 @@ def setup(J,n_J,testrun=False):
             iteration=5)
     simpar.new_prodphase(last_burnphase='B')
 						
-    postproc = PostProcPar(True,'bhat_hier_dip',thr=0.47,lowthr=0.08,dipthr=0.28)
+    postproc = setup_postproc()
 
     return prior,simpar,postproc
 
+def setup_postproc():
+    return PostProcPar(True,'bhat_hier_dip',thr=0.47,lowthr=0.08,dipthr=0.28)

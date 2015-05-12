@@ -183,7 +183,7 @@ def visualEigen(Sigma, mu, dim):
     VV = np.dot(e.transpose(),V2.transpose()) + mu[dim].transpose()
     return VV
     
-def component_plot(mus,Sigmas,dim,ax,colors=None):
+def component_plot(mus,Sigmas,dim,ax,colors=None,lw=2):
     '''
         Viusalize mixture component
         
@@ -207,10 +207,10 @@ def component_plot(mus,Sigmas,dim,ax,colors=None):
             q_res = np.percentile(plres[:,1], 50)
             q_y[0] = min(q_y[0],q_res)
             q_y[1] = max(q_y[1],q_res)
-            ax.plot(plres[:,0],plres[:,1],'-',color = colors[k],linewidth=2)    
+            ax.plot(plres[:,0],plres[:,1],'-',color = colors[k],linewidth=lw)    
     return {'q_x': q_x, 'q_y': q_y}
     
-def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
+def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None,lw=1):
     '''
         Visualize mixture components for all samples
     '''
@@ -218,7 +218,7 @@ def pers_component_plot(muspers,Sigmaspers,dim,ax,colors=None):
     q_x = [np.inf,-np.inf]
     q = {'q_x': q_x, 'q_y': q_y}
     for j in range(len(muspers)):
-        qnew = component_plot(muspers[j],Sigmaspers[j],dim,ax,colors)
+        qnew = component_plot(muspers[j],Sigmaspers[j],dim,ax,colors,lw)
         q = mergeQ(q,qnew)
     return q
 
