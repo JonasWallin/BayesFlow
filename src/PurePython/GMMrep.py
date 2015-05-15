@@ -281,7 +281,8 @@ class mixture_repeat_measurements(object):
 				self.sigma_eps.append(cov_data*0.01)
 
 			self.mu_eps = np.array(self.mu_eps)
-		
+			self.sigma = np.array(self.sigma)
+			self.mu = np.array(self.mu)
 		mu_prior = {"theta":np.zeros((self.d ,1)),"Sigma":np.diag(np.diag(cov_data))*10**4 }
 		sigma_prior = {"nu":self.d, "Q":np.eye(self.d )*10**-6}
 		self.alpha_vec = 0.5*np.ones(self.K) 
@@ -290,7 +291,7 @@ class mixture_repeat_measurements(object):
 			for i in range(self.K):  # @UnusedVariable
 				self.prior.append({"mu":cp.deepcopy(mu_prior), "sigma": cp.deepcopy(sigma_prior),"p": 1/2.})
 		
-		self.p = np.ones(self.K, dtype=np.double)/self.K 
+		self.p = np.ones((self.n_measurements, self.K), dtype=np.double)/self.K 
 		
 		self.x = []
 		self.prob_X = [] 
@@ -299,14 +300,7 @@ class mixture_repeat_measurements(object):
 			self.x.append( -np.ones(shape=self.n[i],dtype = np.int, order='C' ))
 			
 			
-		if self.high_memory == True:
-			self.data_mu = []
-			for l in range(self.n_measurements):
-				data_i = []
-				for k in range(self.K):
-					data_i.append( self.data_split[l] - self.mu_eps[l][k] )
-				
-				self.data_mu.append(data_i)
+
 		
 		self.ln_gamma_d = ln_gamma_d(self.d)
 	
@@ -476,15 +470,135 @@ class mixture_repeat_measurements(object):
 		
 		pass
 	
+
+
 	@underconstruct
 	def set_AMCMC(self, n_AMCMC, min_p_AMCMC = 10**-6, p_rate_AMCMC = 0.66):
-		
-		pass
-	
+		"""
+			Adapative MCMC parameters
+			
+			n_AMCMC      - (1x1) expected number of samples in each iteration
+			
+			min_p_AMCMC  - (1x1) mimum probabilility of sampling a class
+			
+			p_rate_AMCMC - (1x1) rate on which we update the AMCMC
+			
+			p_AMCMC      - (nxK) integrated probability of beloning to a class for a point 
+			
+			p_max_AMCMC  - (nx1) the probability used to determine sampling
+			 
+		"""
+		self.AMCMC          = True
+		self.p_AMCMC        =  [np.ones((n,self.K + 1)) for n in self.n] 
+		self.p_rate_AMCMC   = p_rate_AMCMC
+		self.p_count_AMCMC  = [ np.zeros(n) for n in self.n]
+		self.p_max_AMCMC        = [np.ones((n,1)) for n in self.n]
+		self.min_p_AMCMC    = min_p_AMCMC
+		self.n_AMCMC        = n_AMCMC
+
 	@underconstruct
-	def compute_ProbX(self, norm =True, mu = None, sigma = None, p =None, active_komp = None):
+	def update_AMCMC(self,slice_p):
+		"""
+			Updates the coeffient used in the AMCMC given a new sample of x
+			
+			
+			slice_p  - (?xl) list of probabilies of the updated samples
 		
-		pass
+		"""
+		for l in range(self.n_measurements):
+			#updating the count of the data that was sampled in the Gibbs sampler
+			p_count_AMCMC_vec = self.p_count_AMCMC[l].compress(self.index_AMCMC[l], axis=0)
+			p_count_AMCMC_vec += 1
+			self.p_count_AMCMC[l][self.index_AMCMC[l]] = p_count_AMCMC_vec 
+		
+			#coeffient on how much to update the parameter of the AMCMC
+			weight = p_count_AMCMC_vec**(-self.p_rate_AMCMC)
+			one_minus_weight = 1 - weight
+		
+			p_AMCMC_vec = self.p_AMCMC[l].compress(self.index_AMCMC[l],axis=0)
+			p_AMCMC_vec *= one_minus_weight[:,np.newaxis]
+			p_AMCMC_vec[:,:(self.K  + self.noise_class)] += weight[:,np.newaxis] * slice_p[l]
+			
+			p_ = np.min(1-p_AMCMC_vec,1)
+			self.p_AMCMC[l][self.index_AMCMC[l],:] = p_AMCMC_vec
+		
+			# setting the probabilites to being sample to a minimum probability of being sampled
+			p_[p_ < self.min_p_AMCMC] = self.min_p_AMCMC
+			self.p_max_AMCMC[l][self.index_AMCMC[l]] = p_[:,np.newaxis]
+			# making sure that the expcted number of sampled Gibbs steps is correct
+			c = self.n_AMCMC / np.sum(self.p_max_AMCMC[l]) 
+			self.p_max_AMCMC[l] *= c 
+
+	@underconstruct
+	def compute_ProbX(self, norm =True, mu_eps = None, sigma = None, p =None, active_komp = None):
+		"""
+			Computes the E[x=i|\mu,\Sigma,p,Y] 
+		"""
+		if mu_eps is None:
+			mu_eps = self.mu_eps
+			sigma = self.sigma
+			p = self.p
+			
+		if active_komp is None:
+			active_komp = self.active_komp
+		
+		if self.AMCMC:
+			U = [None]*self.n_measurements
+			self.index_AMCMC = [None] * self.n_measurements
+			n_index          = [None] * self.n_measurements
+			for l in range(self.n_measurements):
+				U[l] = npr.rand(self.n[l],1)
+				self.index_AMCMC[l] = U[l] < self.p_max_AMCMC[l]
+			
+		else:
+			self.index_AMCMC[l] =	[np.ones((n,1)) for n in self.n]
+					
+		n_index  =[np.sum(index_A) for index_A in self.index_AMCMC]  
+		self.index_AMCMC = [ np.reshape(self.index_AMCMC[l],self.index_AMCMC[l].shape[0]) for l in range(self.n_measurements)]
+		
+		slice_p = [self.prob_X[l].compress(self.index_AMCMC[l] ,axis=0) for l in range(self.n_measurements)]
+		
+		X_slice  =[self.data_split[l].compress(self.index_AMCMC[l],axis=0) for l in range(self.n_measurements)]
+		
+		Qs = [None] * self.K
+		log_const = [None] * self.K
+		for k in range(self.K):
+			Qs[k] = np.linalg.inv(sigma[k])
+			log_const[k] = np.log(np.linalg.det(Qs[k]))/2. - (self.d/2.)* np.log(2 * np.pi)
+		
+		for l in range(self.n_measurements):
+			xbar_l = np.sum(X_slice[l],0)
+			for k in range(self.K):
+				if active_komp[l][k] == True:
+					
+					Qmu     =  np.dot(mu_eps[l,k,:],Qs[k])
+					mu_T_mu = np.dot(mu_eps[l,k,:].T, Qmu)
+					slice_p[l][:,k] = log_const[k] - 0.5 * mu_T_mu +  np.dot(xbar_l, Qmu)
+					slice_p[l][:,k] -= 0.5 * np.sum(X_slice[l] * np.dot(X_slice[l],Qs[k]),1)
+						
+					slice_p[l][: ,k] += np.log(p[l,k])
+		
+		
+		
+			if self.noise_class:
+				slice_p[l][:, self.K] = self.l_noise + np.log(p[l,self.K])
+			if norm:
+				slice_p[l] -= np.reshape(np.max(slice_p[l],1),(n_index[l] ,1))
+				slice_p[l][:] = np.exp(slice_p[l])
+				slice_p[l] /= np.reshape(np.sum(slice_p[l],1),(n_index[l] ,1))
+		
+		
+			for k in range(self.K):
+				if active_komp[l][k] == False:
+					slice_p[l][:,k] = 0.
+				
+			self.prob_X[l][self.index_AMCMC[l],:] = slice_p[l]
+
+		
+		
+		
+		if self.AMCMC:
+			self.update_AMCMC(slice_p)
 	
 	@underconstruct
 	def simulate_one_obs(self):

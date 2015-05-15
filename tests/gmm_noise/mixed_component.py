@@ -6,7 +6,7 @@ Created on Thu May  7 19:21:41 2015
 """
 import matplotlib.pyplot as plt
 import numpy as np
-from BayesFlow.PurePython.GMM import mixture_repeat_measurements
+from BayesFlow.PurePython.GMMrep import mixture_repeat_measurements
 
 n  = 500
 m  = 200
@@ -57,15 +57,37 @@ for k in range(K):
  
  
 #TODO: add test 
+#ADD test:
+# FOR n = 500, m= 200
+# the first digjit of:
+# np.mean(mix_obj.mu_eps,0)-mu should be (close to) zero
 mix_obj.sample_mu_eps()
 
 mix_obj.AMCMC = True
 
 #TODO: add test
+#ADD test:
+# FOR n = 500, m= 200
+# the first digjit of:
+# np.mean(mix_obj.mu_eps,0)-mu should be (close to) zero
 mix_obj.sample_mu_eps()
+
+
 
 #ADD test:
 # FOR n = 500, m= 200
 # the first digjit of:
-# np.mean(mix_obj.mu_eps,0)-mu should be zero
+# mix_obj.mu-mu should be zero
+mix_obj.sample_mu_given_mu_eps = False
+mix_obj.sample_mu()
+#ADD test:
+# FOR n = 500, m= 200
+# the first digjit of:
+# mix_obj.mu-mu should be zero
+mix_obj.sample_mu_given_mu_eps = True
+mix_obj.sample_mu()
+
+mix_obj.set_AMCMC(100)
+mix_obj.compute_ProbX()
+
 plt.scatter(x[:,0],x[:,1])
