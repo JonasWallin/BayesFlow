@@ -314,7 +314,7 @@ class mixture_repeat_measurements(object):
 		self.sample_x()
 		self.sample_mu()
 		self.sample_mu_eps()
-		self.sample_sigma()
+		#self.sample_sigma()
 		#self.sample_p()
 		#self.sample_active_komp()
 		#self.lab = self.sample_labelswitch()

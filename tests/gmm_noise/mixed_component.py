@@ -46,14 +46,14 @@ for i in range(m):
     x_i = x[index==i,:]
     z_i = z_true[index==i]
     for k in range(K):
-        
+        mix_obj.xxTbar[i][k][:] = np.dot(x_i[z_i==k,:].T,x_i[z_i==k,:])
         mix_obj.xbar[i][k][:] = np.sum(x_i[z_i==k,:],0)
         mix_obj.n_x[i][k]       = sum(z_i==k)
 
 for k in range(K):
-	mix_obj.sigma[k]     =  Sigma[k]	
-	mix_obj.sigma_eps[k] = np.eye(Sigma[0].shape[0])*sigma_eps
-	mix_obj.mu[k]        = mu[k]
+    mix_obj.sigma[k]     =  Sigma[k]    
+    mix_obj.sigma_eps[k] = np.eye(Sigma[0].shape[0])*sigma_eps
+    mix_obj.mu[k]        = mu[k]
  
  
 #TODO: add test 
@@ -89,5 +89,16 @@ mix_obj.sample_mu()
 
 mix_obj.set_AMCMC(100)
 mix_obj.compute_ProbX()
+mix_obj.sample_x()
+mix_obj.AMCMC = False
+mix_obj.compute_ProbX()
+mix_obj.sample_x()
+
+#TODO: add test
+#ADD test:
+# FOR n = 500, m= 200
+# the first digjit of:
+# Sigma vs mix_obj.sigma should be (close to) zero
+mix_obj.sample_sigma()
 
 plt.scatter(x[:,0],x[:,1])

@@ -14,10 +14,10 @@ import scipy.special as sps
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
+#import bayesianmixture.mixture_util.GMM_util as GMM_util
 
 
-
-
+#TODO: remove noise class, should be fairly easy to add an usefull
 
 def log_betapdf(p, a, b):
 	
@@ -41,29 +41,15 @@ def sample_mu(X, Sigma, theta, Sigma_mu):
 		
 	"""
 	
-	return sample_mu_Xbar(X.shape[0], np.sum(X,0), Sigma, theta, Sigma_mu)
-
-
-
-def sample_mu_Xbar(n, x_sum, Sigma, theta, Sigma_mu):
-	"""
-		Sampling the posterior mean given:
-		n        - (1x1)  the number of data points
-		Xbar	 - (1xd)  the mean data
-		Sigma	 - (dxd)  the covariance of the data
-		theta	 - (dx1)  the prior mean of mu
-		Sigma_mu  - (dx1)  the prior cov of mu
-		
-	"""
-	
+	x_sum = np.sum(X,0)
 	inv_Sigma	= np.linalg.inv(Sigma)
 	inv_Sigma_mu = np.linalg.inv(Sigma_mu)
 	
 	mu_s		 = np.dot(inv_Sigma_mu, theta).reshape(theta.shape[0]) + np.dot(inv_Sigma, x_sum)
-	Q			= n * inv_Sigma  + inv_Sigma_mu
+	Q			= X.shape[0] * inv_Sigma  + inv_Sigma_mu
 	L = np.linalg.cholesky(Q)
 	mu_t = np.linalg.solve(L, mu_s)
-	mu = np.linalg.solve(L.transpose(), mu_t + np.random.randn(theta.shape[0]))
+	mu = np.linalg.solve(L.transpose(), mu_t + np.random.randn(X.shape[1]))
 	return mu.reshape(mu.shape[0])
 	
 def sample_sigma_zero_mean(X, Q, nu):
@@ -71,23 +57,6 @@ def sample_sigma_zero_mean(X, Q, nu):
 	Q_star = Q +  np.dot(X.transpose(), X)
 	nu_star = nu + X.shape[0]
 	return wishart.invwishartrand(nu_star, Q_star)	
-
-def sample_sigma_xxT(n, xxTbar, xbar, mu, Q, nu):
-	"""
-		parameter for sampling the posterior distribution
-		of the covariance matrix given:
-		n        - (1x1)  the number of data points
-		xxTbar   - (dxd) the outer product of the data points
-		Xbar	 - (1xd)  the mean data
-		Q   - (dxd)	the covariance
-		nu  - (double) the observation parameter for the Inverse Wishart prior
-		
-	"""	
-	
-	m_T  = np.outer(xbar, mu)
-	Q_star  = Q + xxTbar -m_T - m_T.T + n * np.outer(mu, mu)
-	nu_star = nu + n 
-	return wishart.invwishartrand(nu_star, Q_star)
 
 def sample_sigma(X, mu, Q, nu):
 	"""
@@ -136,7 +105,7 @@ class mixture(object):
 			
 		self.high_memory = high_memory
 		self.prior = cp.deepcopy(prior)
-		if not data is None:
+		if data != None:
 			self.set_data(data)
 
 
@@ -152,7 +121,8 @@ class mixture(object):
 		self.lab =np.array([-1,-1])
 		
 		self.name=  name
-		self.AMCMC = False
+		if AMCMC == True:
+			self.AMCMC = True
 			
 
 	
@@ -203,14 +173,13 @@ class mixture(object):
 		return params
 	
 	
-	
 	def set_name(self,name):
 		"""
 			setting the name
 		"""
 		self.name = name
 		
-	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None,a = 1):
+	def add_noiseclass(self, Sigma_scale  = 5., mu = None, Sigma = None):
 		"""
 			adds a class that does not update and cant be deactiveted or label switch
 			the data need to be loaded first!
@@ -218,21 +187,16 @@ class mixture(object):
 			Sigma_scale  - (double)  a scaling constant for the the covariance matrix (not used if Sigma supplied)
 			mu           - (d x 1 vector) mean value for the noise. If not supplied, the mean of the data is used.
 			Sigma        - (d x d matrix) covariance matrix fo the noise
-			a 			 - (double) Dirichlet distribution parameter corresponding to noise cluster
 		"""
 		
 		
-		if self.data  is None:
+		if self.data  == None:
 				raise ValueError, 'need data to be loaded first'
 		
-		if not self.noise_class:
-			self.noise_class = 1
-			self.active_komp = np.hstack((self.active_komp,True))
-			self.p = np.hstack((self.p * (1- 0.01), 0.01))
-			self.alpha_vec =  np.hstack((self.alpha_vec,a))
-		else:
-			print "Noise class already present"
-
+		self.noise_class = 1
+		self.active_komp = np.hstack((self.active_komp,True))
+		self.p = np.hstack((self.p * (1- 0.01), 0.01))
+		self.alpha_vec =  np.hstack((self.alpha_vec,1/2.))
 		if Sigma is None:
 			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
 		if mu is None:
@@ -330,7 +294,6 @@ class mixture(object):
 			self.active_komp = active_komp
 			
 	
-	
 	def sample_activate(self):
 		"""
 			try to activate a component using RJMCMC
@@ -405,7 +368,6 @@ class mixture(object):
 		self.data = np.empty_like(data)
 		self.data[:] = data[:]
 		self.n = self.data.shape[0]
-		self.index_n = np.array(range(self.n),dtype=np.int)
 		self.d  = self.data.shape[1]
 		#just a stupied inital guess!!!
 		cov_data  = np.cov(data.transpose())
@@ -422,7 +384,7 @@ class mixture(object):
 		mu_prior = {"theta":np.zeros((self.d ,1)),"Sigma":np.diag(np.diag(cov_data))*10**4 }
 		sigma_prior = {"nu":self.d, "Q":np.eye(self.d )*10**-6}
 		self.alpha_vec = 0.5*np.ones(self.K) 
-		if self.prior is None:
+		if self.prior == None:
 			self.prior =[]
 			for i in range(self.K):  # @UnusedVariable
 				self.prior.append({"mu":cp.deepcopy(mu_prior), "sigma": cp.deepcopy(sigma_prior),"p": 1/2.})
@@ -446,9 +408,6 @@ class mixture(object):
 		self.sample_active_komp()
 		self.lab = self.sample_labelswitch()
 		#TODO: stores the components the average componentes
-	
-	
-	
 		
 	def updata_mudata(self):
 		
@@ -503,7 +462,7 @@ class mixture(object):
 			self.prior[k]['mu']['theta'][:]   = prior[k]['theta'].reshape(self.prior[k]['mu']['theta'].shape)
 			self.prior[k]['mu']['Sigma'][:]   = prior[k]['Sigma'][:] 
 				
-	def set_param(self, param, active_only=False):
+	def set_param(self, param):
 		
 		if len(self.mu) == 0 :
 			for k in range(self.K):
@@ -511,14 +470,11 @@ class mixture(object):
 				self.sigma.append((np.empty_like(param[k]['sigma'])))
 			
 		for k in range(self.K):
-			if not active_only or self.active_komp[k]:
-				self.mu[k][:] = param[k]['mu'][:]
-				self.sigma[k][:] = param[k]['sigma'][:]
+			self.mu[k][:] = param[k]['mu'][:]
+			self.sigma[k][:] = param[k]['sigma'][:]
 			
 		self.updata_mudata()
 
-		
-		
 			
 	def sample_x(self):
 		"""
@@ -526,26 +482,27 @@ class mixture(object):
 		
 		"""
 		self.compute_ProbX()
-		P = np.cumsum(self.slice_p ,1)
-		U = npr.rand(np.sum(self.index_AMCMC))
-		index_n = self.index_n[self.index_AMCMC].copy()
+		P = np.cumsum(self.prob_X[self.index_AMCMC,:],1)
+		U = npr.rand(sum(self.index_AMCMC))
+		index_n = np.array(range(self.n),dtype=np.int)
+		index_n = index_n[self.index_AMCMC]
 		#TODO: add things
 		for i in range(self.K + self.noise_class): 
 			index = U < P[:,i]
 			self.x[index_n[index]] = i
-			index_F = index==False
-			P  = P.compress(index_F, axis= 0)
-			U  = U.compress(index_F,axis = 0)
+			
+			P = P[index == False]
+			U = U[index == False]
 			
 			
-			index_n = index_n[index_F] 
+			index_n = index_n[index == False] 
 			
 			if U.shape[0] == 0:
 				break
 		else:
 			self.x[index_n] = self.K - 1 + self.noise_class
 			
-	
+		
 
 	def sample_labelswitch(self):
 		"""
@@ -582,15 +539,15 @@ class mixture(object):
 			if np.isnan(mu[0]) == 1:
 					return 0, None, None, None
 			
-			if R_S_mu is None:
+			if R_S_mu == None:
 					R_S_mu = sla.cho_factor(self.prior[k]['mu']['Sigma'],check_finite = False)
 			log_det_Sigma_mu = 2 * np.sum(np.log(np.diag(R_S_mu[0])))
 			
-			if log_det_Q is None:
+			if log_det_Q == None:
 					R_Q = sla.cho_factor(self.prior[k]['sigma']['Q'],check_finite = False)
 					log_det_Q = 2 * np.sum(np.log(np.diag(R_Q[0])))
 			
-			if R_S is None:
+			if R_S == None:
 					R_S = sla.cho_factor(Sigma,check_finite = False)
 			log_det_Sigma	= 2 * np.sum(np.log(np.diag(R_S[0])))
 			
@@ -652,7 +609,7 @@ class mixture(object):
 				else:
 					self.sigma[k] = np.NAN * np.ones((self.d, self.d))
 	
-
+	
 	def sample_p(self):
 		"""
 			Draws the posterior distribution for
@@ -678,7 +635,7 @@ class mixture(object):
 		
 		
 		self.compute_ProbX(norm=False, mu = mu, sigma = sigma,p = p, active_komp =  active_komp)
-		if active_komp is None:
+		if active_komp == None:
 			active_komp = self.active_komp
 		l = np.zeros(self.n)
 		for k in range(self.K + self.noise_class): 
@@ -701,7 +658,7 @@ class mixture(object):
 		self.AMCMC          = True
 		self.p_AMCMC        =  np.zeros((self.n, self.K + 1))
 		self.p_rate_AMCMC   = p_rate_AMCMC
-		self.p_count_AMCMC  = np.zeros(self.n)
+		self.p_count_AMCMC  = np.zeros((self.n,1))
 		self.p_max_AMCMC        = np.ones((self.n,1))
 		self.min_p_AMCMC    = min_p_AMCMC
 		self.n_AMCMC        = n_AMCMC
@@ -711,100 +668,75 @@ class mixture(object):
 		"""
 			Computes the E[x=i|\mu,\Sigma,p,Y] 
 		"""
-		if mu is None:
+		if mu == None:
 			mu = self.mu
 			sigma = self.sigma
 			high_memory = self.high_memory
 			p = self.p
 		else:
 			high_memory = False
-		if active_komp is None:
+		if active_komp == None:
 			active_komp = self.active_komp
 		
 		if self.AMCMC:
-			U = npr.rand(self.n,1)
+			U = npr.rand(self.n)
 			self.index_AMCMC = U < self.p_max_AMCMC
-			
 		else:
-			self.index_AMCMC =	np.ones((self.n,1), dtype=bool)		
-		n_index = np.sum(self.index_AMCMC)
-		self.index_AMCMC = np.reshape(self.index_AMCMC,self.index_AMCMC.shape[0])
+			self.index_AMCMC =	np.ones(self.n, dtype=bool)		
+			
 		#TODO: add index for sampling subsampling
 		# 
-		slice_p = self.prob_X.compress(self.index_AMCMC ,axis=0)
-		
-		if high_memory == False:
-			X_slice  =self.data.compress(self.index_AMCMC,axis=0)
-		
 		for k in range(self.K):
 			if active_komp[k] == True:
 				Q = np.linalg.inv(sigma[k])
-				
 				if high_memory == True:
-					temp_data = self.data_mu[k][self.index_AMCMC]
-					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
-					
-					slice[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
+					self.prob_X[self.index_AMCMC ,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
+					self.prob_X[self.index_AMCMC ,k] -= np.sum(self.data_mu[self.index_AMCMC ,k] * np.dot(self.data_mu[self.index_AMCMC ,k],Q),1)/2.
 				else:
-					X_mu = X_slice - mu[k]
-					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
-					
-					np.sum(X_slice * np.dot(X_mu,Q))
-					
-					slice_p[:,k] -= np.sum(X_mu * np.dot(X_mu,Q),1)/2.
-				slice_p[: ,k] += np.log(p[k])
+					X_mu = self.data[self.index_AMCMC,:] - mu[k]
+					self.prob_X[self.index_AMCMC,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
+					self.prob_X[self.index_AMCMC,k] -= np.sum(X_mu * np.dot(X_mu,Q),1)/2.
+				
+				self.prob_X[self.index_AMCMC ,k] += np.log(p[k])
 		
 		
 		
 		if self.noise_class:
-			slice_p[:, self.K] = self.l_noise + np.log(p[self.K])
+			self.prob_X[self.index_AMCMC,self.K] = self.l_noise + np.log(p[self.K])
 		if norm:
-			slice_p -= np.reshape(np.max(slice_p,1),(n_index ,1))
-			slice_p[:] = np.exp(slice_p)
-			slice_p /= np.reshape(np.sum(slice_p,1),(n_index ,1))
-		
+			self.prob_X[self.index_AMCMC,:] -= np.reshape(np.max(self.prob_X[self.index_AMCMC,:],1),(sum(self.index_AMCMC),1))
+			self.prob_X[self.index_AMCMC,:] = np.exp(self.prob_X[self.index_AMCMC,:])
+			self.prob_X[self.index_AMCMC,:] /= np.reshape(np.sum(self.prob_X[self.index_AMCMC,:],1),(sum(self.index_AMCMC),1))
 		
 		for k in range(self.K):
 			if active_komp[k] == False:
-				slice_p[:,k] = 0.
-				
-		self.prob_X[self.index_AMCMC,:] = slice_p
-		self.slice_p = slice_p
-		
-		
+				self.prob_X[self.index_AMCMC,k] = 0.
 		
 		if self.AMCMC:
-			p_count_AMCMC_vec = self.p_count_AMCMC.compress(self.index_AMCMC, axis=0)
-			p_count_AMCMC_vec += 1
-			self.p_count_AMCMC[self.index_AMCMC] = p_count_AMCMC_vec
-			
-			weight = p_count_AMCMC_vec**(-self.p_rate_AMCMC)
+			self.p_count_AMCMC[self.index_AMCMC,:] += 1
+			weight = self.p_count_AMCMC[self.index_AMCMC,:]**(-self.p_rate_AMCMC)
 			one_minus_weight = 1 - weight
-			
-			p_AMCMC_vec = self.p_AMCMC.compress(self.index_AMCMC,axis=0)
-			p_AMCMC_vec *= one_minus_weight[:,np.newaxis]
-			p_AMCMC_vec[:,:(self.K  + self.noise_class)] += weight[:,np.newaxis] * slice_p
-			p_ = np.min(1-p_AMCMC_vec,1)
-			self.p_AMCMC[self.index_AMCMC,:] = p_AMCMC_vec
-			
-			
+			self.p_AMCMC[self.index_AMCMC,:] *= one_minus_weight
+			self.p_AMCMC[self.index_AMCMC,:(self.K -1 + self.noise_class)] += weight * self.prob_X[self.index_AMCMC, :]
+			p_ = np.min(1-self.p_AMCMC[self.index_AMCMC,:],1)
 			p_[p_ < self.min_p_AMCMC] = self.min_p_AMCMC
-			self.p_max_AMCMC[self.index_AMCMC] = p_[:,np.newaxis]
-			c = self.n_AMCMC / np.sum(self.p_max_AMCMC) 
+			self.p_max_AMCMC[self.index_AMCMC] = p_
+			c = self.n_AMCMC / sum(self.p_max_AMCMC) 
 			self.p_max_AMCMC *= c 
+			
 
 	def simulate_data(self,n):
 		"""
 			simulates data using current Sigma, mu, p
-			if there exists noise class it __will__ be used
+			if there exists noise class it will not be used
 		"""
 		
 		p = np.zeros_like(self.p)
 		p[:] = self.p[:]
 		p[np.isnan(p)] = 0 
-		#if self.noise_class:
-		#	p = p[:-1]
-		#	p /= np.sum(p)		
+		if self.noise_class:
+			p = p[:-1]
+			p /= np.sum(p)		
 		x_ = npr.multinomial(1, p, size=n)
 		_, x = np.where(x_)  
 		X =np.zeros((n,self.d))
@@ -812,48 +744,27 @@ class mixture(object):
 			n_count = np.sum(x == k)
 			x_ = npr.multivariate_normal(self.mu[k], self.sigma[k],size = n_count)
 			X[x == k,:] = x_
-		if self.noise_class:
-			n_count = np.sum(x == self.K)
-			x_ = npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = n_count)
-			X[x == self.K,:] = x_
 		return X
 	
 	def simulate_one_obs(self):
 		"""
-			if there exists noise class it __will__ be used
+			if there exists noise class it will not be used
 		"""
 		p = np.zeros_like(self.p)
 		p[:] = self.p[:]
 		p[np.isnan(p)] = 0 
-		#if self.noise_class:
-		#	p = p[:-1]
-		#	p /= np.sum(p)
-		x = npr.choice(range(self.K+self.noise_class),p = p)
-		if x == self.K:
-			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
+		if self.noise_class:
+			p = p[:-1]
+			p /= np.sum(p)
+		x = npr.choice(range(self.K),p = p)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
-	def deactivate_outlying_components(self,aquitted=None):
-		any_deactivated = 0
+	def deactivate_outlying_components(self):
 		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
 		for k in range(self.K):
-			aquitted_k = [k]
-			if not aquitted is None:
-				for aqu in aquitted:
-					if k in aqu:
-						aquitted_k = aqu
-						break
-			if not np.isnan(self.mu[k]).any():
-				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
-				if not np.argmin(dist) in aquitted_k:
-					#print "thetas = {}".format(thetas)
-					#print "mu = {}".format(self.mu)
-					#print "aquitted = {}".format(aquitted)
-					self.deactivate_component(k)
-					any_deactivated = 1
-		if np.sum(self.active_komp) == 0:
-			print "All components deactivated"
-		return any_deactivated
+			dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+			if np.argmin(dist) != k:
+				self.deactivate_component(k)
 	
 	def deactivate_component(self,k_off):
 		self.active_komp[k_off] = False
@@ -902,12 +813,6 @@ class mixture(object):
 		"""
 		with file(filename, 'rb') as f:
 			return pickle.load(f)	
-
-	
-
-	
-
-
 
 if __name__ == "__main__":
 	N = 100
