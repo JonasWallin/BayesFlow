@@ -1,6 +1,7 @@
 '''
 Created on Jul 5, 2014
-
+updated: May 28, 2015: added AMCMC
+ 
 @author: jonaswallin
 '''
 import numpy as np
@@ -20,14 +21,15 @@ class nu_class(object):
 	'''
 		Class object for sampling the prior paramaeter of an wishart distribution
 	'''
+	
 
-
-	def __init__(self, nu0 = None, param = None, prior = None, prior_func = None):
+	def __init__(self, nu0 = None, param = None, prior = None, prior_func = None, AMCMC = True):
 		'''
 			param - dict with ['Q'] or better ['detQ'] (which containes log det of Q)
 			prior is empty
 			prior_func - function representing prior, should return log of prior
 						if None use expontial prior with lambda 0.01
+			AMCMC - use adaptive MCMC to calibrate sigma to get a fixed accpetance prob (deafult true)
 		'''
 		
 		self.log2 = np.log(2)
@@ -47,7 +49,15 @@ class nu_class(object):
 		if prior_func is None:
 			self.prior = {'nu':0.01}
 			self.prior_func = f_prior_nu
-	
+			
+		self.AMCMC = AMCMC
+		if self.AMCMC:
+			self.set_AMCMC()
+			
+		
+		self.amcmc_count  = 0.
+		self.amcmc_accept = 0.
+		
 	def set_val(self, nu ):
 		
 		self.nu = nu
@@ -130,17 +140,19 @@ class nu_class(object):
 		return self.nu
 			
 	def sample_(self):
+		
+		
+		self.iter += 1
+		self.amcmc_count += 1
 		nu_star = npr.randint(self.nu - self.sigma, self.nu + self.sigma + 1)
 		if nu_star == self.nu:
 			self.acc += 1
-			self.iter += 1
+			self.amcmc_accept += 1
 			return
 		
 		
 		
 		if nu_star <= self.d + 1:
-			self.acc += 0
-			self.iter += 1
 			return
 		
 		
@@ -156,7 +168,7 @@ class nu_class(object):
 		#print "***********"
 		if np.log(npr.rand()) < loglik_star - loglik:
 			self.acc += 1
-			self.iter += 1	
+			self.amcmc_accept += 1
 			self.loglik_val = loglik_star
 			self.nu = nu_star		
 		
@@ -177,5 +189,36 @@ class nu_class(object):
 			loglik += self.prior_func(nu,**self.prior)
 		return loglik
 	
+	def set_AMCMC(self, batch = 50, accpate = 0.2, delta_rate = .5):
+		"""
+			Using AMCMC
+			
+			batch	   - (int) how often to update sigma_MCMC
+			accpate	   - [0,1] desired accpance rate (0.574)
+			delta_rate - [0,1] updating ratio for the amcmc
+		"""
 		
+		self.amcmc_delta_max	= 0.1
+		self.amcmc_desired_accept = accpate
+		self.amcmc_batch		= batch
+		self.amcmc_delta_rate   =  delta_rate
+		self.AMCMC = True
+		
+	def update_AMCMC(self):
+		"""
+		Using roberts and rosenthal method for tunning the acceptance rate
+		"""
+	
+	
+		if (self.amcmc_count +1) % self.amcmc_batch == 0:
+
+			delta = np.min([self.amcmc_delta_max, (self.count_mcmc/self.amcmc_batch)**(-self.amcmc_delta_rate)])
+			
+			if self.amcmc_accept / self.amcmc_count > self.amcmc_desired_accept:
+				self.sigma *= np.exp(delta) 
+			else:
+				self.sigma /= np.exp(delta)
+			
+			self.amcmc_count  = 0.
+			self.amcmc_accept = 0.
 		

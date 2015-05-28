@@ -254,7 +254,7 @@ class logisticMNormal(object):
 		
 		
 		
-		self.amcmc_delta_min	= 0.1
+		self.amcmc_delta_max	= 0.1
 		self.amcmc_desired_accept = accpate
 		self.amcmc_batch		= batch
 		self.amcmc_delta_rate   =  delta_rate
@@ -269,7 +269,7 @@ class logisticMNormal(object):
 	
 		if (self.amcmc_count +1) % self.amcmc_batch == 0:
 
-			delta = np.min([self.amcmc_delta_min, (self.count_mcmc/self.amcmc_batch)**(-self.amcmc_delta_rate)])
+			delta = np.min([self.amcmc_delta_max, (self.count_mcmc/self.amcmc_batch)**(-self.amcmc_delta_rate)])
 			
 			if self.amcmc_accept / self.amcmc_count > self.amcmc_desired_accept:
 				self.sigma_MCMC *= np.exp(delta) 

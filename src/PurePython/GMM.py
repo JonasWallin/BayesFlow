@@ -15,10 +15,6 @@ import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
 
-
-
-
-
 def log_betapdf(p, a, b):
 	
 	pdf = - sps.betaln(a, b)
