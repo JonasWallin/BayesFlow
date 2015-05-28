@@ -9,6 +9,7 @@ import numpy as np
 from mpi4py import MPI
 import os
 import inspect
+import shutil
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -35,9 +36,11 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
             if not os.path.exists(dr):
                 os.makedirs(dr)
         simfile = inspect.getouterframes(inspect.currentframe())[1][1]
-        os.system("cp \""+simfile+"\" "+savedir)
+        shutil.copy(simfile,savedir)
+        #os.system("cp \""+simfile+"\" "+savedir)
         if not setupfile is None:
-            os.system("cp \""+setupfile+"\" "+savedir)
+            shutil.copy(setupfile,savedir)
+            #os.system("cp \""+setupfile+"\" "+savedir)
         for kw in kws:
             if not kw is None:
                 with open(savedir+kw+'.dat','w') as f:

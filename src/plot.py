@@ -25,6 +25,46 @@ def autocorr(x_in, lag=100):
         res[t] = np.corrcoef(np.array([x[0:len(x)-t], x[t:len(x)]]))[0,1]
     return res
 
+def hist2d(dat,dim,bins,quan=[0.5,99.5],quan_plot = [5, 95],ax=None,lims=None,labels=None):
+
+    if ax is None:
+        ax = plt.figure().add_subplot(111)
+
+    i,j = dim
+
+    if lims is None:
+        index_i = (dat[:,i] > np.percentile(dat[:,i], quan[0])) * (dat[:,i] < np.percentile(dat[:,i], quan[1]))
+        index_j = (dat[:,j] > np.percentile(dat[:,j], quan[0]) ) * (dat[:,j] < np.percentile(dat[:,j], quan[1]))
+        q1_y = np.percentile(dat[index_j*index_i ,j], quan_plot[0])
+        q2_y = np.percentile(dat[index_j*index_i ,j], quan_plot[1])
+        q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
+        q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
+    else:
+        q1_x =lims[i, 0]
+        q2_x =lims[i, 1]
+        q1_y =lims[j, 0]
+        q2_y =lims[j, 1]
+        index_i = (dat[:,i] > q1_x) * (dat[:,i] < q2_x)
+        index_j = (dat[:,j] > q1_y) * (dat[:,j] < q2_y)        
+
+
+    dat_j  = dat[index_i*index_j ,j]
+    #dat_j[dat_j == 0] = 1.
+    dat_i  = dat[index_i*index_j ,i]
+    #dat_i[dat_i == 0] = 1.
+    
+    ax.hist2d(dat_i, dat_j, bins = bins, norm=colors.LogNorm(),vmin=1)
+    ax.patch.set_facecolor('white')
+    ax.axes.xaxis.set_ticks(np.linspace(q1_x, q2_x,num=4))
+    ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    ax.axes.yaxis.set_ticks(np.linspace(q1_y, q2_y,num=4))
+    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    ax.tick_params(axis='both', which='major', labelsize=8)
+    if not labels is None:
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel(labels[j])
+
+
 def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None, 
            lims = None, labels = None):
     

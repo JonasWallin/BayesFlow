@@ -61,7 +61,7 @@ class ClustPlot(object):
         if fig is None:
             fig = plt.figure()
         quantiles = self.clust.get_quantiles((.01,.25,.5,.75,.99))
-        print "quantiles = {}".format(quantiles)
+        #print "quantiles = {}".format(quantiles)
         nbr_cols = 2*totplots - 1
         col_start = 2*(plotnbr-1)
         boxloc = (np.array(range(self.clust.d)) + .5)/(self.clust.d+1)
@@ -664,8 +664,9 @@ class BMplot(object):
     def pca_screeplot(self,ax=None):
         plot.pca_screeplot(self.bmres.p,ax)
 
-    def component_fit(self,plotdim,name='pooled',lim=[-.2,1.2],bins=100):
-        fig = plt.figure()
+    def component_fit(self,plotdim,name='pooled',lim=[-.2,1.2],bins=100,fig=None):
+        if fig is None:
+            fig = plt.figure()
         labels = self.bmres.meta_data.marker_lab
         if name == 'pooled':
             names = self.sampnames
