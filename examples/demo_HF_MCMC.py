@@ -5,7 +5,6 @@ Created on Fri May  8 16:04:29 2015
 @author: johnsson
 """
 from __future__ import division
-from mpi4py import MPI
 
 import BayesFlow as bf
 from BayesFlow.utils import Timer
@@ -17,8 +16,6 @@ from example_util import  retrieve_healthyFlowData,load_setup_HF,HF,get_J
 '''
     Initialization
 '''
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
 
 timer = Timer()
 
@@ -29,7 +26,7 @@ timer.timepoint('retrieve data')
 setupfile,setup = load_setup_HF(setupdir,setupno)
 savedir,run = bf.setup_sim(expdir,seed,setupfile) # copies experiment setup and set seed
 
-data,metadata = HF(dataset,Nevent=Nevent,scale='percentilescale',datadir=datadir)
+data,metadata = HF(datadir,Nevent=Nevent,scale='percentilescale')
 
 prior,simpar,postpar = setup(get_J(data),Nevent,testrun)
 

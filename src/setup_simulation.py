@@ -18,6 +18,10 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
     '''
         Define save and load directories, create save directories and copy experiment setup
     '''
+
+    if expdir[-1] != '/':
+        expdir += '/'
+
     if rank == 0:
         runarr = np.array([1],dtype='i')
         while os.path.exists(expdir+'run'+str(runarr[0])+'/'):

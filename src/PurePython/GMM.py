@@ -15,9 +15,6 @@ import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
 
-
-#TODO: remove noise class, should be fairly easy to add an usefull
-
 def log_betapdf(p, a, b):
 	
 	pdf = - sps.betaln(a, b)
@@ -40,15 +37,29 @@ def sample_mu(X, Sigma, theta, Sigma_mu):
 		
 	"""
 	
-	x_sum = np.sum(X,0)
+	return sample_mu_Xbar(X.shape[0], np.sum(X,0), Sigma, theta, Sigma_mu)
+
+
+
+def sample_mu_Xbar(n, x_sum, Sigma, theta, Sigma_mu):
+	"""
+		Sampling the posterior mean given:
+		n        - (1x1)  the number of data points
+		Xbar	 - (1xd)  the mean data
+		Sigma	 - (dxd)  the covariance of the data
+		theta	 - (dx1)  the prior mean of mu
+		Sigma_mu  - (dx1)  the prior cov of mu
+		
+	"""
+	
 	inv_Sigma	= np.linalg.inv(Sigma)
 	inv_Sigma_mu = np.linalg.inv(Sigma_mu)
 	
 	mu_s		 = np.dot(inv_Sigma_mu, theta).reshape(theta.shape[0]) + np.dot(inv_Sigma, x_sum)
-	Q			= X.shape[0] * inv_Sigma  + inv_Sigma_mu
+	Q			= n * inv_Sigma  + inv_Sigma_mu
 	L = np.linalg.cholesky(Q)
 	mu_t = np.linalg.solve(L, mu_s)
-	mu = np.linalg.solve(L.transpose(), mu_t + np.random.randn(X.shape[1]))
+	mu = np.linalg.solve(L.transpose(), mu_t + np.random.randn(theta.shape[0]))
 	return mu.reshape(mu.shape[0])
 	
 def sample_sigma_zero_mean(X, Q, nu):
@@ -56,6 +67,23 @@ def sample_sigma_zero_mean(X, Q, nu):
 	Q_star = Q +  np.dot(X.transpose(), X)
 	nu_star = nu + X.shape[0]
 	return wishart.invwishartrand(nu_star, Q_star)	
+
+def sample_sigma_xxT(n, xxTbar, xbar, mu, Q, nu):
+	"""
+		parameter for sampling the posterior distribution
+		of the covariance matrix given:
+		n        - (1x1)  the number of data points
+		xxTbar   - (dxd) the outer product of the data points
+		Xbar	 - (1xd)  the mean data
+		Q   - (dxd)	the covariance
+		nu  - (double) the observation parameter for the Inverse Wishart prior
+		
+	"""	
+	
+	m_T  = np.outer(xbar, mu)
+	Q_star  = Q + xxTbar -m_T - m_T.T + n * np.outer(mu, mu)
+	nu_star = nu + n 
+	return wishart.invwishartrand(nu_star, Q_star)
 
 def sample_sigma(X, mu, Q, nu):
 	"""
@@ -169,6 +197,7 @@ class mixture(object):
 		params["high_memory"]	= cp.deepcopy(self.high_memory)
 		
 		return params
+	
 	
 	
 	def set_name(self,name):
@@ -297,6 +326,7 @@ class mixture(object):
 			self.active_komp = active_komp
 			
 	
+	
 	def sample_activate(self):
 		"""
 			try to activate a component using RJMCMC
@@ -412,6 +442,9 @@ class mixture(object):
 		self.sample_active_komp()
 		self.lab = self.sample_labelswitch()
 		#TODO: stores the components the average componentes
+	
+	
+	
 		
 	def updata_mudata(self):
 		
@@ -480,6 +513,8 @@ class mixture(object):
 			
 		self.updata_mudata()
 
+		
+		
 			
 	def sample_x(self):
 		"""
@@ -506,7 +541,7 @@ class mixture(object):
 		else:
 			self.x[index_n] = self.K - 1 + self.noise_class
 			
-		
+	
 
 	def sample_labelswitch(self):
 		"""
@@ -613,7 +648,7 @@ class mixture(object):
 				else:
 					self.sigma[k] = np.NAN * np.ones((self.d, self.d))
 	
-	
+
 	def sample_p(self):
 		"""
 			Draws the posterior distribution for
@@ -709,6 +744,9 @@ class mixture(object):
 				else:
 					X_mu = X_slice - mu[k]
 					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
+					
+					np.sum(X_slice * np.dot(X_mu,Q))
+					
 					slice_p[:,k] -= np.sum(X_mu * np.dot(X_mu,Q),1)/2.
 				slice_p[: ,k] += np.log(p[k])
 		
@@ -860,6 +898,12 @@ class mixture(object):
 		"""
 		with file(filename, 'rb') as f:
 			return pickle.load(f)	
+
+	
+
+	
+
+
 
 if __name__ == "__main__":
 	N = 100

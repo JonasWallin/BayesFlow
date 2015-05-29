@@ -16,7 +16,7 @@ try:
     res = hmres
     res.plot = BMplot(res)
 except:
-    _,setup_postproc = load_setup_postproc_HF(savedir,setupno)
+    _,setup_postproc = load_setup_postproc_HF(loaddirres,setupno)
     postpar = setup_postproc()  
     res = ls.load_HMres(loaddirres,postpar.mergemeth)  
 
@@ -65,22 +65,20 @@ if 'compfit' in toplot:
 ### 1D centers
 
 if 'cent' in toplot:
-    if success:
-        res.components.plot.center(yscale=True)
+
+    res.components.plot.center(yscale=True)
     res.components.plot.center(suco=False,yscale=True)
 
 ### Quantiles
 
 if 'quan' in toplot:
-    if success:
-        res.clust_m.plot.box()
+    res.clust_m.plot.box()
     res.clust_nm.plot.box()
 
 ### Probabilities
 
 if 'prob' in toplot:
-    if success:
-        res.clust_m.plot.prob()
+    res.clust_m.plot.prob()
     res.clust_nm.plot.prob()
 
 
@@ -114,14 +112,6 @@ if 'sampmix' in toplot:
 # ### PCA biplot
 
 if 'pca' in toplot:
-#     if latexplot:
-#         lb = ' \n '
-#         dim = r'$^\text{dim}$'
-#     else:
-#         lb = '\n'
-#         dim = 'dim'
-#     figpca = plt.figure(figsize=(5,5))
-#     ax = figpca.add_subplot(111)
 
      res.plot.pca_screeplot()
      res.plot.set_population_lab(['CD4 T cells','CD8 T cells','B cells','','',''])
@@ -130,22 +120,22 @@ if 'pca' in toplot:
 
 
 ### Dip test
-if success:
-    if 'dip' in toplot:
-    
-        res.clust_m.plot.pdip()
-        res.clust_m.plot.qhist_dipcrit(q=.25)
-        res.clust_nm.plot.pdip()
-        res.clust_nm.plot.qhist_dipcrit(q=.25)
+
+if 'dip' in toplot:
+
+    res.clust_m.plot.pdip()
+    res.clust_m.plot.qhist_dipcrit(q=.25)
+    res.clust_nm.plot.pdip()
+    res.clust_nm.plot.qhist_dipcrit(q=.25)
 
 
 ### Histograms showing overlap between clusters
-if success:
-    if 'overlap' in toplot:
-        res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=0,ks=[0,1])
-        res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=1,ks=[0,1])
-        res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=2,ks=[0,1])
-        res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=3,ks=[0,1])
+
+if 'overlap' in toplot:
+    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=0,ks=[0,1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=1,ks=[0,1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=2,ks=[0,1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=3,ks=[0,1])
 
 ### Diagnostic plots
 
@@ -153,14 +143,12 @@ if 'diagn' in toplot:
     res.components.plot.center_distance_quotient()
     res.components.plot.cov_dist()
 
-if success:
-    if 'scatter' in toplot:
-        res.clust_m.plot.scatter([0,1],0)
+if 'scatter' in toplot:
+    res.clust_m.plot.scatter([0,1],0)
 
 # ###
 
 print "id(res.plot.cop) = {}".format(id(res.plot.cop))
 print "id(res.components.plot) = {}".format(id(res.components.plot))
 
-if not latexplot:
-    plt.show()
+plt.show()

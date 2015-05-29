@@ -4,14 +4,14 @@ version 0.1
 ## Installation
 - Ensure that you have obtained the dependencies listed below.
 - Update the configuration file setup.cfg: 
-  - Specify which libraries you are using for linear algebra (e.g. library = cblas, clapack)
+  - Specify which libraries you are using for linear algebra (e.g. libraries = cblas, clapack)
   - Specify library directories and header file directories for the listed libraries.
-  - If needed, specify additional arguments that should be passed to the compiler (e.g. if you use MKL)
+  - If needed, specify additional arguments that should be passed to the compiler (e.g. if you use MKL).
 NB! If you use MKL, in addition to the usual arguments to the compiler, you also need to pass the argument -DMKL.
 - Go to the main directory (BayesFlow/) and run `python setup.py install`.
 
 ## Examples
-
+- demo_HF.py: Demonstration of how to use BayesFlow for healthyFlowData dataset. 
 
 ## Dependencies
 
@@ -20,7 +20,7 @@ The package has the following dependencies:
 - OpenMPI
 - Libraries for linear algebra computations with c interfaces, e.g. CBLAS and CLAPACK or MKL. 
 
-The dependence on rpy2 is only needed for computing dip test and loading data from R package healhtyFlowData.
+The dependence on rpy2 is only needed for computing dip test and loading data from R package healthyFlowData.
 If installation without this dependency is wanted, files
 
 ```
@@ -74,16 +74,16 @@ Note that you need to pass the extra argument `-DMKL` to the compiler.
 
 Python and OpenMPI can be installed using homebrew.
 First install homebrew following the instructions at http://brew.sh.
-Then install pyhon and OpenMPI:
+Then install Python and OpenMPI:
 ```
 brew install python, openmpi
 ```
-Then python packages can be installed using
+Then Python packages can be installed using
 ```
 pip install numpy, cython, matplotlib, mpi4py, json, pyyaml, rpy2
 ```
 For linear algebra c libraries, you can use the BLAS and LAPACK distributions provided in the Accelerate veclib framework.
-Then put
+To do this, put
 ```
 [build_ext]
 include_dirs = /usr/include:/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/Headers/

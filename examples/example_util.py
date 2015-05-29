@@ -11,14 +11,17 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 def retrieve_healthyFlowData(datadir):
-    if not os.path.exists(datadir):
-        os.makedirs(datadir)
-    if len(os.listdir(datadir)) > 0:
-        print "Directory {} not empty, not data retrieved".format(datadir)
-        return
-    data,metadata = hf.load(scale=False)
-    for j,dat in enumerate(data):
-        np.savetxt(datadir+metadata['samp']['names'][j]+'.dat',data[j])
+    if rank == 0:
+        if datadir[-1] != '/':
+            datadir += '/'
+        if not os.path.exists(datadir):
+            os.makedirs(datadir)
+        if len(os.listdir(datadir)) > 0:
+            print "Directory {} not empty, no data retrieved".format(datadir)
+            return
+        data,metadata = hf.load(scale=False)
+        for j,dat in enumerate(data):
+            np.savetxt(datadir+metadata['samp']['names'][j]+'.dat',data[j])
 
 def load_setup_HF(setupdir,setupno):
     if setupdir[-1] != '/':
@@ -61,6 +64,8 @@ def read_argv(args):
 '''
         
 def HF(datadir,**kw):
+    if datadir[-1] != '/':
+        datadir += '/'
     ext = '.dat'
     loadfilef = lambda filename: np.loadtxt(filename)
     startrow = 0

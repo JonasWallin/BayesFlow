@@ -7,9 +7,9 @@ import unittest
 import os
 import numpy as np
 import numpy.random as npr
-from bayesianmixture.distribution import normal_p_wishart, Wishart_p_nu
+from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution.wishart import  invwishartrand
+from BayesFlow.PurePython.distribution.wishart import  invwishartrand
 
 class Test_wishart_p_nu(unittest.TestCase):
 
