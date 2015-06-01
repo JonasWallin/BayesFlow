@@ -864,7 +864,7 @@ class hierarical_mixture_mpi(object):
 		self.comm.Barrier()
 		self.update_GMM()
 		
-	def toggle_timing(on=True):
+	def toggle_timing(self,on=True):
 		if on:
 			self.timing = True
 		else:

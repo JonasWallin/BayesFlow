@@ -29,6 +29,47 @@ def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=T
 
     return data,metadata
 
+def meta_data(sampnames,marker_lab):
+    metasamp = {'names':sampnames}
+    metadata = {'samp':metasamp,'marker_lab':marker_lab}    
+    return metadata
+
+def non_extreme_ind(data):
+    ok = np.ones(data.shape[0],dtype='bool')
+    for dd in range(data.shape[1]):
+        ok *= data[:,dd] > 1.001*np.min(data[:,dd]) 
+        ok *= data[:,dd] < 0.999*np.max(data[:,dd])
+    return ok
+
+def add_noise(data,sd=0.01):
+    return data + npr.normal(0,sd,data.shape)
+
+def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
+                  Nevent=None,scale='percentilescale',
+                  rm_extreme=True,perturb_extreme=False,
+                  i_eventind_load = 0):
+    datafile = datadir + name + ext
+    data = loadfilef(datafile)[startrow:,startcol:]
+    try:
+        eventind_dic = ls.load_eventind(datadir,Nevent,i_eventind_load,name)
+    except:
+        ok = non_extreme_ind(data)
+        if perturb_extreme:
+            data[~ok,:] = add_noise(data[~ok,:])
+        if rm_extreme:
+            ok_inds = np.nonzero(ok)[0]
+        else:
+            ok_inds = data.shape[0]
+            
+        if Nevent is None:
+            indices = ok_inds
+        else:
+            indices = npr.choice(ok_inds,Nevent,replace=False)
+            eventind_dic[name] = indices
+        ls.save_eventind(eventind_dic,datadir,Nevent,name)  
+
+    data = data[eventind_dic[name],:]
+            
 
 def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
                 Nsamp=None,Nevent=None,scale='percentilescale',
@@ -84,48 +125,49 @@ def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
         sampnames.append(datafiles[j].replace(datadir,'').replace(' ','').replace(ext,''))
         data.append(loadfilef(datafiles[j])[startrow:,startcol:])
 
-    metasamp = {'names':sampnames}
-    metadata = {'samp':metasamp,'marker_lab':marker_lab}          
+    metadata = meta_data(sampnames,marker_lab)         
 
     compute_new_eventind = True
     if load_eventind:
-        eventind_dic = ls.load_eventind(datadir,Nevent,i_eventind_load)
-        if len(eventind_dic) > 0:
-            compute_new_eventind = False
-    elif len(eventind_dic) > 0:
-        for j,name in enumerate(sampnames):
-            data[j] = data[j][eventind_dic[name],:]
-        compute_new_eventind = False
-    elif len(eventind) > 0:
-        for j,dat in enumerate(data):
-            data[j] = dat[eventind[j],:] 
+        try:
+            eventind_dic = ls.load_eventind(datadir,Nevent,i_eventind_load)
+        except:
+            eventind_dic = {}
+
+    if all([name in eventind_dic.keys() for name in sampnames]) or len(eventind) > J:
         compute_new_eventind = False
 
     if perturb_extreme or (rm_extreme and compute_new_eventind):
-        ok_inds = []
+        if rm_extreme:
+            ok_inds = []
         for j,dat in enumerate(data):
-            ok = np.ones(dat.shape[0],dtype='bool')
-            for dd in range(dat.shape[1]):
-                ok *= dat[:,dd] > 1.001*np.min(dat[:,dd]) 
-                ok *= dat[:,dd] < 0.999*np.max(dat[:,dd])
-            if perturb_extreme:
-                data[j][~ok,:] = data[j][~ok,:] + npr.normal(0,0.01,data[j][~ok,:].shape)
-                ok_inds.append(np.arange(data[j].shape[0]))
+            if rm_extreme and (sampnames[j] in eventind_dic.keys()):
+                ok_inds.append([])
             else:
-                ok_inds.append(np.nonzero(ok)[0]) 
+                ok = non_extreme_ind(dat)
+                if perturb_extreme:
+                    data[j][~ok,:] = add_noise(data[j][~ok,:])
+                if rm_extreme:
+                    ok_inds.append(np.nonzero(ok)[0]) 
 
-    if not Nevent is None:
-        for j,dat in enumerate(data):
-            if compute_new_eventind:
-                indices_j = npr.choice(ok_inds[j],Nevent,replace=False)
-                eventind.append(indices_j)
-                eventind_dic[sampnames[j]] = indices_j
+    if not rm_extreme:
+        ok_inds = [np.arange(dat.shape[0]) for dat in data]
+
+    for j,dat in enumerate(data):
+        if compute_new_eventind and not sampnames[j] in eventind_dic.keys():
+            if Nevent is None:
+                indices_j = ok_inds[j]
             else:
-                try:
-                    indices_j = eventind_dic[sampnames[j]]
-                except:
-                    indices_j = eventind[j]
-            data[j] = dat[indices_j,:]
+                indices_j = npr.choice(ok_inds[j],Nevent,replace=False)
+            eventind.append(indices_j)
+            eventind_dic[sampnames[j]] = indices_j
+        else:
+            try:
+                indices_j = eventind_dic[sampnames[j]]
+            except KeyError as e:
+                print "Key error({0}): {1}".format(e.errno, e.strerror)
+                indices_j = eventind[j]
+        data[j] = dat[indices_j,:]
 
     if compute_new_eventind:
         ls.save_eventind(eventind_dic,datadir,Nevent)  
@@ -144,7 +186,7 @@ def percentilescale(data, q = (1.,99.)):
         Scales the data sets in data so that given quantiles of the pooled data ends up at 0 and 1 respectively.
 
         data	-	list of data sets
-	       q	-	percentiles. q[0] is the percentile will be scaled to 0, 
+	  q	-	percentiles. q[0] is the percentile will be scaled to 0, 
                     q[1] is the percentile that will be scaled to 1 (in the pooled data).
     '''
     alldata = np.vstack(data)
