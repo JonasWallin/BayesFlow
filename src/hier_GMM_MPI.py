@@ -9,6 +9,8 @@ import GMM
 import numpy as np
 from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from BayesFlow.GMM import mixture
+from BayesFlow.utils import dat_util
+from BayesFlow.utils.mpiutil import bcast_int
 import HMlog
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -18,7 +20,6 @@ import glob
 import time
 import warnings
 import traceback
-import pdb
 import sys
 
 #TODO: change to geomtrical median instead of mean!!
@@ -93,7 +94,7 @@ class SimulationError(Exception):
 class hierarical_mixture_mpi(object):
 	"""	
 		Comment about noise_class either all mpi hier class are noise class or none!
-		either incosistency can occuer when loading
+		either inconsistency can occur when loading
 	"""
 	def __init__(self, K = None, data = None, sampnames = None, prior = None, thetas = None ):
 		"""
@@ -128,7 +129,6 @@ class hierarical_mixture_mpi(object):
 
 	def mpiexceptabort(self,type, value, tb):
 	    traceback.print_exception(type, value, tb)
-	    pdb.pm()
 	    self.comm.Abort(1)
 	
 	def save_prior_to_file(self,dirname):
@@ -451,7 +451,35 @@ class hierarical_mixture_mpi(object):
 		if self.comm.Get_rank() == 0:
 			for k in range(self.K):
 				self.wishart_p_nus[k].Q_class.nu_s = nu
+	
+	def load_data(self,sampnames,scale='percentilescale',q=(1,99),**kw):
+		"""
+			Load data corresponding to sampnames directly onto worker
+		"""
+		rank = self.comm.Get_rank()
 		
+		data = []
+		for name in sampnames:
+			data.append(dat_util.load_fcsample(name,**kw))
+
+		if rank == 0:
+			d = data[0].shape[1]
+		else:
+			d = 0
+		d = bcast_int(d)
+		self.d = d
+
+		if scale == 'percentilescale':
+			lower,_ = dat_util.pooled_percentile_mpi(q[0],sampnames,data,**kw)
+			upper,_ = dat_util.pooled_percentile_mpi(q[1],sampnames,data,**kw)
+
+			dat_util.percentilescale(data,qvalues=(lower,upper))
+
+		for Y,name in zip(data,sampnames):
+			if self.d != Y.shape[1]:
+				raise ValueError('dimension mismatch in the data')
+			self.GMMs.append(GMM.mixture(data=Y,K=self.K,name=name))
+
 	def set_data(self, data, names = None):
 		"""
 			List of np.arrays
@@ -476,7 +504,7 @@ class hierarical_mixture_mpi(object):
 			data = np.array(data)
 			send_data = np.array_split(data,size)
 			self.counts = np.empty(size,dtype='i') 
-			if names == None:
+			if names is None:
 				names = range(self.n_all)
 			send_name = np.array_split( np.array(names),size)
 		else:

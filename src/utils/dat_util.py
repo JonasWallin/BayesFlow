@@ -7,12 +7,101 @@ Created on Wed Mar 18 16:32:31 2015
 from __future__ import division
 import numpy as np
 import numpy.random as npr
+import copy
 import glob
 from mpi4py import MPI
 import load_and_save as ls
+import cPickle as pickle
+import mpiutil
+import os
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+size = comm.Get_size()
+
+def sampnames_mpi(datadir,ext,Nsamp=None):
+    if rank == 0:
+        if datadir[-1] != '/':
+            datadir += '/'
+        datafiles = glob.glob(datadir+'*'+ext)
+        sampnames_all = [datafile.replace(datadir,'').replace(' ','').replace(ext,'') for datafile in datafiles]
+        #print "sampnames_all = {}".format(sampnames_all)
+        if not Nsamp is None:
+            sampnames_all = sampnames_all[:Nsamp]
+        send_name = np.array_split(np.array(sampnames_all),size)
+    else:
+        send_name = None
+    names_dat = comm.scatter(send_name, root= 0)  # @UndefinedVariable
+    return names_dat
+
+def total_number_events(sampnames,**kw):
+    J = np.sum(mpiutil.collect_int(len(sampnames)))
+    J = mpiutil.bcast_int(J)
+    #print "J at rank {} = {}".format(rank,J)
+    try:
+        Nevent = kw['Nevent']
+        print "J*Nevent = {}".format(J*Nevent)
+        return J*Nevent
+    except:
+        pass
+    kw_ = copy.deepcopy(kw)
+    kw_['scale'] = None
+    N_loc = 0
+    for name in sampnames:
+        N_loc += load_fcsample(name,**kw_).shape[0]
+    N = np.sum(mpiutil.collect_int(N_loc))
+    N = mpiutil.bcast_int(N)
+    return N
+
+def partition_all_columns(data,N):
+    for d in range(data.shape[1]):
+        data[:,d] = np.partition(data[:,d],N)
+
+def pooled_percentile_mpi(q,sampnames,data=None,Nevent=None,i_eventind_load=0,load=True,save=True,**kw):
+    scaleKey = scale_key(kw['datadir'],sampnames,Nevent,i_eventind_load)
+    if load:
+        try:
+            return ls.load_percentile(kw['datadir'],q,scaleKey),scaleKey
+        except IOError:
+            pass
+
+    if q > 50:
+        if data is None:
+            kw_ = copy.deepcopy(kw)
+            kw_['loadfilef'] = lambda name: -kw['loadfilef'](name)
+            percentiles = -pooled_percentile_MPI(100-q,sampnames,load=False,save=False,**kw_)[0]
+        else:
+            percentiles = -pooled_percentile_MPI(100-q,-[dat for dat in data],load=False,save=False)[0]
+        if rank == 0 and save:
+            ls.save_percentile(percentiles,kw['datadir'],q,scaleKey) 
+        return percentiles,scaleKey
+
+    if rank == 0:
+        print "Computing new percentiles"
+    N = int(np.round(total_number_events(sampnames,**kw)*q/100))
+    if data is None:
+        kw_ = copy.deepcopy(kw)
+        kw_['scale'] = None
+        data_list = []
+        for name in sampnames:
+            dat = load_fcsample(name,**kw_)
+            partition_all_columns(dat,N)
+            data_list.append(dat[:N,:])
+        data_loc = np.vstack(data_list)
+    else:
+        data_loc = np.vstack(data)
+    partition_all_columns(data_loc,N)
+    data_all = mpiutil.collect_data(data_loc[:N,:],data_loc.shape[1],'d',MPI.DOUBLE)
+    if rank == 0:
+        partition_all_columns(data_all,N)
+        percentiles = data_all[N-1,:]
+        print "percentiles = {}".format(percentiles)
+        if save:
+            ls.save_percentile(percentiles,kw['datadir'],q,scaleKey)
+    else:
+        percentiles = None
+
+    return mpiutil.bcast_array_1d(percentiles,'d',MPI.DOUBLE),scaleKey
 
 def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=True,**kw):
 
@@ -29,27 +118,16 @@ def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=T
 
     return data,metadata
 
-def meta_data(sampnames,marker_lab):
-    metasamp = {'names':sampnames}
-    metadata = {'samp':metasamp,'marker_lab':marker_lab}    
-    return metadata
-
-def non_extreme_ind(data):
-    ok = np.ones(data.shape[0],dtype='bool')
-    for dd in range(data.shape[1]):
-        ok *= data[:,dd] > 1.001*np.min(data[:,dd]) 
-        ok *= data[:,dd] < 0.999*np.max(data[:,dd])
-    return ok
-
-def add_noise(data,sd=0.01):
-    return data + npr.normal(0,sd,data.shape)
-
 def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
-                  Nevent=None,scale='percentilescale',
+                  Nevent=None,
                   rm_extreme=True,perturb_extreme=False,
                   i_eventind_load = 0):
+
+    if datadir[-1] != '/':
+        datadir += '/'
     datafile = datadir + name + ext
     data = loadfilef(datafile)[startrow:,startcol:]
+
     try:
         eventind_dic = ls.load_eventind(datadir,Nevent,i_eventind_load,name)
     except:
@@ -59,16 +137,18 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
         if rm_extreme:
             ok_inds = np.nonzero(ok)[0]
         else:
-            ok_inds = data.shape[0]
+            ok_inds = np.arange(data.shape[0])
             
         if Nevent is None:
             indices = ok_inds
         else:
             indices = npr.choice(ok_inds,Nevent,replace=False)
-            eventind_dic[name] = indices
+        eventind_dic = {name: indices}
         ls.save_eventind(eventind_dic,datadir,Nevent,name)  
 
     data = data[eventind_dic[name],:]
+
+    return data
             
 
 def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
@@ -181,20 +261,28 @@ def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
 
     return data,metadata
     
-def percentilescale(data, q = (1.,99.)):
+def percentilescale(data,q = (1.,99.), qvalues = None):
     '''
         Scales the data sets in data so that given quantiles of the pooled data ends up at 0 and 1 respectively.
 
         data	-	list of data sets
-	  q	-	percentiles. q[0] is the percentile will be scaled to 0, 
+	    q       -	percentiles to be computed. q[0] is the percentile will be scaled to 0, 
                     q[1] is the percentile that will be scaled to 1 (in the pooled data).
+        qvalues -   tuple of percentile values. If provided percentiles does not have to be computed.
     '''
-    alldata = np.vstack(data)
-    datq = np.percentile(alldata,q,0)
+    if qvalues is None:
+        alldata = np.vstack(data)
+        lower,upper = np.percentile(alldata,q,0)
+    else:
+        lower,upper = qvalues
+    
+    intercept = lower
+    slope = upper - lower
+
     for j in range(len(data)):
         for m in range(data[0].shape[1]):
-            data[j][:,m] = (data[j][:,m]-datq[0][m])/(datq[1][m]-datq[0][m])
-    return datq
+            data[j][:,m] = (data[j][:,m]-intercept[m])/slope[m]
+    return lower,upper
 
 def maxminscale(data):
     """
@@ -207,3 +295,54 @@ def maxminscale(data):
     for j in range(len(data)):
         for m in range(d):
             data[j][:,m] = (data[j][:,m]-np.min(data[j][:,m]))/(np.max(data[j][:,m])-np.min(data[j][:,m]))        
+
+def meta_data(sampnames,marker_lab):
+    metasamp = {'names':sampnames}
+    metadata = {'samp':metasamp,'marker_lab':marker_lab}    
+    return metadata
+
+def non_extreme_ind(data):
+    ok = np.ones(data.shape[0],dtype='bool')
+    for dd in range(data.shape[1]):
+        ok *= data[:,dd] > 1.001*np.min(data[:,dd]) 
+        ok *= data[:,dd] < 0.999*np.max(data[:,dd])
+    return ok
+
+def add_noise(data,sd=0.01):
+    return data + npr.normal(0,sd,data.shape)
+
+def scale_key(datadir,sampnames,Nevent,i_eventind_load):
+    sampnames_all = mpiutil.collect_strings(sampnames)
+    #if rank == 0:
+    #    print "sampnames_all = {}".format(sampnames_all)
+    comm.Barrier()
+    sampnames_all = comm.bcast(sampnames_all)
+    #print "sampnames_all after bcast at rank {}= {}".format(rank,sampnames_all)
+    if rank == 0:
+        if datadir[-1] != '/':
+            datadir += '/'
+        if not os.path.exists(datadir+'scale_dat/'):
+            os.mkdir(datadir+'scale_dat/')
+        keyfile = datadir+'scale_dat/scale_keys.pkl'
+        if os.path.exists(keyfile):
+            with open(keyfile,'r') as f:
+                parent_dict = pickle.load(f)
+        else:
+            parent_dict = {}
+        curr_dict = parent_dict
+        #print "curr_dict = {}".format(curr_dict)
+        samp_tuple = tuple(sorted(sampnames_all))
+        key = ''
+        for j,dat in enumerate([samp_tuple,Nevent,i_eventind_load]):
+            try:
+                i,curr_dict = curr_dict[dat]
+            except:
+                curr_dict[dat] = (len(curr_dict),{})
+                i,curr_dict = curr_dict[dat]
+            key += '_%d' % i
+        #print "parent_dict = {}".format(parent_dict)
+        with open(keyfile,'w') as f:
+            pickle.dump(parent_dict,f)
+    else:
+        key = None
+    return mpiutil.bcast_string(key)
