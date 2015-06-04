@@ -2,7 +2,6 @@ from __future__ import division
 import numpy as np
 from rpy2.robjects.packages import importr, data
 from rpy2.rinterface import RRuntimeError
-#from BayesFlow.utils import discriminant
 import matplotlib.pyplot as plt
 
     
@@ -24,6 +23,9 @@ def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):
             
     '''
     
+    ## TODO! Preprocess xF and yF so that yF increasing and xF does
+    ## not have more than two copies of each x-value.
+
     if (xF[1:]-xF[:-1] < -eps).any():
         raise ValueError, 'need sorted x-values to compute dip'
     if (yF[1:]-yF[:-1] < -eps).any():

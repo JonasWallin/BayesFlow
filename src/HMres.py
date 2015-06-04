@@ -26,7 +26,7 @@ class HMres(Mres):
             else:
                 self.p_noise = None
             super(HMres,self).__init__(bmlog.d,bmlog.K,bmlog.prob_sim_mean[:,:bmlog.K],
-            bmlog.classif_freq,data,meta_data,self.p_noise)
+                                       bmlog.classif_freq,data,meta_data,self.p_noise)
 
             self.sim = bmlog.sim
 

@@ -4,12 +4,13 @@ import numpy as np
 import collections
 import warnings
 from utils import mpiutil
+from utils.jsonutil import ObjJsonEncoder
+from scipy import io,sparse
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 warnings.filterwarnings('ignore',message='using a non-integer number.*',category= DeprecationWarning)
-
 
 class HMlogB(object):
     '''
@@ -27,6 +28,7 @@ class HMlogB(object):
         self.K = hGMM.K
         self.d = hGMM.d
         self.noise_class = hGMM.noise_class
+        self.names_loc = [GMM.name for GMM in hGMM]
         self.set_names(hGMM)
         self.active_komp_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.active_komp_curr_loc = np.ones((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
@@ -68,7 +70,6 @@ class HMlogB(object):
         self.active_komp_curr_loc = np.copy(self.tmp_active_comp_curr_loc)
         if debug:
             print "savesim ok at iter {} at rank {}".format(self.i,rank)
-
 
         return nus
         
@@ -122,20 +123,34 @@ class HMlogB(object):
             self.lab_sw = lab_sw_all
         del self.lab_sw_loc
          
-
     def set_active_komp(self):
         active_komp_all = mpiutil.collect_data(self.active_komp_loc,self.K+self.noise_class,'i',MPI.INT)
         if rank == 0:
             self.active_komp = active_komp_all/self.sim
         del self.active_komp_loc
 
-
     def set_names(self,hGMM):
         name_data = [np.array([ch for ch in GMM.name]) for GMM in hGMM.GMMs]
         name_all = mpiutil.collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
         if rank == 0:
             self.names = [''.join(nam.reshape((-1,))) for nam in name_all]
-            
+
+    def encode_json(self):
+        jsondict = {'__type__':'HMlogB'}
+        for arg in ['savefrq','nbrsave','sim','K','d','noise_class','names',
+                    'active_komp','lab_sw']:
+            jsondict.update({arg:getattr(o,arg)})             
+        return jsondict    
+
+    def save(self,savedir,logname='blog'):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        with open(savedir+logname+'.json','w') as f:
+            json.dump(self,f,cls=ObjJsonEncoder)
+        with open(savedir+logname+'_theta_sim.npy','w') as f:
+            np.save(f,self.theta_sim)
+        with open(savedir+logname+'_nu_sim.npy','w') as f:
+            np.save(f,self.nu_sim)       
 
 class HMlog(HMlogB):
     '''
@@ -215,9 +230,11 @@ class HMlog(HMlogB):
     def cat(self):
         print "cat not implemented yet for this object type"
 
-    def postproc(self):
+    def postproc(self,high_memory = False):
         '''
             Post-processing production iterations
+
+            high_memory     - set to True if root can handle data from all workers
         '''
         super(HMlog,self).postproc()
         if rank == 0:
@@ -240,10 +257,11 @@ class HMlog(HMlogB):
             self.prob_sim_mean[~self.active_komp.astype('bool')] = np.nan
             self.prob_sim_mean /= self.active_komp
             self.prob_sim_mean[np.isnan(self.prob_sim_mean)] = 0
-            
-        self.set_savesampnames()
-        self.set_savesamp()
-        self.set_Y_sim()
+        
+        if high_memory:    
+            self.set_savesampnames()
+            self.set_savesamp()
+            self.set_Y_sim()
          
     def append_Y(self,Y,j):
         self.Y_sim_loc[j][int(self.i/self.savefrqy),:] = Y
@@ -296,6 +314,38 @@ class HMlog(HMlogB):
         if rank == 0:
             self.savesamp = [self.names.index(name) for name in self.savesampnames]
 
+    def set_syndata_dir(self,dirname):
+        if not dirname[-1] == '/':
+            dirname += '/'
+        self.syndata_dir = dirname
+
+    def encode_json(self):
+        jsondict = super(HMlog,self).encode_json()
+        jsondict['__type__'] = 'HMlog'
+        for arg in ['theta_sim_mean','Sigmaexp_sim_mean','mupers_sim_mean','Sigmapers_sim_mean',
+                    'prob_sim_mean','J']:
+            jsondict.update(arg:getattr(o,arg))
+        try:
+            jsondict['syndata_dir'] = self.syndata_dir
+        except:
+            pass
+        return jsondict
+
+    def save(self,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        if len(self.savesampnames) > 0:
+            self.syndata_dir = savedir + 'syndata/'
+        if not os.path.exists(self.syndata_dir):
+            os.mkdir(self.syndata_dir)
+        for j,name in self.savesampnames_loc:
+            with open(savedir+name+'_MODEL.pkl','w') as f:
+                pickle.dump(self.Y_sim_loc[j],f,-1)
+        if rank == 0:
+            with open(savedir+'pooled_MODEL.pkl','w') as f:
+                pickle.dump(self.Y_pooled_sim,f,-1)
+        super(HMlog,self).save(savedir,logname='log')
+
 class HMElog(HMlog):
     '''
         Class for saving results from sampling of posterior distribution
@@ -303,13 +353,14 @@ class HMElog(HMlog):
         thus makes it possible to create Clustering object.
     '''
     
-    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None):
+    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None,
+                 high_memory=False):
         super(HMElog,self).__init__(hGMM,sim,savesamp,savesampnames,nbrsave,savefrq,nbrsavey,savefrqy)
         self.batch = 1000
         self.ii = -1
         self.init_classif(hGMM)
         self.set_ns()
-        if rank == 0:
+        if rank == 0 and high_memory:
             self.classif_freq_all = np.zeros((sum(self.ns),self.K+self.noise_class))
 
     def init_classif(self,hGMM):
@@ -327,40 +378,63 @@ class HMElog(HMlog):
             self.ii = 0
         for j,GMM in enumerate(hGMM.GMMs):
             self.classif[j][:,self.ii] = GMM.x[:]
-            
+
     def postproc(self):
         '''
             Post-processing production iterations
         '''
-        super(HMElog,self).postproc()
+         super(HMElog,self).postproc()
         if not self.ii == self.batch:
             self.add_classif_fr()
         del self.classif
-        if rank == 0:
-            self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
-            del self.classif_freq_all        
-        
+        if rank == 0 and if high_memory:
+            self.classif_freq = mpiutil.collect_arrays(self.classif_freq_loc)     
+            
+    # def postproc_old(self):
+    #     '''
+    #         Post-processing production iterations
+    #     '''
+    #     super(HMElog,self).postproc()
+    #     if not self.ii == self.batch:
+    #         self.add_classif_fr()
+    #     del self.classif
+    #     if rank == 0:
+    #         self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
+    #         del self.classif_freq_all        
+
     def add_classif_fr(self):
-        classif_freqs_loc = [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
+        try:
+            classif_freq_loc = self.classif_freq_loc
+        except:
+            classif_freq_loc= [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
         for j,cl in enumerate(self.classif):
             for ii in range(cl.shape[0]):
                 cnt = collections.Counter(cl[ii,:])
                 del cnt[-1]
-                classif_freqs_loc[j][ii,cnt.keys()] = cnt.values()
-        classif_freq_loc = np.array(np.vstack(classif_freqs_loc),dtype = 'i')
-        #classif_freq_loc = classif_freq_loc[0:100,:]
-        if rank == 0:
-            counts = np.empty(comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        comm.Gather(sendbuf=[np.array(classif_freq_loc.shape[0] * classif_freq_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+                classif_freq_loc[j][ii,cnt.keys()] += cnt.values()
+        self.classif_freq_loc = classif_freq_loc
+
+    # def add_classif_fr_old(self):
+    #     classif_freqs_loc = [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
+    #     for j,cl in enumerate(self.classif):
+    #         for ii in range(cl.shape[0]):
+    #             cnt = collections.Counter(cl[ii,:])
+    #             del cnt[-1]
+    #             classif_freqs_loc[j][ii,cnt.keys()] = cnt.values()
+    #     classif_freq_loc = np.array(np.vstack(classif_freqs_loc),dtype = 'i')
+    #     #classif_freq_loc = classif_freq_loc[0:100,:]
+    #     if rank == 0:
+    #         counts = np.empty(comm.Get_size(),dtype = 'i')
+    #     else:
+    #         counts = 0
+    #     comm.Gather(sendbuf=[np.array(classif_freq_loc.shape[0] * classif_freq_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
         
-        if rank == 0:
-            classif_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
-            #print "classif_all.shape = {}".format(classif_all.shape)
-        else:
-            classif_all = None
-        comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
+    #     if rank == 0:
+    #         classif_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
+    #         #print "classif_all.shape = {}".format(classif_all.shape)
+    #     else:
+    #         classif_all = None
+    #     comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
         if rank == 0:
             self.classif_freq_all += classif_all
 
@@ -381,7 +455,20 @@ class HMElog(HMlog):
         if rank == 0:
             self.ns = ns
 
-
+    def save(self,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        self.classif_freq_dir = savedir+'classif_freq/'
+        if not os.path.exists(self.classif_freq_dir):
+            os.mkdir(self.classif_freq_dir)
+        try:
+            for j,name in self.names_loc:
+                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))
+        except:
+            if rank == 0:
+                for j,name in self.names:
+                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
+        super(HMElog,self).save(savedir)
 
 
 
