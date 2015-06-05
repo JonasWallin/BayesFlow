@@ -95,7 +95,7 @@ def load_HMlog(savedir,name=None):
         savedir += '/'
     try:
         with open(savedir+name+'.pkl','rb') as f:
-        return pickle.load(f)
+            return pickle.load(f)
     except:
         with open(savedir+name+'.json','rb') as f:
             hmlog = json.load(f,object_hook=jsonutil.hmlog_decoder)
@@ -126,7 +126,8 @@ def load_HMElog(savedir):
     except:
         with open(savedir+'log.json','rb') as f:
             hmelog = json.load(f,object_hook=jsonutil.hmlog_decoder)
-
+            return hmelog
+## TODO! Load also other data
 
 
 

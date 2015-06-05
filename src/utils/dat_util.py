@@ -34,9 +34,12 @@ def sampnames_mpi(datadir,ext,Nsamp=None):
     names_dat = comm.scatter(send_name, root= 0)  # @UndefinedVariable
     return names_dat
 
-def total_number_events(sampnames,**kw):
+def total_number_samples(sampnames):
     J = np.sum(mpiutil.collect_int(len(sampnames)))
-    J = mpiutil.bcast_int(J)
+    return mpiutil.bcast_int(J) 
+
+def total_number_events_and_samples(sampnames,data=None,**kw):
+    J = total_number_samples(sampnames)
     #print "J at rank {} = {}".format(rank,J)
     try:
         Nevent = kw['Nevent']
@@ -44,24 +47,29 @@ def total_number_events(sampnames,**kw):
         return J*Nevent
     except:
         pass
-    kw_ = copy.deepcopy(kw)
-    kw_['scale'] = None
-    N_loc = 0
-    for name in sampnames:
-        N_loc += load_fcsample(name,**kw_).shape[0]
+    if data is None:
+        kw_ = copy.deepcopy(kw)
+        kw_['scale'] = None
+        N_loc = 0
+        for name in sampnames:
+            N_loc += load_fcsample(name,**kw_).shape[0]
+    else:
+        N_loc = np.sum([dat.shape[0] for dat in data])
     N = np.sum(mpiutil.collect_int(N_loc))
     N = mpiutil.bcast_int(N)
-    return N
+    return N,J
 
 def partition_all_columns(data,N):
     for d in range(data.shape[1]):
         data[:,d] = np.partition(data[:,d],N)
 
 def pooled_percentile_mpi(q,sampnames,data=None,Nevent=None,i_eventind_load=0,load=True,save=True,**kw):
-    scaleKey = scale_key(kw['datadir'],sampnames,Nevent,i_eventind_load)
-    if load:
+    if load or save:
+        scaleKey = scale_key(kw['datadir'],sampnames,Nevent,i_eventind_load)
         try:
-            return ls.load_percentile(kw['datadir'],q,scaleKey),scaleKey
+            percentile = ls.load_percentile(kw['datadir'],q,scaleKey)
+            print "percentile = {}".format(percentile)
+            return percentile
         except IOError:
             pass
 
@@ -69,31 +77,33 @@ def pooled_percentile_mpi(q,sampnames,data=None,Nevent=None,i_eventind_load=0,lo
         if data is None:
             kw_ = copy.deepcopy(kw)
             kw_['loadfilef'] = lambda name: -kw['loadfilef'](name)
-            percentiles = -pooled_percentile_MPI(100-q,sampnames,load=False,save=False,**kw_)[0]
+            percentiles = -pooled_percentile_mpi(100-q,sampnames,load=False,save=False,**kw_)
         else:
-            percentiles = -pooled_percentile_MPI(100-q,-[dat for dat in data],load=False,save=False)[0]
+            #print "pooled_percentile_mpi(100-q,-[dat for dat in data],load=False,save=False)[0] = {}".format(pooled_percentile_mpi(100-q,-[dat for dat in data],load=False,save=False)[0])
+            percentiles = -pooled_percentile_mpi(100-q,sampnames,[-dat for dat in data],load=False,save=False,**kw)
         if rank == 0 and save:
             ls.save_percentile(percentiles,kw['datadir'],q,scaleKey) 
-        return percentiles,scaleKey
+        return percentiles
 
     if rank == 0:
         print "Computing new percentiles"
-    N = int(np.round(total_number_events(sampnames,**kw)*q/100))
+    NN,_ = total_number_events_and_samples(sampnames,data,**kw)
+    N = int(np.round(NN*q/100))
     if data is None:
         kw_ = copy.deepcopy(kw)
         kw_['scale'] = None
         data_list = []
         for name in sampnames:
             dat = load_fcsample(name,**kw_)
-            partition_all_columns(dat,N)
+            partition_all_columns(dat,N-1)
             data_list.append(dat[:N,:])
         data_loc = np.vstack(data_list)
     else:
         data_loc = np.vstack(data)
-    partition_all_columns(data_loc,N)
+    partition_all_columns(data_loc,N-1)
     data_all = mpiutil.collect_data(data_loc[:N,:],data_loc.shape[1],'d',MPI.DOUBLE)
     if rank == 0:
-        partition_all_columns(data_all,N)
+        partition_all_columns(data_all,N-1)
         percentiles = data_all[N-1,:]
         print "percentiles = {}".format(percentiles)
         if save:
@@ -101,7 +111,10 @@ def pooled_percentile_mpi(q,sampnames,data=None,Nevent=None,i_eventind_load=0,lo
     else:
         percentiles = None
 
-    return mpiutil.bcast_array_1d(percentiles,'d',MPI.DOUBLE),scaleKey
+    #return mpiutil.bcast_array_1d(percentiles,'d',MPI.DOUBLE),scaleKey
+    #percentiles = np.array(comm.bcast(percentiles))
+    #print "percentiles = {}".format(percentiles)
+    return comm.bcast(percentiles)
 
 def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=True,**kw):
 
@@ -312,9 +325,9 @@ def add_noise(data,sd=0.01):
     return data + npr.normal(0,sd,data.shape)
 
 def scale_key(datadir,sampnames,Nevent,i_eventind_load):
-    sampnames_all = mpiutil.collect_strings(sampnames)
-    #if rank == 0:
-    #    print "sampnames_all = {}".format(sampnames_all)
+    sampnames_all = comm.gather(sampnames)#mpiutil.collect_strings(sampnames)
+    if rank == 0:
+        sampnames_all = list(np.hstack(sampnames_all))
     comm.Barrier()
     sampnames_all = comm.bcast(sampnames_all)
     #print "sampnames_all after bcast at rank {}= {}".format(rank,sampnames_all)
@@ -346,3 +359,4 @@ def scale_key(datadir,sampnames,Nevent,i_eventind_load):
     else:
         key = None
     return mpiutil.bcast_string(key)
+    

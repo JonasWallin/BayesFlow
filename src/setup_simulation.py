@@ -10,6 +10,7 @@ from mpi4py import MPI
 import os
 import inspect
 import shutil
+from utils.mpiutil import bcast_int
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -55,9 +56,10 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
     if rank == 0:
         with open(savedir+'seed.dat','w') as f:
             f.write(str(seed))        
-    comm.Barrier()
-    with open(savedir+'seed.dat','r') as f:
-        seed = np.int(f.readline())
+    seed = bcast_int(seed)
+    #comm.Barrier()
+    #with open(savedir+'seed.dat','r') as f:
+    #    seed = np.int(f.readline())
     np.random.seed(seed)
     print "seed set to {} at rank {}".format(seed,rank)
 
