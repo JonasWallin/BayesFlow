@@ -338,9 +338,15 @@ class HMlog(HMlogB):
             self.syndata_dir = savedir + 'syndata/'
         if not os.path.exists(self.syndata_dir):
             os.mkdir(self.syndata_dir)
-        for j,name in self.savesampnames_loc:
-            with open(savedir+name+'_MODEL.pkl','w') as f:
-                pickle.dump(self.Y_sim_loc[j],f,-1)
+        try:
+            for j,name in self.savesampnames_loc:
+                with open(savedir+name+'_MODEL.pkl','w') as f:
+                    pickle.dump(self.Y_sim_loc[j],f,-1)
+        except:
+            if rank == 0:
+                for j,name in self.savesampnames:
+                    with open(savedir+name+'_MODEL.pkl','w') as f:
+                        pickle.dum(self.Y_sim[j],f,-1)
         if rank == 0:
             with open(savedir+'pooled_MODEL.pkl','w') as f:
                 pickle.dump(self.Y_pooled_sim,f,-1)
