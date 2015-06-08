@@ -4,7 +4,7 @@ import numpy as np
 import collections
 import warnings
 from utils import mpiutil
-from utils.jsonutil import ObjJsonEncoder
+from utils.jsonutil import ObjJsonEncoder,class_decoder
 from scipy import io,sparse
 import os
 import cPickle as pickle
@@ -157,7 +157,19 @@ class HMlogB(object):
             with open(savedir+logname+'_theta_sim.npy','w') as f:
                 np.save(f,self.theta_sim)
             with open(savedir+logname+'_nu_sim.npy','w') as f:
-                np.save(f,self.nu_sim)       
+                np.save(f,self.nu_sim)
+
+    @classmethod
+    def load(cls,savedir,logname='blog'):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        with open(savedir+logname+'.json','r') as f:
+            hmlog = json.load(f,object_hook=class_decoder)
+        if rank == 0:
+            with open(savedir+logname+'_theta_sim.npy','r') as f:
+                self.theta_sim = np.load(f)
+            with open(savedir+logname+'_nu_sim.npy','r') as f:
+                self.nu_sim = np.load(f)
 
 class HMlog(HMlogB):
     '''
@@ -353,12 +365,33 @@ class HMlog(HMlogB):
         except:
             if rank == 0:
                 for j,name in enumerate(self.savesampnames):
-                    with open(savedir+name+'_MODEL.pkl','w') as f:
+                    with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
                         pickle.dump(self.Y_sim[j],f,-1)
         if rank == 0:
             with open(self.syndata_dir+'pooled_MODEL.pkl','w') as f:
                 pickle.dump(self.Y_pooled_sim,f,-1)
         super(HMlog,self).save(savedir,logname='log')
+
+    @classmethod
+    def load(cls,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        hmlog = super(HMlog,cls).load(savedir,logname='log')
+        try:
+            self.Y_sim_loc = []
+            for name in self.savesampnames_loc:
+                with open(savedir+name+'_MODEL.pkl','r') as f:
+                    self.Y_sim_loc.append(pickle.load(f))
+        except:
+            if rank == 0:
+                self.Y_sim = []
+                for j,name in enumerate(self.savesampnames):
+                    with open(self.syndata_dir+name+'_MODEL.pkl','r') as f:
+                        self.Y_sim.append(pickle.load(f))
+        if rank == 0:
+            with open(self.syndata_dir+'pooled_MODEL.pkl','r') as f:
+                self.Y_pooled_sim = pickle.load(f)        
+
 
 class HMElog(HMlog):
     '''
@@ -487,6 +520,21 @@ class HMElog(HMlog):
                     io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
         super(HMElog,self).save(savedir)
 
+    @classmethod
+    def load(cls,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        super(HMElog,cls).load(savedir)
+        try:
+            print "names_loc at rank {}: {}".format(rank,self.names_loc)
+            self.classif_freq_loc = []         
+            for j,name in enumerate(self.names_loc):
+                self.classif_freq_loc.append(io.mmread(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+        except:
+            if rank == 0:
+                self.classif_freq = []
+                for j,name in enumerate(self.names):
+                    self.classif_freq.append(io.mmread(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))        
 
 
 
