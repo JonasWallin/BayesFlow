@@ -167,9 +167,10 @@ class HMlogB(object):
             hmlog = json.load(f,object_hook=lambda obj: class_decoder(obj,cls))
         if rank == 0:
             with open(savedir+logname+'_theta_sim.npy','r') as f:
-                self.theta_sim = np.load(f)
+                hmlog.theta_sim = np.load(f)
             with open(savedir+logname+'_nu_sim.npy','r') as f:
-                self.nu_sim = np.load(f)
+                hmlog.nu_sim = np.load(f)
+        return hmlog
 
 class HMlog(HMlogB):
     '''
@@ -378,19 +379,20 @@ class HMlog(HMlogB):
             savedir += '/'
         hmlog = super(HMlog,cls).load(savedir,logname='log')
         try:
-            self.Y_sim_loc = []
-            for name in self.savesampnames_loc:
+            hmlog.Y_sim_loc = []
+            for name in hmlog.savesampnames_loc:
                 with open(savedir+name+'_MODEL.pkl','r') as f:
-                    self.Y_sim_loc.append(pickle.load(f))
+                    hmlog.Y_sim_loc.append(pickle.load(f))
         except:
             if rank == 0:
-                self.Y_sim = []
-                for j,name in enumerate(self.savesampnames):
-                    with open(self.syndata_dir+name+'_MODEL.pkl','r') as f:
-                        self.Y_sim.append(pickle.load(f))
+                hmlog.Y_sim = []
+                for j,name in enumerate(hmlog.savesampnames):
+                    with open(hmlog.syndata_dir+name+'_MODEL.pkl','r') as f:
+                        hmlog.Y_sim.append(pickle.load(f))
         if rank == 0:
-            with open(self.syndata_dir+'pooled_MODEL.pkl','r') as f:
-                self.Y_pooled_sim = pickle.load(f)        
+            with open(hmlog.syndata_dir+'pooled_MODEL.pkl','r') as f:
+                hmlog.Y_pooled_sim = pickle.load(f) 
+        return hmlog       
 
 
 class HMElog(HMlog):
@@ -524,17 +526,18 @@ class HMElog(HMlog):
     def load(cls,savedir):
         if not savedir[-1] == '/':
             savedir += '/'
-        super(HMElog,cls).load(savedir)
+        hmlog = super(HMElog,cls).load(savedir)
         try:
-            print "names_loc at rank {}: {}".format(rank,self.names_loc)
-            self.classif_freq_loc = []         
-            for j,name in enumerate(self.names_loc):
-                self.classif_freq_loc.append(io.mmread(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+            print "names_loc at rank {}: {}".format(rank,hmlog.names_loc)
+            hmlog.classif_freq_loc = []         
+            for j,name in enumerate(hmlog.names_loc):
+                hmlog.classif_freq_loc.append(io.mmread(hmlog.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
         except:
             if rank == 0:
-                self.classif_freq = []
-                for j,name in enumerate(self.names):
-                    self.classif_freq.append(io.mmread(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))        
+                hmlog.classif_freq = []
+                for j,name in enumerate(hmlog.names):
+                    hmlog.classif_freq.append(io.mmread(hmlog.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+        return hmlog       
 
 
 
