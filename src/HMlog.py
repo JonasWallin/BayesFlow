@@ -347,12 +347,12 @@ class HMlog(HMlogB):
                 os.mkdir(self.syndata_dir)
         comm.Barrier()
         try:
-            for j,name in self.savesampnames_loc:
+            for j,name in enumerate(self.savesampnames_loc):
                 with open(savedir+name+'_MODEL.pkl','w') as f:
                     pickle.dump(self.Y_sim_loc[j],f,-1)
         except:
             if rank == 0:
-                for j,name in self.savesampnames:
+                for j,name in enumerate(self.savesampnames):
                     with open(savedir+name+'_MODEL.pkl','w') as f:
                         pickle.dump(self.Y_sim[j],f,-1)
         if rank == 0:
