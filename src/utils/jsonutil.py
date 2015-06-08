@@ -83,6 +83,7 @@ def construct_from_dict(dic,Cls):
                     continue
                 if arg == 'hGMM':
                     init_dict[arg] = construct_from_dict(dic,hier_mixture_mpi_mimic)
+                    continue
                 raise KeyError, 'Attribute needed for constructor not provided'
     return Cls(**init_dict)
 
