@@ -164,7 +164,7 @@ class HMlogB(object):
         if not savedir[-1] == '/':
             savedir += '/'
         with open(savedir+logname+'.json','r') as f:
-            hmlog = json.load(f,object_hook=class_decoder)
+            hmlog = json.load(f,object_hook=lambda obj: class_decoder(obj,cls))
         if rank == 0:
             with open(savedir+logname+'_theta_sim.npy','r') as f:
                 self.theta_sim = np.load(f)

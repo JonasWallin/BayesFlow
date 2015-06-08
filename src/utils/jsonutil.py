@@ -51,13 +51,12 @@ class ObjJsonEncoder(ArrayEncoder):
     Decoding
 '''
 
-def class_decoder(obj):
+def class_decoder(obj,Cls):
     if not '__type__'in obj or obj['__type__'] == 'np.ndarray':
         return array_decoder(obj)
     classname = obj['__type__']
     del obj['__type__']
-    Cls = eval(classname)
-    obj_decode = construct_from_dict(Cls,obj)
+    obj_decode = construct_from_dict(obj,Cls)
     for arg in obj:
         setattr(obj_decode,arg,obj[arg])
     return obj_decode
@@ -67,7 +66,7 @@ def array_decoder(obj):
         return np.asarray(obj['data'],dtype=obj['dtype'])
     return obj
 
-def construct_from_dict(Cls,dic):
+def construct_from_dict(dic,Cls):
     init_args,_,_,defaults = inspect.getargspec(Cls.__init__)
     print "init_args = {}".format(init_args)
     init_dict = {}
@@ -83,7 +82,7 @@ def construct_from_dict(Cls,dic):
                 if arg == 'self':
                     continue
                 if arg == 'hGMM':
-                    init_dict[arg] = construct_from_dict(hier_mixture_mpi_mimic,dic)
+                    init_dict[arg] = construct_from_dict(dic,hier_mixture_mpi_mimic)
                 raise KeyError, 'Attribute needed for constructor not provided'
     return Cls(**init_dict)
 
