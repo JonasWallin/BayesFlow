@@ -1,6 +1,7 @@
 import json
 import numpy as np
-from ..HMlog import HMlogB,HMlog
+import inspect
+#from ..HMlog import HMlogB,HMlog
 
 '''
     Encoding
@@ -8,8 +9,11 @@ from ..HMlog import HMlogB,HMlog
 
 class ArrayEncoder(json.JSONEncoder):
     def default(self, o):
+        #print "decoding {} with type {}".format(o,type(o))
         if isinstance(o,np.ndarray):
-            return {'shape':o.shape,'data':list(o.flatten()),'__type__':'np.ndarray'}
+            return {'shape':o.shape,'data':o.tolist(),'__type__':'np.ndarray','dtype':str(o.dtype)}
+        if isinstance(o,np.int32):
+            return int(o)
         return super(ArrayEncoder,self).default(o)
 
 class ObjJsonEncoder(ArrayEncoder):
@@ -58,6 +62,11 @@ def class_decoder(obj):
         setattr(obj_decode,arg,obj[arg])
     return obj_decode
 
+def array_decoder(obj):
+    if '__type__' in obj and obj['__type__'] == 'np.ndarray':
+        return np.asarray(obj['data'],dtype=obj['dtype'])
+    return obj
+
 def construct_from_dict(Cls,dic):
     init_args,_,_,defaults = inspect.getargspec(Cls.__init__)
     print "init_args = {}".format(init_args)
@@ -65,8 +74,8 @@ def construct_from_dict(Cls,dic):
     for i in range(1,len(init_args)+1):
         arg = init_args[-i]
         try:
-            init_dict[arg] = obj[arg]
-            del obj[arg]
+            init_dict[arg] = dic[arg]
+            del dic[arg]
         except:
             try:
                 init_dict[arg] = defaults[-i]
@@ -74,7 +83,7 @@ def construct_from_dict(Cls,dic):
                 if arg == 'self':
                     continue
                 if arg == 'hGMM':
-                    init_dict[arg] = construct_from_dict(hierarchical_mixture_mpi_mimic,dic)
+                    init_dict[arg] = construct_from_dict(hier_mixture_mpi_mimic,dic)
                 raise KeyError, 'Attribute needed for constructor not provided'
     return Cls(**init_dict)
 

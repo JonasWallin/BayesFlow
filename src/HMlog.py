@@ -6,6 +6,9 @@ import warnings
 from utils import mpiutil
 from utils.jsonutil import ObjJsonEncoder
 from scipy import io,sparse
+import os
+import cPickle as pickle
+import json
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -28,7 +31,7 @@ class HMlogB(object):
         self.K = hGMM.K
         self.d = hGMM.d
         self.noise_class = hGMM.noise_class
-        self.names_loc = [GMM.name for GMM in hGMM]
+        self.names_loc = [GMM.name for GMM in hGMM.GMMs]
         self.set_names(hGMM)
         self.active_komp_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.active_komp_curr_loc = np.ones((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
@@ -139,18 +142,22 @@ class HMlogB(object):
         jsondict = {'__type__':'HMlogB'}
         for arg in ['savefrq','nbrsave','sim','K','d','noise_class','names',
                     'active_komp','lab_sw']:
-            jsondict.update({arg:getattr(o,arg)})             
+            jsondict.update({arg:getattr(self,arg)})
+        #print "jsondict= {}".format(jsondict)
+        #with open('jsondump.pkl','w') as f:
+        #    pickle.dump(jsondict,f,-1)
         return jsondict    
 
     def save(self,savedir,logname='blog'):
-        if not savedir[-1] == '/':
-            savedir += '/'
-        with open(savedir+logname+'.json','w') as f:
-            json.dump(self,f,cls=ObjJsonEncoder)
-        with open(savedir+logname+'_theta_sim.npy','w') as f:
-            np.save(f,self.theta_sim)
-        with open(savedir+logname+'_nu_sim.npy','w') as f:
-            np.save(f,self.nu_sim)       
+        if rank == 0:
+            if not savedir[-1] == '/':
+                savedir += '/'
+            with open(savedir+logname+'.json','w') as f:
+                json.dump(self,f,cls=ObjJsonEncoder)
+            with open(savedir+logname+'_theta_sim.npy','w') as f:
+                np.save(f,self.theta_sim)
+            with open(savedir+logname+'_nu_sim.npy','w') as f:
+                np.save(f,self.nu_sim)       
 
 class HMlog(HMlogB):
     '''
@@ -324,7 +331,7 @@ class HMlog(HMlogB):
         jsondict['__type__'] = 'HMlog'
         for arg in ['theta_sim_mean','Sigmaexp_sim_mean','mupers_sim_mean','Sigmapers_sim_mean',
                     'prob_sim_mean','J']:
-            jsondict.update(arg:getattr(o,arg))
+            jsondict.update({arg:getattr(self,arg)})
         try:
             jsondict['syndata_dir'] = self.syndata_dir
         except:
@@ -334,10 +341,11 @@ class HMlog(HMlogB):
     def save(self,savedir):
         if not savedir[-1] == '/':
             savedir += '/'
-        if len(self.savesampnames) > 0:
-            self.syndata_dir = savedir + 'syndata/'
-        if not os.path.exists(self.syndata_dir):
-            os.mkdir(self.syndata_dir)
+        self.syndata_dir = savedir + 'syndata/'
+        if rank == 0:
+            if not os.path.exists(self.syndata_dir):
+                os.mkdir(self.syndata_dir)
+        comm.Barrier()
         try:
             for j,name in self.savesampnames_loc:
                 with open(savedir+name+'_MODEL.pkl','w') as f:
@@ -346,9 +354,9 @@ class HMlog(HMlogB):
             if rank == 0:
                 for j,name in self.savesampnames:
                     with open(savedir+name+'_MODEL.pkl','w') as f:
-                        pickle.dum(self.Y_sim[j],f,-1)
+                        pickle.dump(self.Y_sim[j],f,-1)
         if rank == 0:
-            with open(savedir+'pooled_MODEL.pkl','w') as f:
+            with open(self.syndata_dir+'pooled_MODEL.pkl','w') as f:
                 pickle.dump(self.Y_pooled_sim,f,-1)
         super(HMlog,self).save(savedir,logname='log')
 
@@ -385,15 +393,15 @@ class HMElog(HMlog):
         for j,GMM in enumerate(hGMM.GMMs):
             self.classif[j][:,self.ii] = GMM.x[:]
 
-    def postproc(self):
+    def postproc(self,high_memory=False):
         '''
             Post-processing production iterations
         '''
-         super(HMElog,self).postproc()
+        super(HMElog,self).postproc(high_memory)
         if not self.ii == self.batch:
             self.add_classif_fr()
         del self.classif
-        if rank == 0 and if high_memory:
+        if rank == 0 and high_memory:
             self.classif_freq = mpiutil.collect_arrays(self.classif_freq_loc)     
             
     # def postproc_old(self):
@@ -441,8 +449,8 @@ class HMElog(HMlog):
     #     else:
     #         classif_all = None
     #     comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
-        if rank == 0:
-            self.classif_freq_all += classif_all
+    #    if rank == 0:
+    #        self.classif_freq_all += classif_all
 
     def set_ns(self):
         ns_loc = np.array([cl.shape[0] for cl in self.classif],dtype='i')
@@ -465,15 +473,18 @@ class HMElog(HMlog):
         if not savedir[-1] == '/':
             savedir += '/'
         self.classif_freq_dir = savedir+'classif_freq/'
-        if not os.path.exists(self.classif_freq_dir):
-            os.mkdir(self.classif_freq_dir)
+        if rank == 0:
+            if not os.path.exists(self.classif_freq_dir):
+                os.mkdir(self.classif_freq_dir)
+        comm.Barrier()
         try:
-            for j,name in self.names_loc:
+            print "names_loc at rank {}: {}".format(rank,self.names_loc)            
+            for j,name in enumerate(self.names_loc):
                 io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))
         except:
             if rank == 0:
-                for j,name in self.names:
-                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
+                for j,name in enumerate(self.names):
+                    io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
         super(HMElog,self).save(savedir)
 
 

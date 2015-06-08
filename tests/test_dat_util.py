@@ -19,8 +19,7 @@ print "sampnames = {}".format(sampnames)
 if 0:
 	print "dat_util.total_number_events(sampnames,**kw) at rank {} = {}".format(rank,dat_util.total_number_events(sampnames,**kw))
 
-prc,scaleKey = dat_util.pooled_percentile_mpi(1,sampnames=sampnames,**kw)
-print "dat_util.pooled_percentile_mpi(1,sampnames,**kw)[0] = {}".format(prc)
+print "dat_util.pooled_percentile_mpi(1,sampnames,**kw) = {}".format(dat_util.pooled_percentile_mpi(1,sampnames=sampnames,**kw))
 
 print "dat_util.pooled_percentile_mpi(99,sampnames,**kw) = {}".format(dat_util.pooled_percentile_mpi(99,sampnames=sampnames,**kw))
 
