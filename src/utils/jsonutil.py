@@ -91,6 +91,7 @@ def construct_from_dict(dic,Cls):
 class GMM_mimic(object):
     def __init__(self,name):
         self.name = name
+        self.data = np.empty(0)
 
 class hier_mixture_mpi_mimic(object):
     def __init__(self,K,d,names,noise_class):

@@ -8,7 +8,6 @@ import cPickle as pickle
 import os
 import numpy as np
 import json
-import jsonutil
 import yaml
 import re
 from mpi4py import MPI
@@ -28,25 +27,13 @@ def save_object(obj, savedir, filename=None, objtype=None):
         if not filename is None:
             save_object_to_file(obj,savedir+filename)
             return
-        if objtype is None:
-            objtype = obj.__class__.__name__
-
         if objtype == 'eventind':
             save_eventind(obj,savedir)
-            return
-        if objtype == 'HMlogB':
-            save_HMlogB(obj,savedir)
-            return
-        if objtype == 'HMlog':
-            save_HMlog(obj,savedir)
-            return
-        if objtype == 'HMElog':
-            save_HMElog(obj,savedir)
-            return
-
         defaultnames = {'HMlogB':'blog','HMlog':'log_ne','HMElog':'log',
         'BMres':'hmres_','HMres':'hmres_','faillog':'flog','triallog':'tlog',
         'eventind':'eventind'}
+        if objtype is None:
+            objtype = obj.__class__.__name__
         filename = defaultnames[objtype]
         if hasattr(obj,'mergeMeth'):
             filename += obj.mergeMeth
@@ -54,108 +41,14 @@ def save_object(obj, savedir, filename=None, objtype=None):
         print "saving file {}".format(filename)
         save_object_to_file(obj,savedir+filename)
 
-def load_burnlog(savedir):
-    return load_HMlogB(savedir)
-
-def load_prodlog(savedir):
-    return load_HMElog(savedir)
-
-def save_HMlogB(obj,savedir):
-    json.dump(obj,savedir+'blog.json',cls=jsonutil.HMlogBEncoder)
-
-def load_HMlogB(savedir):
-    if not savedir[-1] == '/':
-        savedir += '/'
-    try:
-        with open(savedir+'blog.pkl','rb') as f:
-            return pickle.load(f)
-    except:
-        with open(savedir+'blog.json') as f:
-            return json.load(f,object_hook=jsonutil.hmlogb_decoder)
-
-def save_HMlog(obj,savedir,logname=None):
-    if not savedir[-1] == '/':
-        savedir += '/'
-    if logname is None:
-        logname = 'log_ne'
-    json.dump(obj,savedir+logname+'.json',cls=jsonutil.HMlogEncoder)
-
-    savedir += 'syndata/'
-    if not os.path.exists(savedir):
-        os.mkdir(savedir)
-    for j,name in obj.savesampnames_loc:
-        np.savetxt(savedir+name+'_MODEL.txt', obj.Y_sim_loc[j])
-    if rank == 0:
-        np.savetxt(savedir+'pooled_MODEL.txt', obj.Y_pooled_sim)
-
-def load_HMlog(savedir,name=None):
-    if name is None:
-        name = 'log_ne'
-    if not savedir[-1] == '/':
-        savedir += '/'
-    try:
-        with open(savedir+name+'.pkl','rb') as f:
-            return pickle.load(f)
-    except:
-        with open(savedir+name+'.json','rb') as f:
-            hmlog = json.load(f,object_hook=jsonutil.hmlog_decoder)
-        hmlog.set_syndata_dir(savedir+'syndata/')
-        return hmlog
-
-def save_HMElog(obj,savedir):
-    if not savedir[-1] == '/':
-        savedir += '/'
-    save_HMlog(obj,savedir,logname='log')
-    savedir += 'classif_freq/'
-    if not os.path.exists(savedir):
-        os.mkdir(savedir)
-    try:
-        for j,name in obj.names_loc:
-            np.savetxt(savedir+name+'_CLASSIF_FREQ.txt',obj.classif_freq_loc[j])
-    except:
-        if rank == 0:
-            for j,name in obj.names:
-                np.savetxt(savedir+name+'_CLASSIF_FREQ.txt',obj.classif_freq[j])
-
-def load_HMElog(savedir):
-    if not savedir[-1] == '/':
-        savedir += '/'
-    try:
-        with open(savedir+'log.pkl','rb') as f:
-            return pickle.load(f)
-    except:
-        with open(savedir+'log.json','rb') as f:
-            hmelog = json.load(f,object_hook=jsonutil.hmlog_decoder)
-            return hmelog
-## TODO! Load also other data
-
-
-
-def load_percentilescale(datadir,q,scaleKey):
-    q1,q2 = q
-    lower_q = load_percentile(datadir,q1,scaleKey)
-    upper_q = load_percentile(datadir,q2,scaleKey)
-    intercept = lower_q
-    slope = upper_q - lower_q
-    return intercept,slope
-
-def percentilename(datadir,q,scaleKey):
-    if datadir[-1] != '/':
-        datadir += '/'
-    savedir = datadir + 'scale_dat/'
-    if not os.path.exists(savedir):
-        os.mkdir(savedir)
-    return savedir+'percentile_'+str(q)+scaleKey+'.txt'
-
-def load_percentile(datadir,q,scaleKey):
-    filename = percentilename(datadir,q,scaleKey)
-    return np.loadtxt(filename)
-
-def save_percentile(percentile,datadir,q,scaleKey):
-    if datadir[-1] != '/':
-        datadir += '/'
-    filename = percentilename(datadir,q,scaleKey)
-    np.savetxt(filename,percentile)
+def eventfilename(savedir,Nevent,i,name=None):
+    eventfile = 'eventind'
+    if not name is None:
+        eventfile += '_'+name
+    if not Nevent is None:
+        eventfile += '_%d' % Nevent
+    eventfile += '_%d.json' % i
+    return savedir+eventfile
 
 def save_eventind(eventind_dict,savedir,Nevent,name=None):
     i = 0
@@ -171,19 +64,16 @@ def save_eventind(eventind_dict,savedir,Nevent,name=None):
     with open(eventfile,'w') as f:
         json.dump(eventind_dict,f)
 
-def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False,verbose=False):
+def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False):
     if pkl:
         return pickle.load(open(savedir+'eventind.pkl','rb'))
     eventfile = eventfilename(savedir,Nevent,i,name)
-    if not os.path.exists(eventfile):
-        eventfile = eventfilename(savedir,Nevent,i)
     with open(eventfile, 'r') as f:
         try:
             line1 = f.readline()
             eventind_dic = yaml.load(line1)
         except:
-            if verbose:
-                print "Loading eventind Matlab style"
+            print "Loading eventind Matlab style"
             lines = [line1]+f.readlines()
             line = ' '.join(lines)
             line = line.replace('\r','')
@@ -191,32 +81,25 @@ def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False,verbose=False):
             line = line.replace('\n','')
             line = re.sub('\[([0-9]+)\]','\\1',line)
             eventind_dic = yaml.load(line)
-    if verbose:
-        print "Events loaded ok"
+    print "Events loaded ok"
     for key in eventind_dic:
         eventind_dic[key] = np.array(eventind_dic[key])
     return eventind_dic
 
-def eventfilename(savedir,Nevent,i,name=None):
-    if not savedir[-1] == '/':
-        savedir += '/'
-    eventdir = savedir+'eventinds/'
-    if not os.path.exists(eventdir):
-        os.mkdir(eventdir)
-    eventfile = 'eventind'
-    if not name is None:
-        eventfile += '_'+name
-    if not Nevent is None:
-        eventfile += '_%d' % Nevent
-    eventfile += '_%d.json' % i
-    return eventdir+eventfile
+def load_burnlog(savedir):
+    return load_HMlogB(savedir)
 
-
+def load_prodlog(savedir):
+    return load_HMElog(savedir)
                 
-
-
+def load_HMlogB(savedir):
+    return pickle.load(open(savedir+'blog'+'.pkl','rb'))
     
-
+def load_HMlog(savedir):
+    return pickle.load(open(savedir+'log_ne'+'.pkl','rb'))
+    
+def load_HMElog(savedir):
+    return pickle.load(open(savedir+'log'+'.pkl','rb'))
 
 def load_faillog(savedir):
     return pickle.load(open(savedir+'flog'+'.pkl','rb'))
