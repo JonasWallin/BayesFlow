@@ -361,7 +361,7 @@ class HMlog(HMlogB):
         comm.Barrier()
         try:
             for j,name in enumerate(self.savesampnames_loc):
-                with open(savedir+name+'_MODEL.pkl','w') as f:
+                with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
                     pickle.dump(self.Y_sim_loc[j],f,-1)
         except:
             if rank == 0:
@@ -379,18 +379,23 @@ class HMlog(HMlogB):
             savedir += '/'
         hmlog = super(HMlog,cls).load(savedir,logname='log')
         try:
+            syndata_dir = hmlog.syndata_dir
+        except:
+            syndata_dir = savedir+'syndata/'
+
+        try:
             hmlog.Y_sim_loc = []
             for name in hmlog.savesampnames_loc:
-                with open(savedir+name+'_MODEL.pkl','r') as f:
+                with open(syndata_dir+name+'_MODEL.pkl','r') as f:
                     hmlog.Y_sim_loc.append(pickle.load(f))
         except:
             if rank == 0:
                 hmlog.Y_sim = []
                 for j,name in enumerate(hmlog.savesampnames):
-                    with open(hmlog.syndata_dir+name+'_MODEL.pkl','r') as f:
+                    with open(syndata_dir+name+'_MODEL.pkl','r') as f:
                         hmlog.Y_sim.append(pickle.load(f))
         if rank == 0:
-            with open(hmlog.syndata_dir+'pooled_MODEL.pkl','r') as f:
+            with open(syndata_dir+'pooled_MODEL.pkl','r') as f:
                 hmlog.Y_pooled_sim = pickle.load(f) 
         return hmlog       
 
@@ -528,15 +533,19 @@ class HMElog(HMlog):
             savedir += '/'
         hmlog = super(HMElog,cls).load(savedir)
         try:
+            classif_freq_dir = hmlog.classif_freq_dir
+        except:
+            classif_freq_dir = savedir+'classif_freq/'
+        try:
             print "names_loc at rank {}: {}".format(rank,hmlog.names_loc)
             hmlog.classif_freq_loc = []         
             for j,name in enumerate(hmlog.names_loc):
-                hmlog.classif_freq_loc.append(io.mmread(hmlog.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+                hmlog.classif_freq_loc.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
         except:
             if rank == 0:
                 hmlog.classif_freq = []
                 for j,name in enumerate(hmlog.names):
-                    hmlog.classif_freq.append(io.mmread(hmlog.classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+                    hmlog.classif_freq.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
         return hmlog       
 
 
