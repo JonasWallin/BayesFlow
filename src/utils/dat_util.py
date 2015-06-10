@@ -79,7 +79,7 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
             ok = non_extreme_ind(data)
             data[~ok,:] = add_noise(data[~ok,:])    
 
-    return data[eventind.data,:]
+    return data[eventind.indices,:]
 
 def percentilescale(data,q = (1.,99.), qvalues = None):
     '''
@@ -105,6 +105,7 @@ def percentilescale(data,q = (1.,99.), qvalues = None):
     return lower,upper
 
 def sampnames_mpi(comm,datadir,ext,Nsamp=None):
+    rank = comm.Get_rank()
     if rank == 0:
         if datadir[-1] != '/':
             datadir += '/'
@@ -148,7 +149,7 @@ class EventInd(object):
 
     def __init__(self,sampname,indices,i=0):
         self.sampname = sampname
-        self.data = indices
+        self.indices = indices
         self.Nevent = len(indices)
         self.i = i
 
@@ -179,11 +180,14 @@ class EventInd(object):
             os.mkdir(savedir)
         fpath = savedir+str(self)+'.npy'
         while os.path.exists(fpath):
-            print fpath ' already exists, increasing i'
+            print fpath+' already exists, increasing i'
             self.i += 1
             fpath = savedir+str(self)+'.npy'
         with open(fpath,'w') as f:
-            np.save(f,indices)
+            np.save(f,self.indices)
+
+class NoDataError(Exception):
+    pass
 
 class PercentilesMPI(object):
     def __init__(self,comm,sampnames,Nevent=None,i_eventind_load=0,datadir=None):
@@ -194,6 +198,7 @@ class PercentilesMPI(object):
         self.i_eventind_load = i_eventind_load
         self.datadir = datadir
         self.savedir_ = self.savedir(datadir)
+        self.key_file_ = self.savedir_+'scale_keys.pkl'
         self.key_dict_ = self.key_dict()
         self.key_ = self.key(sampnames)
 
@@ -220,25 +225,25 @@ class PercentilesMPI(object):
                 self.save(q,percentile_values)#ls.save_percentile(percentiles,datadir,q,key) 
             return percentile_values
 
-        if rank == 0:
+        if self.rank == 0:
             print "Computing new percentiles"
-        NN,_ = total_number_events_and_samples(self.comm,sampnames,data,datadir=self.datadir,**kw)
+        NN,_ = total_number_events_and_samples(self.comm,self.sampnames,data,datadir=self.datadir,**kw)
         N = int(np.round(NN*q/100))
         if data is None:
             data_list = []
-            for name in sampnames:
+            for name in self.sampnames:
                 dat = load_fcsample(name,datadir=self.datadir,**kw)
                 self.partition_all_columns(dat,N-1)
                 data_list.append(dat[:N,:])
             data_loc = np.vstack(data_list)
         else:
             data_loc = np.vstack(data)
-        partition_all_columns(data_loc,N-1)
+        self.partition_all_columns(data_loc,N-1)
         data_all = mpiutil.collect_data(data_loc[:N,:],data_loc.shape[1],'d',MPI.DOUBLE,self.comm)
-        if rank == 0:
-            partition_all_columns(data_all,N-1)
+        if self.rank == 0:
+            self.partition_all_columns(data_all,N-1)
             percentile_values = data_all[N-1,:]
-            print "percentiles = {}".format(percentiles_values)
+            print "percentiles = {}".format(percentile_values)
             if save:
                 self.save(q,percentile_values)
         else:
@@ -256,7 +261,7 @@ class PercentilesMPI(object):
 
     def key_dict(self):
         try:
-            with open(self.savedir_+'scale_keys.pkl','r') as f:
+            with open(self.key_file_,'r') as f:
                 return pickle.load(f)
         except:
             pass
@@ -264,12 +269,12 @@ class PercentilesMPI(object):
 
     def key(self):
         sampnames_all = self.comm.gather(self.sampnames)
-        if rank == 0:
+        if self.rank == 0:
             sampnames_all = list(np.hstack(sampnames_all))
         #comm.Barrier()
         sampnames_all = self.comm.bcast(sampnames_all)
         #print "sampnames_all after bcast at rank {}= {}".format(rank,sampnames_all)
-        if rank == 0:
+        if self.rank == 0:
             curr_dict = self.key_dict_
             #print "curr_dict = {}".format(curr_dict)
             samp_frozen = frozenset(sampnames_all)
@@ -282,8 +287,8 @@ class PercentilesMPI(object):
                     i,curr_dict = curr_dict[dat]
                 key_ += '_%d' % i
             #print "parent_dict = {}".format(parent_dict)
-            with open(keyfile,'w') as f:
-                pickle.dump(parent_dict,f)
+            #with open(self.key_file_,'w') as f:
+            #    pickle.dump(self.key_dict_,f)
         else:
             key_ = None
         return mpiutil.bcast_string(key_,self.comm)
@@ -300,7 +305,10 @@ class PercentilesMPI(object):
 
     def load_values(self,q):
         if self.rank == 0:
-            values = np.loadtxt(self.savedir_+self.name(q,self.key_)+'.txt')
+            try:
+                values = np.loadtxt(self.savedir_+self.name(q,self.key_)+'.txt')
+            except:
+                raise NoDataError
         else:
             values = None
         self.comm.bcast(values)
