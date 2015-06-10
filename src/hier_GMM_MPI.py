@@ -453,11 +453,13 @@ class hierarical_mixture_mpi(object):
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
     
-    def load_data(self,sampnames,scale='percentilescale',q=(1,99),**kw):
+    def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
         """
             Load data corresponding to sampnames directly onto worker
         """
         rank = self.comm.Get_rank()
+        if sampnames is None:
+            sampnames = dat_util.sampnames_mpi(self.comm,kw['datadir'],kw['ext'],kw['Nsamp'])
         
         data = []
         for name in sampnames:
@@ -470,18 +472,18 @@ class hierarical_mixture_mpi(object):
             self.counts = np.array([n*self.K for n in ns],dtype='i')
         else:
             self.counts = 0
-        print "self.counts at rank {} = {}".format(self.comm.Get_rank(),self.counts)
+        print "self.counts at rank {} = {}".format(rank,self.counts)
         
         if rank == 0:
             d = data[0].shape[1]
         else:
             d = 0
-        d = bcast_int(d)
+        d = bcast_int(d,self.comm)
         self.d = d
 
         if scale == 'percentilescale':
-            lower = dat_util.pooled_percentile_mpi(q[0],sampnames,data,**kw)
-            upper = dat_util.pooled_percentile_mpi(q[1],sampnames,data,**kw)
+            lower = PercentilesMPI.percentiles_pooled_data(q[0],sampnames,data,**kw)
+            upper = PercentilesMPI.percentiles_pooled_data(q[1],sampnames,data,**kw)
 
             dat_util.percentilescale(data,qvalues=(lower,upper))
 

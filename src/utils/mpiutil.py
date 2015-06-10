@@ -1,11 +1,8 @@
 from mpi4py import MPI
 import numpy as np
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-def collect_int(i,root=0):
+def collect_int(i,root=0,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     if rank == root:
         i_all = np.empty(comm.Get_size(),dtype = 'i')
     else:
@@ -13,7 +10,8 @@ def collect_int(i,root=0):
     comm.Gather(sendbuf=[np.array(i,dtype='i'), MPI.INT], recvbuf=[i_all, MPI.INT], root=root)
     return i_all
 
-def bcast_int(i,root=0):
+def bcast_int(i,root=0,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     if rank == root:
         ib = np.array([i],dtype='i')
     else:
@@ -21,9 +19,10 @@ def bcast_int(i,root=0):
     comm.Bcast([ib,MPI.INT],root=root)
     return ib[0]
 
-def bcast_string(s,root=0):
+def bcast_string(s,root=0,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     if rank == root:
-        s_list = [np.array(s) for i in range(size)]
+        s_list = [np.array(s) for i in range(comm.Get_size())]
     else:
         s_list = None
     return str(comm.scatter(s_list, root = root))
@@ -44,12 +43,13 @@ def bcast_string(s,root=0):
 #     comm.bcast(s_list,root=root)
 #     return s_list
 
-def bcast_array_1d(array,nptype,mpitype,root=0):
+def bcast_array_1d(array,nptype,mpitype,root=0,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     if rank == root:
         n = array.shape[0]
     else:
         n = None
-    n = bcast_int(n,root=root)
+    n = bcast_int(n,root=root,comm=comm)
     #print "n = {}".format(n)
 
     if rank != root:
@@ -58,16 +58,16 @@ def bcast_array_1d(array,nptype,mpitype,root=0):
     comm.Bcast([array,mpitype],root=root)
     return array
 
-def collect_arrays(data,nbr_col,nptype,mpitype):
+def collect_arrays(data,nbr_col,nptype,mpitype,comm = MPI.COMM_WORLD):
 
-    nbr_row = collect_data_1d([dat.shape[0] for dat in data],'i',MPI.INT)
+    nbr_row = collect_data_1d([dat.shape[0] for dat in data],'i',MPI.INT,comm)
     
     if len(data) > 0:
         data_stack = np.vstack([np.array(dat,dtype=nptype).reshape((-1,nbr_col)) for dat in data])
     else:
         data_stack = np.empty((0,nbr_col),dtype=nptype)
 
-    data_all_stack = collect_array_(data_stack,nbr_col,nptype,mpitype)
+    data_all_stack = collect_array_(data_stack,nbr_col,nptype,mpitype,comm)
     
     if not data_all_stack is None:
         if len(nbr_row) > 0:
@@ -79,34 +79,35 @@ def collect_arrays(data,nbr_col,nptype,mpitype):
         
     return data_all
 
-def collect_data(data,nbr_col,nptype,mpitype):
+def collect_data(data,nbr_col,nptype,mpitype,comm = MPI.COMM_WORLD):
 
     if len(data) > 0:
         data_array = np.array(data,dtype=nptype).reshape((-1,nbr_col))
     else:
         data_array = np.empty((0,nbr_col),dtype=nptype)
         
-    data_all = collect_array_(data_array,nbr_col,nptype,mpitype)
+    data_all = collect_array_(data_array,nbr_col,nptype,mpitype,comm)
     return data_all
 
-def collect_data_1d(data,nptype,mpitype):
+def collect_data_1d(data,nptype,mpitype,comm = MPI.COMM_WORLD):
 
-    data_all = collect_data(data,1,nptype,mpitype)
+    data_all = collect_data(data,1,nptype,mpitype,comm)
     if not data_all is None:
         data_all = data_all.reshape((-1,))    
     return data_all
 
-def collect_strings(s_list):
+def collect_strings(s_list,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     s_array = [np.array([ch for ch in s]) for s in s_list]
-    s_array_all = collect_arrays(s_array,1,'S',MPI.UNSIGNED_CHAR)
+    s_array_all = collect_arrays(s_array,1,'S',MPI.UNSIGNED_CHAR,comm)
     if rank == 0:
         s_all = [''.join(s.reshape((-1,))) for s in s_array_all]
     else:
         s_all = None
     return s_all
 
-def collect_array_(data_array,nbr_col,nptype,mpitype):
-
+def collect_array_(data_array,nbr_col,nptype,mpitype,comm = MPI.COMM_WORLD):
+    rank = comm.Get_rank()
     if rank == 0:
         nbr_row = np.empty(comm.Get_size(),dtype = 'i')
     else:
