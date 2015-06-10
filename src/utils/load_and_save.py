@@ -42,13 +42,18 @@ def save_object(obj, savedir, filename=None, objtype=None):
         save_object_to_file(obj,savedir+filename)
 
 def eventfilename(savedir,Nevent,i,name=None):
+    if not savedir[-1] == '/':
+        savedir += '/'
+    eventdir = savedir+'eventinds/'
+    if not os.path.exists(eventdir):
+        os.mkdir(eventdir)
     eventfile = 'eventind'
     if not name is None:
         eventfile += '_'+name
     if not Nevent is None:
         eventfile += '_%d' % Nevent
     eventfile += '_%d.json' % i
-    return savedir+eventfile
+    return eventdir+eventfile
 
 def save_eventind(eventind_dict,savedir,Nevent,name=None):
     i = 0
@@ -85,6 +90,32 @@ def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False):
     for key in eventind_dic:
         eventind_dic[key] = np.array(eventind_dic[key])
     return eventind_dic
+
+# def load_percentilescale(datadir,q,scaleKey):
+#      q1,q2 = q
+#      lower_q = load_percentile(datadir,q1,scaleKey)
+#      upper_q = load_percentile(datadir,q2,scaleKey)
+#      intercept = lower_q
+#      slope = upper_q - lower_q
+#      return intercept,slope
+ 
+#  def percentilename(datadir,q,scaleKey):
+#      if datadir[-1] != '/':
+#          datadir += '/'
+#      savedir = datadir + 'scale_dat/'
+#      if not os.path.exists(savedir):
+#          os.mkdir(savedir)
+#      return savedir+'percentile_'+str(q)+scaleKey+'.txt'
+ 
+#  def load_percentile(datadir,q,scaleKey):
+#      filename = percentilename(datadir,q,scaleKey)
+#      return np.loadtxt(filename)
+ 
+#  def save_percentile(percentile,datadir,q,scaleKey):
+#      if datadir[-1] != '/':
+#          datadir += '/'
+#      filename = percentilename(datadir,q,scaleKey)
+#      np.savetxt(filename,percentile)
 
 def load_burnlog(savedir):
     return load_HMlogB(savedir)
