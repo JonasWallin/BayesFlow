@@ -10,6 +10,7 @@ import numpy as np
 from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from BayesFlow.GMM import mixture
 from BayesFlow.utils import dat_util
+from BayesFlow.utils.dat_util import PercentilesMPI
 from BayesFlow.utils.mpiutil import bcast_int
 import HMlog
 import matplotlib.pyplot as plt
@@ -482,8 +483,8 @@ class hierarical_mixture_mpi(object):
         self.d = d
 
         if scale == 'percentilescale':
-            lower = PercentilesMPI.percentiles_pooled_data(q[0],sampnames,data,**kw)
-            upper = PercentilesMPI.percentiles_pooled_data(q[1],sampnames,data,**kw)
+            lower = PercentilesMPI.percentiles_pooled_data(self.comm,q[0],sampnames,data,**kw)
+            upper = PercentilesMPI.percentiles_pooled_data(self.comm,q[1],sampnames,data,**kw)
 
             dat_util.percentilescale(data,qvalues=(lower,upper))
 

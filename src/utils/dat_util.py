@@ -121,27 +121,32 @@ def sampnames_mpi(comm,datadir,ext,Nsamp=None):
     return names_dat
 
 def total_number_samples(comm,sampnames):
-    J = np.sum(mpiutil.collect_int(len(sampnames)),comm)
+    print "id(comm) = {}".format(id(comm))
+    J = np.sum(mpiutil.collect_int(len(sampnames),comm))
     return mpiutil.bcast_int(J,comm) 
 
 def total_number_events_and_samples(comm,sampnames,data=None,**kw):
-    J = total_number_samples(sampnames)
+    print "computing tot samples at rank {}".format(comm.Get_rank())
+    J = total_number_samples(comm,sampnames)
+    print "nbr samples computed"
     #print "J at rank {} = {}".format(rank,J)
     try:
         Nevent = kw['Nevent']
         print "J*Nevent = {}".format(J*Nevent)
         return J*Nevent
-    except:
+    except KeyError:
         pass
     if data is None:
-        kw_ = copy.deepcopy(kw)
-        kw_['scale'] = None
         N_loc = 0
         for name in sampnames:
-            N_loc += load_fcsample(name,**kw_).shape[0]
+            N_loc += load_fcsample(name,**kw).shape[0]
     else:
         N_loc = np.sum([dat.shape[0] for dat in data])
-    N = np.sum(mpiutil.collect_int(N_loc),comm)
+    print "N_loc at rank {} = {}".format(comm.Get_rank(),N_loc)
+    N = int(np.sum(mpiutil.collect_int(N_loc,comm)))
+    print "N = {}".format(N)
+    comm.Barrier()
+    print "N at rank {} = {}".format(comm.Get_rank(),N)
     N = mpiutil.bcast_int(N,comm)
     return N,J
 
@@ -200,11 +205,11 @@ class PercentilesMPI(object):
         self.savedir_ = self.savedir(datadir)
         self.key_file_ = self.savedir_+'scale_keys.pkl'
         self.key_dict_ = self.key_dict()
-        self.key_ = self.key(sampnames)
+        self.key_ = self.key()
 
     @classmethod
     def percentiles_pooled_data(cls,comm,q,sampnames,data=None,Nevent=None,i_eventind_load=0,datadir=None,**kw):
-        percMPI = cls(comm,q,sampnames,Nevent,i_eventind_load,datadir)
+        percMPI = cls(comm,sampnames,Nevent,i_eventind_load,datadir)
         return percMPI.percentiles_pooled_data_method(q,data,**kw)
 
     def percentiles_pooled_data_method(self,q,data=None,load=True,save=True,**kw):
@@ -214,7 +219,7 @@ class PercentilesMPI(object):
             except NoDataError:
                 pass
         if q > 50:
-            if self.data is None:
+            if data is None:
                 kw_ = kw.copy()
                 kw_['loadfilef'] = lambda name: -kw['loadfilef'](name)
                 percentile_values = -self.percentiles_pooled_data_method(100-q,load=False,save=False,**kw_)
@@ -307,12 +312,16 @@ class PercentilesMPI(object):
         if self.rank == 0:
             try:
                 values = np.loadtxt(self.savedir_+self.name(q,self.key_)+'.txt')
+                data_found = True
             except:
-                raise NoDataError
+                data_found = False
         else:
             values = None
-        self.comm.bcast(values)
-        return values
+            data_found = False
+        data_found = self.comm.bcast(data_found)
+        if not data_found:
+            raise NoDataError     
+        return self.comm.bcast(values)
 
     def save(self,q,values):
         if self.rank == 0:
