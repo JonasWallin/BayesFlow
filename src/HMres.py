@@ -6,8 +6,9 @@ Created on Mon Aug 18 18:35:14 2014
 """
 from __future__ import division
 from mpi4py import MPI
-import BMplot as bmp
-from .utils.results import Mres, Traces, MimicSample, Components
+import numpy as np
+from HMplot import HMplot
+from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -26,7 +27,7 @@ class HMres(Mres):
             else:
                 self.p_noise = None
             super(HMres,self).__init__(bmlog.d,bmlog.K,bmlog.prob_sim_mean[:,:bmlog.K],
-                                       bmlog.classif_freq,data,meta_data,self.p_noise)
+                                       bmlog.classif_freq,data,meta_data,self.p_noise,bmlog.sim)
 
             self.sim = bmlog.sim
 
@@ -37,11 +38,12 @@ class HMres(Mres):
 
             self.traces = Traces(bmlog_burn,bmlog)
             self.mimics = {}
-            print "bmlog.savesmapnames = {}".format(bmlog.savesampnames)
+            print "bmlog.savesampnames = {}".format(bmlog.savesampnames)
             for i,name in enumerate(bmlog.savesampnames):
                 j = bmlog.names.index(name)
                 self.mimics[name] = MimicSample(self.data[j],name,bmlog.Y_sim[i],'BHM_MCMC')
-            self.mimics['pooled'] = MimicSample(self.datapooled,'pooled',bmlog.Y_pooled_sim,'BHM_MCMC')
+            datapooled = np.vstack(data)[np.random.choice(range(sum([dat.shape[0] for dat in data])),bmlog.Y_pooled_sim.shape[0],replace=False),:]
+            self.mimics['pooled'] = MimicSample(datapooled,'pooled',bmlog.Y_pooled_sim,'BHM_MCMC')
                 
             self.components = Components(bmlog,self.p)                   
             
@@ -55,7 +57,7 @@ class HMres(Mres):
             else:
                 super(HMres,self).merge(method,thr,**mmfArgs)
             self.components.mergeind = self.mergeind
-            self.plot = bmp.BMplot(self,self.meta_data.marker_lab)
+            self.plot = HMplot(self,self.meta_data.marker_lab)
             for i in range(size):
                 comm.send(self.mergeind,dest=i,tag=2)
         else:

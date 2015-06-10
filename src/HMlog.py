@@ -203,6 +203,8 @@ class HMlog(HMlogB):
             print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,rank)
             print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),rank)
             self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
+            if rank == 0:
+                self.savesampnames = savesampnames
         else:
             if rank == 0:
                 self.savesamp_loc = savesamp
@@ -343,7 +345,7 @@ class HMlog(HMlogB):
         jsondict = super(HMlog,self).encode_json()
         jsondict['__type__'] = 'HMlog'
         for arg in ['theta_sim_mean','Sigmaexp_sim_mean','mupers_sim_mean','Sigmapers_sim_mean',
-                    'prob_sim_mean','J']:
+                    'prob_sim_mean','J','savesampnames']:
             jsondict.update({arg:getattr(self,arg)})
         try:
             jsondict['syndata_dir'] = self.syndata_dir
@@ -371,6 +373,8 @@ class HMlog(HMlogB):
         if rank == 0:
             with open(self.syndata_dir+'pooled_MODEL.pkl','w') as f:
                 pickle.dump(self.Y_pooled_sim,f,-1)
+            if not hasattr(self,'savesampnames'):
+                self.set_savesampnames()
         super(HMlog,self).save(savedir,logname='log')
 
     @classmethod
@@ -383,17 +387,12 @@ class HMlog(HMlogB):
         except:
             syndata_dir = savedir+'syndata/'
 
-        try:
-            hmlog.Y_sim_loc = []
-            for name in hmlog.savesampnames_loc:
+        # TODO! Load dat to all cores instead
+        if rank == 0:
+            hmlog.Y_sim = []
+            for j,name in enumerate(hmlog.savesampnames):
                 with open(syndata_dir+name+'_MODEL.pkl','r') as f:
-                    hmlog.Y_sim_loc.append(pickle.load(f))
-        except:
-            if rank == 0:
-                hmlog.Y_sim = []
-                for j,name in enumerate(hmlog.savesampnames):
-                    with open(syndata_dir+name+'_MODEL.pkl','r') as f:
-                        hmlog.Y_sim.append(pickle.load(f))
+                    hmlog.Y_sim.append(pickle.load(f))
         if rank == 0:
             with open(syndata_dir+'pooled_MODEL.pkl','r') as f:
                 hmlog.Y_pooled_sim = pickle.load(f) 
@@ -536,17 +535,22 @@ class HMElog(HMlog):
             classif_freq_dir = hmlog.classif_freq_dir
         except:
             classif_freq_dir = savedir+'classif_freq/'
-        try:
-            print "names_loc at rank {}: {}".format(rank,hmlog.names_loc)
-            hmlog.classif_freq_loc = []         
-            for j,name in enumerate(hmlog.names_loc):
-                hmlog.classif_freq_loc.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
-        except:
-            if rank == 0:
-                hmlog.classif_freq = []
-                for j,name in enumerate(hmlog.names):
-                    hmlog.classif_freq.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+
+        # TODO! Load classif freq to all cores
+        if rank == 0:
+            hmlog.classif_freq = []
+            for j,name in enumerate(hmlog.names):
+                hmlog.classif_freq.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
         return hmlog       
 
+#if 0:
+#    homedir = '/Users/johnsson/'
+#else:
+#    homedir = '/home/johnsson/'
+#expdir = homedir+'Forskning/Experiments/FlowCytometry/BHM/FCI/StemCell/'
+#expname = 'CYTO'
+#run = 19
+#loaddirres = expdir+expname+'/' + 'run'+str(run)+'/'
+#HMElog.load(loaddirres)
 
 

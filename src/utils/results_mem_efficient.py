@@ -1,31 +1,13 @@
 from __future__ import division
 import numpy as np
 import warnings
-import copy as cp
 from sklearn import mixture as skmixture
-import matplotlib.pyplot as plt
 
 import Bhattacharyya as bhat
 import diptest
-import discriminant as discr
 from plot_util import get_colors 
 
-def get_medprop_pers(prop,fixvalind=[],fixval=-1):
-    med_prop = np.empty(prop[0].shape)
-    for k in range(med_prop.shape[0]):
-        for l in range(med_prop.shape[1]):
-            prop_kl = np.array([pr[k,l] for pr in prop])
-            med_prop[k,l] = np.median(prop_kl[~np.isnan(prop_kl)])
-            if np.isnan(med_prop[k,l]):
-                med_prop[k,l] = fixval
 
-    for ind in fixvalind:
-        if len(ind) == 1:
-            med_prop[ind,:] = fixval
-        else:
-            med_prop[ind[0],ind[1]] = fixval
-            med_prop[ind[1],ind[0]] = fixval
-    return med_prop
 
 def GMM_means_for_best_BIC(data,Ks,n_init=10,n_iter=100,covariance_type='full'):
     data = data[~np.isnan(data[:,0]),:]
@@ -80,7 +62,7 @@ def quantile(y,w,alpha):
 
 class Mres(object):
     
-    def __init__(self,d,K,p,classif_freq,data,meta_data,p_noise=None):
+    def __init__(self,d,K,p,classif_freq,data,meta_data,p_noise=None,sim=None):
 
         self.d = d
         self.K = K # NB! Noise cluster not included in this
@@ -97,10 +79,11 @@ class Mres(object):
         self.data = data
         #self.datapooled = np.vstack(self.data)
         self.J = len(data)
-        self.sim = sum(classif_freq[0][0,:])
+        if sim is None:
+            sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
         for j in range(self.J):
-            self.clusts.append(SampleClustering(data[j],classif_freq[j],self.mergeind),sim,K)
+            self.clusts.append(SampleClustering(data[j],classif_freq[j],self.mergeind,sim,K))
         #self.clust_nm = Clustering(self.data,classif_freq,self.p,self.p_noise)                 
         
     def get_order(self):
@@ -125,12 +108,12 @@ class Mres(object):
             self.hierarchical_merge(self.get_median_overlap,thr,**mmfArgs)
             #self.hclean()
         elif method == 'bhat_hier':
-            self.hierarchical_merge(self.get_median_bh_dt_dist,thr,**mmfArgs)
+            self.hierarchical_merge(self.get_median_bh_dist_data,thr,**mmfArgs)
             #self.hclean()
         elif method == 'bhat_hier_dip':
             lowthr = mmfArgs.pop('lowthr')
             dipthr = mmfArgs.pop('dipthr')
-            self.hierarchical_merge(self.get_median_bh_dt_dist,thr,**mmfArgs)
+            self.hierarchical_merge(self.get_median_bh_dist_data,thr,**mmfArgs)
             self.hierarchical_merge(self.get_median_bh_dt_dist_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
@@ -184,27 +167,26 @@ class Mres(object):
 
     def get_median_overlap(self,fixvalind=[],fixval=-1):
         overlap = []
-        for clust in clusts:
+        for clust in self.clusts:
             overlap.append(clust.get_overlap())
-        return get_medprop_pers(overlap,fixvalind,fixval)
+        return self.get_medprop_pers(overlap,fixvalind,fixval)
     
-    def get_median_bh_dt_dist(self,fixvalind=[],fixval=-1):
+    def get_median_bh_dist_data(self,fixvalind=[],fixval=-1):
         bhd = []
-        for clust in clusts:
+        for clust in self.clusts:
             bhd.append(clust.get_bh_dist_data())
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
-        return get_medprop_pers(bhd,fixvalind,fixval)
+        return self.get_medprop_pers(bhd,fixvalind,fixval)
 
     def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
-        bhd = self.get_bh_dist_data()
-        mbhd = get_medprop_pers(bhd,fixvalind,fixval)
+        mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
             print "Dip test for {} and {}".format(*ind)
             if self.okdiptest(ind,dipthr):
                 return mbhd
             fixvalind.append(ind)
-            mbhd = get_medprop_pers(bhd,fixvalind,fixval)
+            mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         return mbhd  
 
     def okdiptest(self,ind,thr):
@@ -212,8 +194,8 @@ class Mres(object):
         #W_kj = np.array([clust.cluster[k].W for clust in self.clusts])
         #W_lj = np.array([clust.cluster[l].W for clust in self.clusts])
         #vacuous_komp = W_kj + W_lj < 3/self.sim
-        maxbelow = np.ceil((self.J-np.sum(vacuous_komp))/4)-1
-        print "maxbelow = {}".format(maxbelow)
+        #maxbelow = np.ceil((self.J-np.sum(vacuous_komp))/4)-1
+        #print "maxbelow = {}".format(maxbelow)
         for dim in [None]+range(self.d):
             nbr_computable = self.J
             below = 0
@@ -221,8 +203,7 @@ class Mres(object):
                 try:
                     if clust.get_pdip_discr_jkl(k,l,dim) < thr:
                         below += 1
-                except ValueError as e:
-                    print e
+                except EmptyClusterException:
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable):
@@ -293,6 +274,24 @@ class Mres(object):
                 pdipsummary['Minimum'][k,:] = np.min(pdk,0)
         return pdipsummary
 
+    @staticmethod
+    def get_medprop_pers(prop,fixvalind=[],fixval=-1):
+        med_prop = np.empty(prop[0].shape)
+        for k in range(med_prop.shape[0]):
+            for l in range(med_prop.shape[1]):
+                prop_kl = np.array([pr[k,l] for pr in prop])
+                med_prop[k,l] = np.median(prop_kl[~np.isnan(prop_kl)])
+                if np.isnan(med_prop[k,l]):
+                    med_prop[k,l] = fixval
+    
+        for ind in fixvalind:
+            if len(ind) == 1:
+                med_prop[ind,:] = fixval
+            else:
+                med_prop[ind[0],ind[1]] = fixval
+                med_prop[ind[1],ind[0]] = fixval
+        return med_prop
+
     # def hclean(self):
     #     for i in range(self.complist.count([])):
     #         self.complist.remove([])
@@ -338,8 +337,8 @@ class Traces(object):
     '''
     
     def __init__(self,bmlog_burn,bmlog_prod):
-        self.saveburn = bmlog_burn.nbrsave
-        self.saveprod = bmlog_prod.nbrsave
+        self.saveburn = bmlog_burn.theta_sim.shape[0]#bmlog_burn.nbrsave
+        self.saveprod = bmlog_prod.theta_sim.shape[0]#bmlog_prod.nbrsave
         self.savefrqburn = bmlog_burn.savefrq
         self.savefrqprod = bmlog_prod.savefrq
         
@@ -412,8 +411,8 @@ class Cluster(object):
         self.indices = self.classif_freq.indices
         self.weights = self.classif_freq.data
         self.W = sum(self.weights)
-        self.wX = np.dot(self.weights,data[indices,:]).reshape(1,-1)
-        self.wXXT = 0
+        self.wX = np.dot(self.weights,data[self.indices,:]).reshape(1,-1)
+        self.wXXT = np.zeros((data.shape[1],data.shape[1]))
         for i,ind in enumerate(self.indices):
             x = data[ind,:].reshape(1,-1)
             self.wXXT += self.weights[i]*x.T.dot(x)
@@ -443,7 +442,7 @@ class SampleClustering(object):
         self.clusters = []
         for k in range(self.K):
             self.clusters.append(Cluster(classif_freq.getcol(k),data,sim))
-        self.d = data[0].shape[1]
+        self.d = data.shape[1]
         #self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])        
         
     def get_mean(self,s):
@@ -452,7 +451,10 @@ class SampleClustering(object):
 
     def get_scatter(self,s):
         ks = self.mergeind[s]
-        wXXT = sum([self.clusters[k].wXXT for k in ks])/sum([self.clusters[k].W for k in ks])
+        try:
+            wXXT = sum([self.clusters[k].wXXT for k in ks])/sum([self.clusters[k].W for k in ks])
+        except ZeroDivisionError:
+            return np.nan*self.clusters[0].wXXT
         mu = self.get_mean(s).reshape(1,-1)
         return wXXT - mu.T.dot(mu)
 
@@ -482,33 +484,26 @@ class SampleClustering(object):
             probability that Y_i is classified as belonging to l when it
             truly belongs to k.
         '''
-        S = len(mergeind)
+        S = len(self.mergeind)
         overlap = np.zeros((S,S))
         for k in range(S):
             for l in range(S):
-                overlap[k,l] = self.get_classif_freq[k].T.dot(self.get_classif_freq[l])
+                overlap[k,l] = self.get_classif_freq(k).T.dot(self.get_classif_freq(l)).todense()
             overlap[k,:] /= self.get_W(k)
             overlap[k,k] = 0
         return overlap
         
     def get_bh_dist_data(self):
-        S = len(mergeind)
+        S = len(self.mergeind)
         bhd = -np.ones((S,S))
         mus = [self.get_mean(k) for k in range(S)]
         Sigmas = [self.get_scatter(k) for k in range(S)]
         for k in range(S):
             for l in range(S):
                 if l != k:
-                    try:
-                        bhd[j][k,l] = bhat.bhattacharyya_dist(mus[k],Sigmas[k],mus[l],Sigmas[l])
-                    except ValueError as e:
-                        print "bhd[{},{}] set to nan due to {}".format(k,l,e)
-                        print "muk = {}".format(muk)
-                        print "mul = {}".format(mul)
-                        print "Sigmak = {}".format(Sigmak)
-                        print "Sigmal = {}".format(Sigmal)
+                    bhd[k,l] = bhat.bhattacharyya_dist(mus[k],Sigmas[k],mus[l],Sigmas[l])
 
-            bhd[j][k,k] = 0
+            bhd[k,k] = 0
             #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
         return bhd
@@ -523,26 +518,32 @@ class SampleClustering(object):
         clf_k = self.get_classif_freq(k)
         clf_l = self.get_classif_freq(l)
         clf = clf_k + clf_l
-        W = self.get_W(k) + self.get_W(l)
+        W_k = self.get_W(k)
+        W_l = self.get_W(l)
+        W = W_k + W_l
 
         if dim is None:
+            if W_k == 0 or W_l == 0:
+                raise EmptyClusterException
             dataproj = self.discriminant_projection(k,l)
         else:
+            if W == 0:
+                raise EmptyClusterException             
             dataproj = self.data[:,dim]
 
         xcum,ycum = diptest.cum_distr(dataproj[clf.indices],clf.data/W)
         dip = diptest.dip_from_cdf(xcum,ycum)
-        return diptest.dip_pval_tabinterpol(dip,self.W)
+        return diptest.dip_pval_tabinterpol(dip,W)
 
     def discriminant_projection(self,s1,s2):
         '''
             Projection of a data set onto Fisher's discriminant coordinate between two super clusters.
             
         '''
-        mu1,Sigma1 = self.get_mean(s1),self.get_scatter(s1)
-        mu2,Sigma2 = self.get_mean(s2),self.get_scatter(s2)
+        mu1,Sigma1 = self.get_mean(s1).T,self.get_scatter(s1)
+        mu2,Sigma2 = self.get_mean(s2).T,self.get_scatter(s2)
         dc = self.discriminant_coordinate(mu1,Sigma1,mu2,Sigma2)
-        proj = np.dot(data,dc)
+        proj = np.dot(self.data,dc)
         return proj        
 
     @staticmethod
@@ -608,6 +609,8 @@ class SampleClustering(object):
     #         clf = self.classif_freq[j][:,k]/sum(self.classif_freq[0][0,:])
     #     return data[clf > min_clf]
             
+class EmptyClusterException(Exception):
+    pass
 
 class Components(object):
     '''
@@ -687,7 +690,7 @@ class Components(object):
         
     def get_median_bh_dist(self,fixvalind=[],fixval=-1):
         bhd = self.get_bh_dist()
-        return get_medprop_pers(bhd,fixvalind,fixval)
+        return self.get_medprop_pers(bhd,fixvalind,fixval)
 
     def get_center_distance(self):
         '''
