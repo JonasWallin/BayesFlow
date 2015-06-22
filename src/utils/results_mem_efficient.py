@@ -232,9 +232,9 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable):
-                    print "For {} and {}, diptest failed for dim: {}".format(self.mergeind[ind[k]],self.mergeind[ind[l]],dim)
+                    print "For {} and {}, diptest failed for dim: {}".format(self.mergeind[k],self.mergeind[l],dim)
                     return False
-        print "Diptest ok for {} and {}: {} below out of {}".format(self.mergeind[ind[k]],self.mergeind[ind[l]],below,nbr_computable)
+        print "Diptest ok for {} and {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],below,nbr_computable)
         return True
 
     def get_pdip(self,suco=True):
