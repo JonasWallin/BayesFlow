@@ -212,7 +212,7 @@ class Mres(object):
         mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
-            print "Dip test for {} and {}".format(*ind)
+            print "Dip test for {} and {}".format(self.mergeind[ind[0]],self.mergeind[ind[1]])
             if self.okdiptest(ind,dipthr):
                 return mbhd
             fixvalind.append(ind)
@@ -232,9 +232,9 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable):
-                    print "For ind {} and {}, diptest failed for dim: {}".format(k,l,dim)
+                    print "For {} and {}, diptest failed for dim: {}".format(self.mergeind[ind[k]],self.mergeind[ind[l]],dim)
                     return False
-        print "Diptest ok for {} and {}".format(k,l)
+        print "Diptest ok for {} and {}: {} below out of {}".format(self.mergeind[ind[k]],self.mergeind[ind[l]],below,nbr_computable)
         return True
 
     def get_pdip(self,suco=True):
