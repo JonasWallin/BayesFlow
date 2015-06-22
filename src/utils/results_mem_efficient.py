@@ -131,7 +131,9 @@ class Mres(object):
         elif method == 'bhat_hier_dip':
             lowthr = mmfArgs.pop('lowthr')
             dipthr = mmfArgs.pop('dipthr')
+            print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
             self.hierarchical_merge(self.get_median_bh_dist_data,thr,**mmfArgs)
+            print "Merging components with median Bhattacharyya overlap at least {} and robust dip test at least {}".format(lowthr,dipthr)
             self.hierarchical_merge(self.get_median_bh_dt_dist_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
@@ -148,9 +150,19 @@ class Mres(object):
         if (self.p < 0).any():
             raise ValueError, 'Negative p'
         mm = mergeMeasureFun(**mmfArgs)
-        if (mm > thr).any():
-            self.merge_kl(np.unravel_index(np.argmax(mm),mm.shape))
+        ind = np.unravel_index(np.argmax(mm),mm.shape)
+        if mm[ind] > thr:
+            print "Threshold passed at value {} for {} and {}, merging".format(mm[ind],self.mergeind[ind[0]],self.mergeind[ind[1]])
+            self.merge_kl(ind)
             self.hierarchical_merge(mergeMeasureFun,thr,**mmfArgs)
+
+    # def hierarchical_merge(self,mergeMeasureFun,thr,**mmfArgs):
+    #     if (self.p < 0).any():
+    #         raise ValueError, 'Negative p'
+    #     mm = mergeMeasureFun(**mmfArgs)
+    #     if (mm > thr).any():
+    #         self.merge_kl(np.unravel_index(np.argmax(mm),mm.shape))
+    #         self.hierarchical_merge(mergeMeasureFun,thr,**mmfArgs)
             
     def merge_kl(self,ind):
         self.mergeind[ind[1]] += self.mergeind[ind[0]]
