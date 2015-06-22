@@ -10,7 +10,6 @@ import numpy as np
 from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from BayesFlow.GMM import mixture
 from BayesFlow.utils import dat_util
-from BayesFlow.utils.dat_util import PercentilesMPI
 from BayesFlow.utils.mpiutil import bcast_int
 import HMlog
 import matplotlib.pyplot as plt
@@ -453,19 +452,14 @@ class hierarical_mixture_mpi(object):
         if self.comm.Get_rank() == 0:
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
-    
+        
     def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
         """
             Load data corresponding to sampnames directly onto worker
         """
+        data = dat_util.load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
         rank = self.comm.Get_rank()
-        if sampnames is None:
-            sampnames = dat_util.sampnames_mpi(self.comm,kw['datadir'],kw['ext'],kw['Nsamp'])
-        
-        data = []
-        for name in sampnames:
-            data.append(dat_util.load_fcsample(name,**kw))
-            
+
         self.n = len(data)
         ns = self.comm.gather(self.n)
         if rank == 0:
@@ -481,12 +475,6 @@ class hierarical_mixture_mpi(object):
             d = 0
         d = bcast_int(d,self.comm)
         self.d = d
-
-        if scale == 'percentilescale':
-            lower = PercentilesMPI.percentiles_pooled_data(self.comm,q[0],sampnames,data,**kw)
-            upper = PercentilesMPI.percentiles_pooled_data(self.comm,q[1],sampnames,data,**kw)
-
-            dat_util.percentilescale(data,qvalues=(lower,upper))
 
         for Y,name in zip(data,sampnames):
             if self.d != Y.shape[1]:

@@ -7,7 +7,18 @@ import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors 
 
+class LazyProperty(object):
 
+    def __init__(self, func):
+        self._func = func
+        self.__name__ = func.__name__
+        self.__doc__ = func.__doc__
+
+    def __get__(self, obj, cls=None):
+        if obj is None: 
+            return None
+        result = obj.__dict__[self.__name__] = self._func(obj)
+        return result
 
 def GMM_means_for_best_BIC(data,Ks,n_init=10,n_iter=100,covariance_type='full'):
     data = data[~np.isnan(data[:,0]),:]
@@ -85,7 +96,14 @@ class Mres(object):
         for j in range(self.J):
             self.clusts.append(SampleClustering(data[j],classif_freq[j],self.mergeind,sim,K))
         #self.clust_nm = Clustering(self.data,classif_freq,self.p,self.p_noise)                 
-        
+    
+    @property
+    def p_merged(self):
+        p_mer = np.zeros((self.J,len(self.mergeind)))
+        for s,m_ind in enumerate(self.mergeind):
+            p_mer[:,s] = sum([self.p[:,k] for k in m_ind])
+        return p_mer
+
     def get_order(self):
         for s,suco in enumerate(self.mergeind):
             sc_ord = np.argsort(-np.array(np.sum(self.p,axis=0)[suco]))
@@ -191,11 +209,6 @@ class Mres(object):
 
     def okdiptest(self,ind,thr):
         k,l = ind
-        #W_kj = np.array([clust.cluster[k].W for clust in self.clusts])
-        #W_lj = np.array([clust.cluster[l].W for clust in self.clusts])
-        #vacuous_komp = W_kj + W_lj < 3/self.sim
-        #maxbelow = np.ceil((self.J-np.sum(vacuous_komp))/4)-1
-        #print "maxbelow = {}".format(maxbelow)
         for dim in [None]+range(self.d):
             nbr_computable = self.J
             below = 0
@@ -292,32 +305,6 @@ class Mres(object):
                 med_prop[ind[1],ind[0]] = fixval
         return med_prop
 
-    # def hclean(self):
-    #     for i in range(self.complist.count([])):
-    #         self.complist.remove([])
-    #     self.mergeind = self.flatten_complist()
-    #     self.clust_m.hclean()
-    #     print "self.mergeind = {}".format(self.mergeind)
-
-    # def gclean(self):
-    #     self.clust_m.gclean(self.mergeind)
-
-    # def flatten_complist(self):
-    #     fllist  = []
-    #     for suco in self.complist:
-    #         suco = self.flatten_supercomp(suco)
-    #         fllist.append(suco)
-    #     return fllist
-
-    # def flatten_supercomp(self,suco):
-    #     i = 0
-    #     while i < len(suco):
-    #         if type(suco[i]) is list:
-    #             suco  = suco[:i] + suco[i] + suco[(i+1):]
-    #             suco = self.flatten_supercomp(suco)
-    #         i += 1
-    #     return suco
-
 class MetaData(object):
     
     def __init__(self,meta_data):
@@ -405,17 +392,29 @@ class MimicSample(object):
 class Cluster(object):
 
     def __init__(self,classif_freq,data,sim):
+        self.sim = sim
         self.data = data
-        self.classif_freq = classif_freq
-        self.classif_freq /= sim
+        self.classif_freq = classif_freq/sim
         self.indices = self.classif_freq.indices
         self.weights = self.classif_freq.data
-        self.W = sum(self.weights)
-        self.wX = np.dot(self.weights,data[self.indices,:]).reshape(1,-1)
-        self.wXXT = np.zeros((data.shape[1],data.shape[1]))
+
+    @LazyProperty
+    def W(self):
+        #print "computing W"
+        return sum(self.weights)
+
+    @LazyProperty
+    def wX(self):
+        #print "computing wX"
+        return np.dot(self.weights,self.data[self.indices,:]).reshape(1,-1)
+
+    @LazyProperty
+    def wXXT(self):
+        wXXT = np.zeros((self.data.shape[1],self.data.shape[1]))
         for i,ind in enumerate(self.indices):
-            x = data[ind,:].reshape(1,-1)
-            self.wXXT += self.weights[i]*x.T.dot(x)
+            x = self.data[ind,:].reshape(1,-1)
+            wXXT += self.weights[i]*x.T.dot(x)
+        return wXXT
 
     def get_pdip(self,suco=True,dims=None):
         if dims is None:
@@ -444,7 +443,22 @@ class SampleClustering(object):
             self.clusters.append(Cluster(classif_freq.getcol(k),data,sim))
         self.d = data.shape[1]
         #self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])        
-        
+ 
+    @property
+    def x_sample(self):
+        N = self.data.shape[0]
+        x = self.K*np.ones(N)
+        cum_freq = np.zeros(N)
+        alpha = np.random.random(N)
+        notfound = np.arange(N)
+        for k,cluster in enumerate(self.clusters):
+            cum_freq += cluster.classif_freq.toarray().reshape(-1)
+            newfound_bool = alpha[notfound] < cum_freq[notfound]
+            newfound = notfound[newfound_bool]
+            x[newfound] = k
+            notfound = notfound[~newfound_bool]
+        return x
+
     def get_mean(self,s):
         ks = self.mergeind[s]
         return sum([self.clusters[k].wX for k in ks])/sum([self.clusters[k].W for k in ks])
@@ -738,3 +752,6 @@ class Components(object):
                     wrongdist = min(np.linalg.norm(self.mupers[j,[k]*sum(otherind),:] - self.mulat[otherind,:],axis = 1))
                     distquo[j,k] = wrongdist/corrdist
         return distquo
+
+
+

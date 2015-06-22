@@ -42,6 +42,23 @@ def non_extreme_ind(data):
         ok *= data[:,dd] < 0.999*np.max(data[:,dd])
     return ok
 
+def load_fcdata(sampnames=None,scale='percentilescale',q=(1,99),comm=MPI.COMM_WORLD,**kw):
+
+    rank = comm.Get_rank()
+    if sampnames is None:
+        sampnames = sampnames_mpi(comm,kw['datadir'],kw['ext'],kw['Nsamp'])
+
+    data = []
+    for name in sampnames:
+        data.append(load_fcsample(name,**kw))
+
+    if scale == 'percentilescale':
+        lower = PercentilesMPI.percentiles_pooled_data(comm,q[0],sampnames,data,**kw)
+        upper = PercentilesMPI.percentiles_pooled_data(comm,q[1],sampnames,data,**kw)
+
+        percentilescale(data,qvalues=(lower,upper))
+    return data
+
 def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
                   Nevent=None,
                   rm_extreme=True,perturb_extreme=False,
@@ -118,7 +135,7 @@ def sampnames_mpi(comm,datadir,ext,Nsamp=None):
     else:
         send_name = None
     names_dat = comm.scatter(send_name, root= 0)  # @UndefinedVariable
-    return names_dat
+    return list(names_dat)
 
 def total_number_samples(comm,sampnames):
     print "id(comm) = {}".format(id(comm))
@@ -325,11 +342,13 @@ class PercentilesMPI(object):
 
     def save(self,q,values):
         if self.rank == 0:
+            if not os.path.exists(self.savedir_):
+                os.mkdir(self.savedir_)
             np.savetxt(self.savedir_+self.name(q,self.key_)+'.txt',values)
             with open(self.savedir_+'scale_keys.pkl','w') as f:
                 pickle.dump(self.key_dict_,f,-1)
 
-def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=True,comm=MPI.COMM_WORLD,**kw):
+def load_fcdata_to_root(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=True,comm=MPI.COMM_WORLD,**kw):
     '''
         As load_fcdata below, but only loading data to first rank when MPI is used.
     '''
@@ -341,7 +360,7 @@ def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=T
     metadata = {'samp':metasamp,'marker_lab': None}  
 
     if rank == 0:
-        data,metadata = load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,**kw)
+        data,metadata = load_fcdata_no_mpi(ext,loadfilef,startrow,startcol,marker_lab,datadir,**kw)
 
     if rank == 0 and verbose:
         print "sampnames = {}".format(metadata['samp']['names'])
@@ -349,7 +368,7 @@ def load_fcdata_MPI(ext,loadfilef,startrow,startcol,marker_lab,datadir,verbose=T
 
     return data,metadata            
 
-def load_fcdata(ext,loadfilef,startrow,startcol,marker_lab,datadir,
+def load_fcdata_no_mpi(ext,loadfilef,startrow,startcol,marker_lab,datadir,
                 Nsamp=None,Nevent=None,scale='percentilescale',
                 rm_extreme=True,perturb_extreme=False,eventind=[],
                 eventind_dic = {},datanames=None,load_eventind=True,

@@ -40,10 +40,14 @@ def hist2d(dat,dim,bins,quan=[0.5,99.5],quan_plot = [5, 95],ax=None,lims=None,la
         q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
         q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
     else:
-        q1_x =lims[i, 0]
-        q2_x =lims[i, 1]
-        q1_y =lims[j, 0]
-        q2_y =lims[j, 1]
+        try:
+            q1_x =lims[i, 0]
+            q2_x =lims[i, 1]
+            q1_y =lims[j, 0]
+            q2_y =lims[j, 1]
+        except TypeError,IndexError:
+            q1_x,q2_x = lims
+            q1_y,q2_y = lims
         index_i = (dat[:,i] > q1_x) * (dat[:,i] < q2_x)
         index_j = (dat[:,j] > q1_y) * (dat[:,j] < q2_y)        
 
@@ -302,6 +306,24 @@ def plot_diagnostics(diagn,ymin,ymax,ybar = None,order=None,name = '',log=False,
         ax.axes.yaxis.set_ticks([])
         ax.axes.xaxis.set_ticks([])
     return fig
+
+def plot_pbars(data,ymin,ymax,order=None,colors=None,log=False,ax=None):
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    K = len(data)
+    if order is None:
+        order = range(K)
+    if colors is None:
+        colors = (1,0,0)*K
+    xloc = np.arange(K)+.5
+    bar_width = 0.35
+    for k,xl in enumerate(xloc):
+        ax.bar(xl,data[order[k]],color=colors[order[k]],log=log)
+    ax.set_ylim(ymin,ymax)
+    ax.axes.yaxis.set_ticks([])
+    ax.axes.xaxis.set_ticks([])
+    return ax
     
 def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sampleid=None,sampmarkers=None):
     '''

@@ -9,7 +9,10 @@ def bhattacharyya_dist(mu1,Sigma1,mu2,Sigma2):
     mu1 = mu1.reshape(-1,1)
     mu2 = mu2.reshape(-1,1)
     mSigma = (Sigma1+Sigma2)/2
-    bhd = np.dot((mu1-mu2).T,np.linalg.solve(mSigma,mu1-mu2))/8 + .5*np.log(np.linalg.det(mSigma)/np.sqrt(np.linalg.det(Sigma1)*np.linalg.det(Sigma2)))   
+    try:
+        bhd = np.dot((mu1-mu2).T,np.linalg.solve(mSigma,mu1-mu2))/8 + .5*np.log(np.linalg.det(mSigma)/np.sqrt(np.linalg.det(Sigma1)*np.linalg.det(Sigma2)))   
+    except np.linalg.linalg.LinAlgError:
+        return np.array(np.nan)
     #if np.isnan(bhd):
     #    return 0
     return np.exp(-bhd)
@@ -23,3 +26,7 @@ if __name__ == "__main__":
     bhattacharyya_dist(a,Sigma1,b,Sigma2)
     a *= np.nan
     bhattacharyya_dist(a,Sigma1,b,Sigma2)
+    Sigma1 = np.ones((3,3))
+    print bhattacharyya_dist(a,Sigma1,b,Sigma2)
+    Sigma2 = 3*np.ones((3,3))
+    print bhattacharyya_dist(a,Sigma1,b,Sigma2)

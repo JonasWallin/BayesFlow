@@ -508,6 +508,15 @@ class HMElog(HMlog):
         if rank == 0:
             self.ns = ns
 
+    def encode_json(self):
+        jsondict = super(HMElog,self).encode_json()
+        jsondict['__type__'] = 'HMElog'
+        try:
+            jsondict['classif_freq_dir'] = self.classif_freq_dir
+        except:
+            pass
+        return jsondict
+
     def save(self,savedir):
         if not savedir[-1] == '/':
             savedir += '/'
