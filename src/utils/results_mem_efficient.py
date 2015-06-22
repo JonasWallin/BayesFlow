@@ -231,7 +231,7 @@ class Mres(object):
                 except EmptyClusterException:
                     nbr_computable -= 1
 
-                if below > np.floor(nbr_computable):
+                if below > np.floor(nbr_computable/4):
                     print "For {} and {}, diptest failed for dim: {}".format(self.mergeind[k],self.mergeind[l],dim)
                     return False
         print "Diptest ok for {} and {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],below,nbr_computable)
