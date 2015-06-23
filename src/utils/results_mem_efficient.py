@@ -134,7 +134,7 @@ class Mres(object):
             print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
             self.hierarchical_merge(self.get_median_bh_dist_data,thr,**mmfArgs)
             print "Merging components with median Bhattacharyya overlap at least {} and robust dip test at least {}".format(lowthr,dipthr)
-            self.hierarchical_merge(self.get_median_bh_dt_dist_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
+            self.hierarchical_merge(self.get_median_bh_dt_dist_dip2,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
             pass
@@ -219,6 +219,17 @@ class Mres(object):
             mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         return mbhd  
 
+    def get_median_bh_dt_dist_dip2(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
+        mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
+        while (mbhd > bhatthr).any():
+            ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
+            print "Dip test for {} and {}".format(self.mergeind[ind[0]],self.mergeind[ind[1]])
+            if self.okdiptest2(ind,dipthr):
+                return mbhd
+            fixvalind.append(ind)
+            mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
+        return mbhd  
+
     def okdiptest(self,ind,thr):
         k,l = ind
         for dim in [None]+range(self.d):
@@ -232,10 +243,59 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable/4):
-                    print "For {} and {}, diptest failed for dim: {}".format(self.mergeind[k],self.mergeind[l],dim)
+                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],dim,below,nbr_computable)
                     return False
-        print "Diptest ok for {} and {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],below,nbr_computable)
+                    print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],dim,below,nbr_computable)
         return True
+        
+    def okdiptest2(self,ind,thr):
+        k,l = ind
+        dims = [None]+self.get_dims_with_low_bhat_overlap(ind)
+        for dim in dims:
+            nbr_computable = self.J
+            below = 0
+            for j,clust in enumerate(self.clusts):
+                try:
+                    if clust.get_pdip_discr_jkl(k,l,dim) < thr:
+                        below += 1
+                except EmptyClusterException:
+                    nbr_computable -= 1
+
+                if below > np.floor(nbr_computable/4):
+                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],dim,below,nbr_computable)
+                    return False
+            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k],self.mergeind[l],dim,below,nbr_computable)
+        return True
+
+    def get_dims_with_low_bhat_overlap(self,ind):
+        k,l = ind
+        dims = []
+        for dd in range(self.d):
+            nbr_computable = len(self.clusts)
+            below = 0
+            for clust in self.clusts:
+               bhat_overlap = clust.get_bh_dist_data(dd,[k,l])[0,1]
+               if np.isnan(bhat_overlap):
+                   nbr_computable -= 1
+               else:
+                   W = clust.get_W(k)+clust.get_W(l)
+                   if bhat_overlap < self.bhat_overlap_1d_threshold(W):
+                       below += 1
+            if below > np.floor(nbr_computable/4):
+                dims.append(dd)
+        return dims
+
+    @staticmethod
+    def bhat_overlap_1d_threshold(weight):
+        '''
+            Based on Table 1 in Hennig (2010): Methods for merging Gaussian 
+            mixture components, Adv Data Anal Classif 4:3-34.
+        '''
+        if weight <= 50:
+            return 0.201
+        if weight <= 200:
+            return 0.390
+        return 0.490
 
     def get_pdip(self,suco=True):
         '''
@@ -428,7 +488,7 @@ class Cluster(object):
             wXXT += self.weights[i]*x.T.dot(x)
         return wXXT
 
-    def get_pdip(self,suco=True,dims=None):
+    def get_pdip(self,dims=None):
         if dims is None:
             dims = range(self.data.shape[1])
         pdip = np.zeros(len(dims))
@@ -503,6 +563,7 @@ class SampleClustering(object):
             xcum,ycum = diptest.cum_distr(self.data[clf.indices,dd],clf.data/W)
             dip = diptest.dip_from_cdf(xcum,ycum)
             pdip[i] = diptest.dip_pval_tabinterpol(dip,W)
+        return pdip
                            
     def get_overlap(self):
         '''
@@ -519,16 +580,23 @@ class SampleClustering(object):
             overlap[k,k] = 0
         return overlap
         
-    def get_bh_dist_data(self):
-        S = len(self.mergeind)
+    def get_bh_dist_data(self,dd=None,ks=None):
+        if ks is None:
+            S = len(self.mergeind)
+            ks = range(S)
+        else:
+            S = len(ks)
         bhd = -np.ones((S,S))
-        mus = [self.get_mean(k) for k in range(S)]
-        Sigmas = [self.get_scatter(k) for k in range(S)]
+        mus = [self.get_mean(k) for k in ks]
+        Sigmas = [self.get_scatter(k) for k in ks]
+    
         for k in range(S):
             for l in range(S):
                 if l != k:
-                    bhd[k,l] = bhat.bhattacharyya_dist(mus[k],Sigmas[k],mus[l],Sigmas[l])
-
+                    if dd is None:
+                        bhd[k,l] = bhat.bhattacharyya_dist(mus[k],Sigmas[k],mus[l],Sigmas[l])
+                    else:
+                        bhd[k,l] = bhat.bhattacharyya_dist(mus[k][0,dd],Sigmas[k][dd,dd].reshape(1,1),mus[l][0,dd],Sigmas[l][dd,dd].reshape(1,1))
             bhd[k,k] = 0
             #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
@@ -622,10 +690,10 @@ class SampleClustering(object):
     #     '''
     #         Get data points belonging to a certain cluster
 
-    #         min_clf	-	min classification frequency for the point into the given cluster
-    #         k		-	cluster number
-    #         dd		-	dimonsion for which data should be returned
-    #         j		- 	sample nbr
+    #         min_clf    -    min classification frequency for the point into the given cluster
+    #         k        -    cluster number
+    #         dd        -    dimonsion for which data should be returned
+    #         j        -     sample nbr
     #     '''
     #     if j is None:
     #         data = np.vstack(self.data)[:,dd]
