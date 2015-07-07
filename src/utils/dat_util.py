@@ -55,8 +55,11 @@ def load_fcdata(sampnames=None,scale='percentilescale',q=(1,99),comm=MPI.COMM_WO
     if scale == 'percentilescale':
         lower = PercentilesMPI.percentiles_pooled_data(comm,q[0],sampnames,data,**kw)
         upper = PercentilesMPI.percentiles_pooled_data(comm,q[1],sampnames,data,**kw)
-
         percentilescale(data,qvalues=(lower,upper))
+
+    if scale == 'maxminscale': #not recommended in general to use this option
+        data = maxminscale(data)
+
     return data
 
 def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
