@@ -44,7 +44,6 @@ def non_extreme_ind(data):
 
 def load_fcdata(sampnames=None,scale='percentilescale',q=(1,99),comm=MPI.COMM_WORLD,**kw):
 
-    rank = comm.Get_rank()
     if sampnames is None:
         sampnames = sampnames_mpi(comm,kw['datadir'],kw['ext'],kw['Nsamp'])
 
@@ -58,7 +57,7 @@ def load_fcdata(sampnames=None,scale='percentilescale',q=(1,99),comm=MPI.COMM_WO
         percentilescale(data,qvalues=(lower,upper))
 
     if scale == 'maxminscale': #not recommended in general to use this option
-        data = maxminscale(data)
+        maxminscale(data)
 
     return data
 
@@ -92,7 +91,7 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
         else:
             indices = npr.choice(ok_inds,Nevent,replace=False)
 
-        eventind = EventInd(name,indices,i_eventind_load)
+        eventind = EventInd(name,Nevent,indices,i_eventind_load)
         eventind.save(datadir)
     else:
         if perturb_extreme:
@@ -160,8 +159,11 @@ def total_number_events_and_samples(comm,sampnames,data=None,**kw):
         pass
     if data is None:
         N_loc = 0
+        kw_cp = kw.copy()
+        if 'scale' in kw_cp:
+            del kw_cp['scale']
         for name in sampnames:
-            N_loc += load_fcsample(name,**kw).shape[0]
+            N_loc += load_fcsample(name,**kw_cp).shape[0]
     else:
         N_loc = np.sum([dat.shape[0] for dat in data])
     print "N_loc at rank {} = {}".format(comm.Get_rank(),N_loc)
@@ -174,10 +176,10 @@ def total_number_events_and_samples(comm,sampnames,data=None,**kw):
 
 class EventInd(object):
 
-    def __init__(self,sampname,indices,i=0):
+    def __init__(self,sampname,Nevent,indices,i=0):
         self.sampname = sampname
         self.indices = indices
-        self.Nevent = len(indices)
+        self.Nevent = Nevent
         self.i = i
 
     def __str__(self):
@@ -197,7 +199,7 @@ class EventInd(object):
             datadir += '/'
         with open(datadir+'eventinds/'+cls.name(sampname,Nevent,i)+'.npy','r') as f:
             indices = np.load(f)
-        return cls(sampname,indices)
+        return cls(sampname,Nevent,indices)
 
     def save(self,datadir):
         if not datadir[-1] == '/':
