@@ -45,7 +45,7 @@ def hist2d(dat,dim,bins,quan=[0.5,99.5],quan_plot = [5, 95],ax=None,lims=None,la
             q2_x =lims[i, 1]
             q1_y =lims[j, 0]
             q2_y =lims[j, 1]
-        except TypeError,IndexError:
+        except TypeError:
             q1_x,q2_x = lims
             q1_y,q2_y = lims
         index_i = (dat[:,i] > q1_x) * (dat[:,i] < q2_x)
@@ -96,7 +96,10 @@ def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None,
         if lims is None:
             ax.set_xlim(xlims[0],xlims[1])
         else:
-            ax.set_xlim(lims[i, 0],lims[i, 1])
+            try:
+                ax.set_xlim(lims[i, 0],lims[i, 1])
+            except TypeError:
+                ax.set_xlim(lims[0],lims[1])
         if not labels is None:
             ax.set_xlabel(labels[i])                
         for j in range(i+1,nv):
@@ -107,10 +110,14 @@ def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None,
                 q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
                 q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
             else:
-                q1_x =lims[i, 0]
-                q2_x =lims[i, 1]
-                q1_y =lims[j, 0]
-                q2_y =lims[j, 1]
+                try:
+                    q1_x =lims[i, 0]
+                    q2_x =lims[i, 1]
+                    q1_y =lims[j, 0]
+                    q2_y =lims[j, 1]
+                except TypeError:
+                    q1_x,q2_x = lims
+                    q1_y,q2_y = lims
             ax = f.add_subplot(gs[nv*i + j])
             count += 1
             dat_j  = dat[index_i*index_j ,j]

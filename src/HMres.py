@@ -8,7 +8,7 @@ from __future__ import division
 from mpi4py import MPI
 import numpy as np
 from HMplot import HMplot
-from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components
+from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components, MetaData
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -26,15 +26,17 @@ class HMres(Mres):
                 self.p_noise = bmlog.prob_sim_mean[:,bmlog.K] 
             else:
                 self.p_noise = None
+
+            self.meta_data = MetaData(meta_data)
+            self.meta_data.sort(bmlog.names)
+            self.data = [data[j] for j in self.meta_data.order]
+
             super(HMres,self).__init__(bmlog.d,bmlog.K,bmlog.prob_sim_mean[:,:bmlog.K],
-                                       bmlog.classif_freq,data,meta_data,self.p_noise,bmlog.sim)
+                                       bmlog.classif_freq,self.p_noise,bmlog.sim)
 
             self.sim = bmlog.sim
 
             self.active_komp = bmlog.active_komp
-
-            self.meta_data.sort(bmlog.names)
-            self.data = [self.data[j] for j in self.meta_data.order]
 
             self.traces = Traces(bmlog_burn,bmlog)
             self.mimics = {}

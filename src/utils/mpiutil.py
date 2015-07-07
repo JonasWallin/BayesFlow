@@ -10,7 +10,7 @@ def collect_int(i,comm = MPI.COMM_WORLD,root=0):
     comm.Gather(sendbuf=[np.array(i,dtype='i'), MPI.INT], recvbuf=[i_all, MPI.INT], root=root)
     return i_all
 
-def bcast_int(i,comm = MPI.COMM_WORLD,root=0,):
+def bcast_int(i,comm = MPI.COMM_WORLD,root=0):
     rank = comm.Get_rank()
     if rank == root:
         ib = np.array([i],dtype='i')

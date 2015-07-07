@@ -73,28 +73,24 @@ def quantile(y,w,alpha):
 
 class Mres(object):
     
-    def __init__(self,d,K,p,classif_freq,data,meta_data,p_noise=None,sim=None):
+    def __init__(self,d,K,p,classif_freq,p_noise=None,sim=None):
 
         self.d = d
         self.K = K # NB! Noise cluster not included in this
-        self.J = len(data)
         self.p = p
         self.p_noise = p_noise
-
-        self.meta_data = MetaData(meta_data)
 
         self.merged = False
         self.mergeMeth = ''
         self.mergeind = [[k] for k in range(self.K)]
         
-        self.data = data
         #self.datapooled = np.vstack(self.data)
-        self.J = len(data)
+        self.J = len(self.data)
         if sim is None:
             sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
         for j in range(self.J):
-            self.clusts.append(SampleClustering(data[j],classif_freq[j],self.mergeind,sim,K))
+            self.clusts.append(SampleClustering(self.data[j],classif_freq[j],self.mergeind,sim,K))
         #self.clust_nm = Clustering(self.data,classif_freq,self.p,self.p_noise)                 
     
     @property
@@ -380,8 +376,8 @@ class Mres(object):
 class MetaData(object):
     
     def __init__(self,meta_data):
-        self.samp = meta_data['samp']
-        self.marker_lab = meta_data['marker_lab']
+        self.samp = meta_data['samp'].copy()
+        self.marker_lab = meta_data['marker_lab'][:]
 
     def sort(self,names):
         self.order = []
