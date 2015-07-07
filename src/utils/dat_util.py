@@ -152,6 +152,8 @@ def total_number_events_and_samples(comm,sampnames,data=None,**kw):
     #print "J at rank {} = {}".format(rank,J)
     try:
         Nevent = kw['Nevent']
+        if Nevent is None:
+            raise KeyError
         print "J*Nevent = {}".format(J*Nevent)
         return J*Nevent
     except KeyError:
