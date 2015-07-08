@@ -725,14 +725,14 @@ class HMplot(object):
     def pca_screeplot(self,ax=None):
         plot.pca_screeplot(self.bmres.p,ax)
 
-    def scatter(self,dim,j,fig=None):
+    def scatter(self,dim,j,ax=None):
         '''
             Plots the scatter plot of the data over dim.
             Clusters are plotted with their canonical colors (see BMPlot).
         '''
-        if fig is None:
+        if ax is None:
             fig = plt.figure()
-        ax = fig.add_subplot(111)
+            ax = fig.add_subplot(111)
                 
         samp_clust = self.bmres.clusts[j]
         data = samp_clust.data[:,dim]
@@ -744,12 +744,11 @@ class HMplot(object):
             ax.plot(data[x==self.bmres.K,0],data[x==self.bmres.K,1],'+',label='outliers',color='black')
         
         elif len(dim) == 3:
-            ax = fig.gca(projection='3d')
             for k in range(self.bmres.K):
                 ax.plot(data[x==k,0],data[x==k,1],data[x==k,2],'+',label='k = %d'%(k+1),color=self.comp_colors[k])
             ax.plot(data[x==self.bmres.K,0],data[x==self.bmres.K,1],data[x==self.bmres.K,2],'+',label='outliers',color='black')
                             
-        return fig, ax
+        return ax
 
     def component_fit(self,plotdim,name='pooled',lim=[-.2,1.2],bins=100,fig=None):
         if fig is None:

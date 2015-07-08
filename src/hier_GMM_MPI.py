@@ -530,7 +530,7 @@ class hierarical_mixture_mpi(object):
         #storing the size of the data used later when sending data
         self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
 
-    def set_prior(self, prior, init = False, thetas = None):
+    def set_prior(self, prior, init = False, thetas = None, Sigmas = None):
         
         self.set_prior_param0()
         if prior.noise_class:
@@ -543,7 +543,7 @@ class hierarical_mixture_mpi(object):
             GMM.alpha_vec = prior.a
             
         if init:
-            self.set_latent_init(prior,thetas)
+            self.set_latent_init(prior,thetas,Sigmas)
             self.set_GMM_init()
 
     def set_location_prior(self,prior):
@@ -575,8 +575,11 @@ class hierarical_mixture_mpi(object):
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
                 
-    def set_latent_init(self,prior,thetas=None):
+    def set_latent_init(self,prior,thetas=None,Sigmas=None,method='random',**kw):
         rank = self.comm.Get_rank()
+        if method == 'EMWIS':
+            data = [GMM.data for GMM in self.GMMs]
+            mus,Sigmas,_ = EM_weighted_iterated_subsampling(self.comm,data,self.K,self.noise_class,**kw)
         if rank == 0:
             for k in range(self.K):
                 npw = self.normal_p_wisharts[k]
@@ -587,7 +590,10 @@ class hierarical_mixture_mpi(object):
                         npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
                 else:
                     npwparam['theta'] = thetas[k]
-                npwparam['Sigma'] = npw.Sigma_class.Q/(npw.Sigma_class.nu-self.d-1)
+                if Sigmas is None:
+                    npwparam['Sigma'] = npw.Sigma_class.Q/(npw.Sigma_class.nu-self.d-1)
+                else:
+                    npwparam['Sigma'] = Sigmas[k]
                 npw.set_parameter(npwparam)
     
                 wpn = self.wishart_p_nus[k]
@@ -596,6 +602,7 @@ class hierarical_mixture_mpi(object):
                 wpnparam['nu'] = wpn.Q_class.nu_s
                 wpn.set_parameter(wpnparam)
                 wpn.nu_class.set_val(wpn.Q_class.nu_s)
+
 
     def set_GMM_init(self):
         self.set_GMMs_mu_Sigma_from_prior()
