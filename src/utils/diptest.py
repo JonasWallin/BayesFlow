@@ -196,6 +196,10 @@ def dip_pval_tabinterpol(dip,N):
     diptable = np.array(qDiptab)
     ps = np.array(qDiptab.colnames).astype(float)
     Ns = np.array(qDiptab.rownames).astype(int)
+
+    if N >= Ns[-1]:
+        dip = transform_dip_to_other_nbr_pts(dip,N,Ns[-1]-0.1)
+        N = Ns[-1]-0.1
     
     iNlow = np.nonzero(Ns < N)[0][-1]
     qN = (N-Ns[iNlow])/(Ns[iNlow+1]-Ns[iNlow])
@@ -212,7 +216,11 @@ def dip_pval_tabinterpol(dip,N):
     qp = (dip_sqrtN-dip_interpol_sqrtN[iplow])/(dip_interpol_sqrtN[iplow+1]-dip_interpol_sqrtN[iplow])
     p_interpol = ps[iplow] + qp*(ps[iplow+1]-ps[iplow])
 
-    return 1 - p_interpol			
+    return 1 - p_interpol
+
+def transform_dip_to_other_nbr_pts(dip_n,n,m):
+    dip_m = np.sqrt(n/m)*dip_n
+    return dip_m
 
 def cum_distr(data,w):
 	eps = 1e-10
@@ -339,3 +347,8 @@ def least_concave_majorant_sorted(x,y,eps=1e-12):
 
 
 	return np.array(i)
+
+if __name__ == '__main__':
+    for (dip,N,M) in [(0.005,20000,50000),(0.01,2000,5000),(0.001,70000,10000),(0.0005,1000000,10000)]:
+        print "dip_pval_tabinterpol(dip,N) = {}".format(dip_pval_tabinterpol(dip,N))
+        print "dip_pval_tabinterpol(transform_dip_to_other_nbr_pts(dip,N,M),M) = {}".format(dip_pval_tabinterpol(transform_dip_to_other_nbr_pts(dip,N,M),M))
