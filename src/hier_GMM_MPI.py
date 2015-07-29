@@ -584,7 +584,7 @@ class hierarical_mixture_mpi(object):
         rank = self.comm.Get_rank()
         if method == 'EMWIS':
             data = [GMM.data for GMM in self.GMMs]
-            mus,Sigmas,_ = EM_weighted_iterated_subsampling(self.comm,data,self.K,self.noise_class,**kw)
+            thetas,Sigmas,_ = EM_weighted_iterated_subsampling(self.comm,data,self.K,**kw)
         if rank == 0:
             for k in range(self.K):
                 npw = self.normal_p_wisharts[k]

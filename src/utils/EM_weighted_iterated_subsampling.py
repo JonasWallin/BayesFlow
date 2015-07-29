@@ -437,4 +437,4 @@ if __name__ == '__main__':
         component_plot(mus_fitted, Sigmas_fitted, [0, 1], ax,
                        colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
         plt.show()
->>>>>>> 8a5529035f0e71841575880a6c730ade77953fdf:src/utils/EM_weighted_iterative_sampling.py
+
