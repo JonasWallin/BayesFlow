@@ -267,7 +267,7 @@ def EM_pooled(comm, data, K, n_iter=10, n_init=5,
                     pis[k] = WeightsMPI(comm, [weight[:, k] for weight in weights]).W
             pis = normalize_pi(pis, k_pi_fixed)
         #weights = M_step_pooled(comm, data, mus, Sigmas, pis)
-        log_lik_loc = np.sum([np.log(np.sum(weight, axis=1)) for weight in weights])
+        log_lik_loc = np.sum([np.sum(np.log(np.sum(weight, axis=1))) for weight in weights])
         log_lik = sum(comm.bcast(comm.gather(log_lik_loc)))
         if log_lik > max_log_lik:
             best_mus, best_Sigmas, best_pis = mus, Sigmas, pis
@@ -305,6 +305,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
             component_plot(mus, Sigmas, [0, 1], ax, colors=[(1, 0, 0)]*len(mus), lw=2)
             component_plot(mus_fixed, Sigmas_fixed, [0, 1], ax, 
                            colors=[(0, 1, 0)]*len(mus_fixed), lw=2)
+            plt.show()
 
         k_fixed = np.argpartition(-pis[:len(pis)-K_fix], K_it-1)[:K_it]
         mus_fixed += [mus[k] for k in k_fixed]
@@ -343,6 +344,12 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
             pis = normalize_pi(pis, [0])
     if plotting:
         plt.show()
+
+    if noise_class:
+        mus = mus[1:]
+        Sigmas = Sigmas[1:]
+        pis = pis[1:]        
+        
     return mus, Sigmas, pis
 
 if __name__ == '__main__':

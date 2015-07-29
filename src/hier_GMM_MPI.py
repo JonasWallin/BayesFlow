@@ -457,7 +457,7 @@ class hierarical_mixture_mpi(object):
     def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
         """
             Load data corresponding to sampnames directly onto worker
-        """
+        """      
         data = dat_util.load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
         rank = self.comm.Get_rank()
 

@@ -66,9 +66,10 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
                   rm_extreme=True,perturb_extreme=False,
                   i_eventind_load = 0):
     '''
-        Load one fc sample in reproducible way, i.e. so that if subsampling is used,
-        the indices (eventind) are saved and will be automatically loaded when a new
-        subsampling of the same size is requested.
+        Load one fc sample in reproducible way, i.e. so that if 
+        subsampling is used, the indices (eventind) are saved and will 
+        be automatically loaded when a new subsampling of the same 
+        size is requested.
     '''
     if datadir[-1] != '/':
         datadir += '/'
@@ -102,12 +103,15 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
 
 def percentilescale(data,q = (1.,99.), qvalues = None):
     '''
-        Scales the data sets in data so that given quantiles of the pooled data ends up at 0 and 1 respectively.
+        Scales the data sets in data so that given quantiles of the 
+        pooled data ends up at 0 and 1 respectively.
 
         data    -   list of data sets
-        q       -   percentiles to be computed. q[0] is the percentile will be scaled to 0, 
-                    q[1] is the percentile that will be scaled to 1 (in the pooled data).
-        qvalues -   tuple of percentile values. If provided percentiles does not have to be computed.
+        q       -   percentiles to be computed. q[0] is the percentile
+                    will be scaled to 0, q[1] is the percentile that 
+                    will be scaled to 1 (in the pooled data).
+        qvalues -   tuple of percentile values. If provided percentiles 
+                    does not have to be computed.
     '''
     if qvalues is None:
         alldata = np.vstack(data)
@@ -123,14 +127,17 @@ def percentilescale(data,q = (1.,99.), qvalues = None):
             data[j][:,m] = (data[j][:,m]-intercept[m])/slope[m]
     return lower,upper
 
-def sampnames_mpi(comm,datadir,ext,Nsamp=None):
+def sampnames_mpi(comm,datadir,ext,Nsamp=None,namerule=None):
     rank = comm.Get_rank()
     if rank == 0:
         if datadir[-1] != '/':
             datadir += '/'
         datafiles = glob.glob(datadir+'*'+ext)
-        sampnames_all = [datafile.replace(datadir,'').replace(' ','').replace(ext,'') for datafile in datafiles]
+        sampnames_all = [datafile.replace(datadir,'').replace(' ','').\
+                                  replace(ext,'') for datafile in datafiles]
         #print "sampnames_all = {}".format(sampnames_all)
+        if not namerule is None:
+            sampnames_all = [name for name in sampnames_all if namerule(name)]
         if not Nsamp is None:
             sampnames_all = sampnames_all[:Nsamp]
         send_name = np.array_split(np.array(sampnames_all),comm.Get_size())
