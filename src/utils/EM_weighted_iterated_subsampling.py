@@ -140,15 +140,19 @@ class DataMPI(object):
     #   N_samp_loc = self.comm.scatter(N_samp)
 
     def subsample_from_each_to_root(self, N):
-        data_subsamp_loc = np.vstack([dat[np.random.choice(dat.shape[0], N, replace=False), :] for dat in self.data])
-        return mpiutil.collect_data(data_subsamp_loc, self.d, np.float, MPI.DOUBLE, self.comm)
+        data_subsamp_loc = np.vstack([dat[np.random.choice(dat.shape[0], N, replace=False), :]
+                                      for dat in self.data])
+        return mpiutil.collect_data(data_subsamp_loc, self.d, np.float,
+                                    MPI.DOUBLE, self.comm)
 
     def subsample_weighted_to_root(self, weights, N):
         weightsMPI = WeightsMPI(self.comm, weights)
         print "tot weight for subsampling {}".format(weightsMPI.W)
         indices = weightsMPI.sample_from_all(N)
-        data_loc = np.vstack([self.data[j][ind, :] for j, ind in enumerate(indices)])
-        return mpiutil.collect_data(data_loc, self.d, np.float, MPI.DOUBLE, self.comm)
+        data_loc = np.vstack([self.data[j][ind, :]
+                              for j, ind in enumerate(indices)])
+        return mpiutil.collect_data(data_loc, self.d, np.float,
+                                    MPI.DOUBLE, self.comm)
 
     def subsample_weighted(self, weights, N):
         weightsMPI = WeightsMPI(self.comm, weights)
@@ -166,7 +170,8 @@ def E_step_pooled(comm, data, weights):
     if weights_mpi.W == 0:
         raise EmptyClusterError
     #print "tot weight of cluster = {}".format(weights_mpi.W)
-    mu_loc = sum([np.sum(dat*weights[j].reshape(-1, 1), axis=0) for j, dat in enumerate(data)])
+    mu_loc = sum([np.sum(dat*weights[j].reshape(-1, 1), axis=0) 
+                  for j, dat in enumerate(data)])
     mu = sum(comm.bcast(comm.gather(mu_loc)))/weights_mpi.W
     if weights_mpi.W < data[0].shape[1]:
         Sigma = np.eye(data[0].shape[1])
@@ -189,7 +194,8 @@ def M_step_pooled(comm, data, mus, Sigmas, pis):
     weights = [np.empty((dat.shape[0], K)) for dat in data]
     for j, dat in enumerate(data):
         for k in range(K):
-            weights[j][:, k] = stats.multivariate_normal.pdf(dat, mus[k], Sigmas[k])
+            weights[j][:, k] = stats.multivariate_normal.pdf(dat, mus[k],
+                                                             Sigmas[k])
     for weight in weights:
         weight *= pis
         weight /= np.sum(weight, axis=1).reshape(-1, 1)
@@ -201,7 +207,8 @@ def component_likelihoods(data, mus, Sigmas):
     weights = [np.empty((dat.shape[0], K)) for dat in data]
     for j, dat in enumerate(data):
         for k in range(K):
-            weights[j][:, k] = stats.multivariate_normal.pdf(dat, mus[k], Sigmas[k])
+            weights[j][:, k] = stats.multivariate_normal.pdf(dat, mus[k],
+                                                             Sigmas[k])
     return weights
 
 
@@ -215,7 +222,8 @@ def normalize_pi(p, k_fixed=[]):
     return p
 
 
-def EM_pooled(comm, data, K, n_iter=10, n_init=5, mus_fixed=[], Sigmas_fixed=[], pis_fixed=[]):
+def EM_pooled(comm, data, K, n_iter=10, n_init=5, 
+              mus_fixed=[], Sigmas_fixed=[], pis_fixed=[]):
     """
         Fitting GMM with EM algorithm with fixed components
 
@@ -226,18 +234,25 @@ def EM_pooled(comm, data, K, n_iter=10, n_init=5, mus_fixed=[], Sigmas_fixed=[],
         n_init          - number of random initializations.
         mus_fixed       - mu values for fixed components.
         Sigmas_fixed    - Sigma values for fixed components.
-        pis_fixed       - pi values for fixed components. Proportions will be fixed if
-                          values are not nan, but not fixed when pi is nan.
+        pis_fixed       - pi values for fixed components. Proportions
+                          will be fixed if values are not nan, but not
+                          fixed when pi is nan.
     """
-    mu0, Sigma0, _ = E_step_pooled(comm, data, [np.array([1./K for i in range(dat.shape[0])]).reshape(-1, 1) for dat in data])
+    mu0, Sigma0, _ = \
+        E_step_pooled(comm, data,
+                      [np.array([1./K
+                                 for i in range(dat.shape[0])]).reshape(-1, 1)
+                       for dat in data])
     d = data[0].shape[1]
     max_log_lik = -np.inf
     K_fix = len(mus_fixed)
     K -= K_fix
-    k_pi_fixed = [K+k for k, pi_k in enumerate(pis_fixed) if not np.isnan(pi_k)]
+    k_pi_fixed = [K+k for k, pi_k in enumerate(pis_fixed) if
+                  not np.isnan(pi_k)]
 
     for init in range(n_init):
-        mus = stats.multivariate_normal.rvs(mu0, Sigma0, size=K).reshape(-1, d).tolist()+mus_fixed
+        mus = stats.multivariate_normal.rvs(mu0, Sigma0, size=K)
+        mus = mus.reshape(-1, d).tolist() + mus_fixed
         Sigmas = [Sigma0 for k in range(K)]+Sigmas_fixed
         #Sigmas = [np.eye(data[0].shape[1]) for k in range(K)]+Sigmas_fixed
         pis = np.array([np.nan for k in range(K)]+pis_fixed)
@@ -245,7 +260,8 @@ def EM_pooled(comm, data, K, n_iter=10, n_init=5, mus_fixed=[], Sigmas_fixed=[],
         for it in range(n_iter):
             weights = M_step_pooled(comm, data, mus, Sigmas, pis)
             for k in range(K):
-                mus[k], Sigmas[k], pis[k] = E_step_pooled(comm, data, [weight[:, k] for weight in weights])
+                (mus[k], Sigmas[k],
+                 pis[k]) = E_step_pooled(comm, data, [weight[:, k] for weight in weights])
             for k_fix in range(K, K+K_fix):
                 if not k_fix in k_pi_fixed:
                     pis[k] = WeightsMPI(comm, [weight[:, k] for weight in weights]).W
@@ -279,13 +295,16 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
     data_subsamp = data
 
     while K_fix < K+int(noise_class):
-        mus, Sigmas, pis = EM_pooled(comm, data_subsamp, K+int(noise_class), mus_fixed=mus_fixed, Sigmas_fixed=Sigmas_fixed, pis_fixed=pis_fixed)
+        mus, Sigmas, pis = EM_pooled(comm, data_subsamp, K+int(noise_class), 
+                                     mus_fixed=mus_fixed, Sigmas_fixed=Sigmas_fixed,
+                                     pis_fixed=pis_fixed)
         if plotting:
             fig = plt.figure()
             ax = fig.add_subplot(111)
             ax.scatter(data_subsamp[0][:, 0], data_subsamp[0][:, 1])
             component_plot(mus, Sigmas, [0, 1], ax, colors=[(1, 0, 0)]*len(mus), lw=2)
-            component_plot(mus_fixed, Sigmas_fixed, [0, 1], ax, colors=[(0, 1, 0)]*len(mus_fixed), lw=2)
+            component_plot(mus_fixed, Sigmas_fixed, [0, 1], ax, 
+                           colors=[(0, 1, 0)]*len(mus_fixed), lw=2)
 
         k_fixed = np.argpartition(-pis[:len(pis)-K_fix], K_it-1)[:K_it]
         mus_fixed += [mus[k] for k in k_fixed]
@@ -294,7 +313,9 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
 
         if not likelihood_weights:
             weights = M_step_pooled(comm, data, mus, Sigmas, pis)
-            weights_subsamp = [1-(np.sum(weight[:, weight.shape[1]-K_fix:], axis=1)+sum([weight[:, k] for k in k_fixed])) for weight in weights]
+            weights_subsamp = [1-(np.sum(weight[:, weight.shape[1]-K_fix:], axis=1)
+                                  + sum([weight[:, k] for k in k_fixed]))
+                               for weight in weights]
         else:
             weights = component_likelihoods(data, mus_fixed, Sigmas_fixed)
             #fig = plt.figure()
@@ -314,7 +335,8 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
     for it in range(iter_final):
         weights = M_step_pooled(comm, data, mus, Sigmas, pis)
         for k in range(int(noise_class), weights[0].shape[1]):
-            mus[k], Sigmas[k], pis[k] = E_step_pooled(comm, data, [weight[:, k] for weight in weights])
+            mus[k], Sigmas[k], pis[k] = E_step_pooled(comm, data,
+                                                      [weight[:, k] for weight in weights])
         if not noise_class:
             pis = normalize_pi(pis)
         else:
@@ -376,15 +398,17 @@ if __name__ == '__main__':
         N = 10000
         data = [MixMod(mus, Sigmas, pis).sample(N)]
         K = 5
-        mus_fitted, Sigmas_fitted, pis_fitted = EM_weighted_iterated_subsampling(comm, data, K, N/10,
-                                                                                 iterations=3, iter_final=3)
+        (mus_fitted, Sigmas_fitted,
+         pis_fitted) = EM_weighted_iterated_subsampling(comm, data, K, N/10,
+                                                        iterations=3, iter_final=3)
         # print "mus_fitted = {}".format(mus_fitted)
         # print "Sigmas_fitted = {}".format(Sigmas_fitted)
         # print "pis_fitted = {}".format(pis_fitted)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.scatter(data[0][:, 0], data[0][:, 1])
-        component_plot(mus_fitted, Sigmas_fitted, [0, 1], ax, colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
+        component_plot(mus_fitted, Sigmas_fitted, [0, 1], ax,
+                       colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
         plt.show()
 
     if 1:
@@ -399,15 +423,18 @@ if __name__ == '__main__':
         N = 10000
         data = [MixMod(mus, Sigmas, pis).sample(N)]
         K = 5
-        mus_fitted, Sigmas_fitted, pis_fitted = EM_weighted_iterated_subsampling(comm, data, K, N/10,
-                                                                                 noise_class=True, noise_mu=5, noise_sigma=10**2,
-                                                                                 iterations=3, iter_final=3)
+        (mus_fitted, Sigmas_fitted,
+         pis_fitted) = EM_weighted_iterated_subsampling(comm, data, K, N/10,
+                                                        noise_class=True, 
+                                                        noise_mu=5, noise_sigma=10**2,
+                                                        iterations=3, iter_final=3)
         # print "mus_fitted = {}".format(mus_fitted)
         # print "Sigmas_fitted = {}".format(Sigmas_fitted)
         # print "pis_fitted = {}".format(pis_fitted)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.scatter(data[0][:, 0], data[0][:, 1])
-        component_plot(mus_fitted, Sigmas_fitted, [0, 1], ax, colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
+        component_plot(mus_fitted, Sigmas_fitted, [0, 1], ax,
+                       colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
         plt.show()
 >>>>>>> 8a5529035f0e71841575880a6c730ade77953fdf:src/utils/EM_weighted_iterative_sampling.py
