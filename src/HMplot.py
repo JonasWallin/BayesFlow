@@ -463,6 +463,17 @@ class CompPlot(object):
 
             plot.set_component_plot_tics([ax1,ax2],plot.mergeQ(ql,qa))
         return fig
+
+    def bhattacharyya_overlap_quotient(self,fig=None,totplots=1,plotnbr=1):
+        '''
+            Diagnostic plot showing quotient between distance to correct latent
+            center and distance to nearest wrong latent center.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        distquo = self.comp.get_latent_bhattacharyya_overlap_quotient()
+        fig = plot.plot_diagnostics(distquo,0,3,1,self.comp_ord,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
+        return fig
     
     def center_distance_quotient(self,fig=None,totplots=1,plotnbr=1):
         '''

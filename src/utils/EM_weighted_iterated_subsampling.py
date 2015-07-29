@@ -231,7 +231,7 @@ def EM_weighted_iterated_subsampling(comm,data,K,noise_class,N,iterations=10,ite
 	mus,Sigmas,pis = mus_fixed,Sigmas_fixed,pis_fixed
 	for it in range(iter_final):
 		weights = M_step_pooled(comm,data,mus,Sigmas,pis)
-		for k in range(int(noise_class):weights.shape[1]):
+		for k in range(int(noise_class),weights.shape[1]):
 			mus[k],Sigmas[k],pis[k] = E_step_pooled(comm,data,weights[:,k])
 	return mus,Sigmas,pis	
 

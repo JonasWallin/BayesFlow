@@ -11,6 +11,7 @@ from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from BayesFlow.GMM import mixture
 from BayesFlow.utils import dat_util
 from BayesFlow.utils.mpiutil import bcast_int
+from BayesFlow.utils.EM_weighted_iterated_subsampling import EM_weighted_iterated_subsampling
 import HMlog
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -574,6 +575,10 @@ class hierarical_mixture_mpi(object):
                 Psiprior['Qs'] = 1/H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
+
+    def set_init(self,prior,thetas=None,Sigmas=None,method='random',**kw):
+        self.set_latent_init(prior,thetas=None,Sigmas=None,method=method,**kw)
+        self.set_GMM_init()
                 
     def set_latent_init(self,prior,thetas=None,Sigmas=None,method='random',**kw):
         rank = self.comm.Get_rank()
@@ -632,10 +637,10 @@ class hierarical_mixture_mpi(object):
         for GMM in self.GMMs:
             GMM.set_param(param,active_only=True)
             
-    def deactivate_outlying_components(self,aquitted=None):
+    def deactivate_outlying_components(self,aquitted=None,bhat_distance=False):
         any_deactivated = 0
         for GMM in self.GMMs:
-            any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components(aquitted))
+            any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components(aquitted,bhat_distance))
             
         if self.comm.Get_rank() == 0:
             any_deactivated_all = np.empty(self.comm.Get_size(),dtype = 'i')

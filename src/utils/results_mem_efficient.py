@@ -808,9 +808,9 @@ class Components(object):
                     covdist[j,k] = np.nan
                 else:
                     if norm == 'F':
-                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:])
+                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:,:])
                     elif norm == 2:
-                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:],ord=2)
+                        covdist[j,k] = np.linalg.norm(self.Sigmapers[j,k,:,:]-self.Sigmalat[k,:,:],ord=2)
         return covdist
 
         
@@ -828,6 +828,18 @@ class Components(object):
                     wrongdist = min(np.linalg.norm(self.mupers[j,[k]*sum(otherind),:] - self.mulat[otherind,:],axis = 1))
                     distquo[j,k] = wrongdist/corrdist
         return distquo
+								
 
+    def get_latent_bhattacharyya_overlap_quotient(self):
+        distquo = np.zeros((self.J,self.K))
+        for suco in self.mergeind:
+            for k in suco:
+                otherind = np.array([not (kk in suco) for kk in range(self.K)])
+                for j in range(self.J):
+                    corrdist = bhat.bhattacharyya_dist(self.mupers[j,k,:],self.Sigmapers[j,k,:,:],self.mulat[k,:],self.Sigmalat[k,:,:])
+                    wrongdist = max([bhat.bhattacharyya_dist(self.mupers[j,k,:],self.Sigmapers[j,k,:,:],self.mulat[kk,:],self.Sigmalat[kk,:,:]) for kk in otherind])
+                    distquo[j,k] = corrdist/wrongdist
+        return distquo
+				
 
 

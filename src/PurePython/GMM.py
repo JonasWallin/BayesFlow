@@ -13,6 +13,7 @@ import scipy.special as sps
 #import matplotlib.pyplot as plt
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
+from BayesFlow.utils.Bhattacharyya import bhattacharyya_dist
 import cPickle as pickle
 
 def log_betapdf(p, a, b):
@@ -829,9 +830,13 @@ class mixture(object):
 			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
-	def deactivate_outlying_components(self,aquitted=None):
+	def deactivate_outlying_components(self,aquitted=None,bhat_dist=False):
 		any_deactivated = 0
 		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
+		if bhat_dist:
+			Qs = [self.prior[k]['sigma']['Q'] for k in range(self.K)]
+			nus = [self.prior[k]['sigma']['nu'] for k in range(self.K)]
+			Sigmas_latent = [Qs[k]/(nus[k]-self.d-1) for k in range(self.K)]
 		for k in range(self.K):
 			aquitted_k = [k]
 			if not aquitted is None:
@@ -840,7 +845,10 @@ class mixture(object):
 						aquitted_k = aqu
 						break
 			if not np.isnan(self.mu[k]).any():
-				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+				if not bhat_dist:
+					dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+				else:
+					dist = [-bhattacharyya_dist(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
 					#print "thetas = {}".format(thetas)
 					#print "mu = {}".format(self.mu)
