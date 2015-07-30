@@ -165,7 +165,7 @@ class EmptyClusterError(Exception):
     pass
 
 
-@profile
+#@profile
 def E_step_pooled(comm, data, weights):
     weights_mpi = WeightsMPI(comm, weights)
     if weights_mpi.W == 0:
@@ -194,7 +194,7 @@ def E_step_pooled(comm, data, weights):
     return mu, Sigma, weights_mpi.W
 
 
-@profile
+#@profile
 def M_step_pooled(comm, data, mus, Sigmas, pis):
     K = len(mus)
     #print "mus = {}".format(mus)
@@ -230,7 +230,7 @@ def normalize_pi(p, k_fixed=[]):
     return p
 
 
-@profile
+#@profile
 def EM_pooled(comm, data, K, n_iter=10, n_init=5,
               mus_fixed=[], Sigmas_fixed=[], pis_fixed=[]):
     """
@@ -283,7 +283,7 @@ def EM_pooled(comm, data, K, n_iter=10, n_init=5,
     return best_mus, best_Sigmas, best_pis
 
 
-@profile
+#@profile
 def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
                                      noise_mu=0.5, noise_sigma=0.5**2, noise_pi=0.001,
                                      iterations=10, iter_final=2, rho=3,
