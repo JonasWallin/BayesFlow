@@ -29,15 +29,15 @@ class WeightsMPI(object):
         self.rank = comm.Get_rank()
         self.weights = weights
 
-    @LazyProperty
+    @property
     def ws_loc(self):
-        return [sum(w) for w in self.weights]
+        return [np.sum(w) for w in self.weights]
 
-    @LazyProperty
+    @property
     def W_loc(self):
-        return sum([sum(w) for w in self.weights])
+        return sum([np.sum(w) for w in self.weights])
 
-    @LazyProperty
+    @property
     def W_locs(self):
         return self.comm.gather(self.W_loc)
 
