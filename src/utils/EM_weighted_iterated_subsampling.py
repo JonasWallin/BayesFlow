@@ -165,12 +165,13 @@ class EmptyClusterError(Exception):
     pass
 
 
+@profile
 def E_step_pooled(comm, data, weights):
     weights_mpi = WeightsMPI(comm, weights)
     if weights_mpi.W == 0:
         raise EmptyClusterError
     #print "tot weight of cluster = {}".format(weights_mpi.W)
-    mu_loc = sum([np.sum(dat*weights[j].reshape(-1, 1), axis=0) 
+    mu_loc = sum([np.sum(dat*weights[j].reshape(-1, 1), axis=0)
                   for j, dat in enumerate(data)])
     mu = sum(comm.bcast(comm.gather(mu_loc)))/weights_mpi.W
     if weights_mpi.W < data[0].shape[1]:
@@ -178,15 +179,22 @@ def E_step_pooled(comm, data, weights):
     else:
         wXXT_loc = np.zeros((data[0].shape[1], data[0].shape[1]))
         for j, dat in enumerate(data):
-            for i in range(dat.shape[0]):
-                x = dat[i, :].reshape(-1, 1)
-                wXXT_loc += weights[j][i]*x.dot(x.T)
+            if weights[j].shape == (dat.shape[0], 1):
+                wXXT_loc += (dat*weights[j]).T.dot(dat)
+            elif weights[j].shape == (dat.shape[0],):
+                wXXT_loc += (dat*weights[j][:, np.newaxis]).T.dot(dat)
+            else:
+                raise ValueError, "weight has shape {}".format(weights[j].shape)
+            # for i in range(dat.shape[0]):
+            #     x = dat[i, :].reshape(-1, 1)
+            #     wXXT_loc += weights[j][i]*x.dot(x.T)
         wXXT = sum(comm.bcast(comm.gather(wXXT_loc)))/weights_mpi.W
         Sigma = wXXT - mu.reshape(-1, 1).dot(mu.reshape(1, -1))
 
     return mu, Sigma, weights_mpi.W
 
 
+@profile
 def M_step_pooled(comm, data, mus, Sigmas, pis):
     K = len(mus)
     #print "mus = {}".format(mus)
@@ -222,7 +230,8 @@ def normalize_pi(p, k_fixed=[]):
     return p
 
 
-def EM_pooled(comm, data, K, n_iter=10, n_init=5, 
+@profile
+def EM_pooled(comm, data, K, n_iter=10, n_init=5,
               mus_fixed=[], Sigmas_fixed=[], pis_fixed=[]):
     """
         Fitting GMM with EM algorithm with fixed components
@@ -274,11 +283,12 @@ def EM_pooled(comm, data, K, n_iter=10, n_init=5,
     return best_mus, best_Sigmas, best_pis
 
 
+@profile
 def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
                                      noise_mu=0.5, noise_sigma=0.5**2, noise_pi=0.001,
                                      iterations=10, iter_final=2, rho=3,
-                                     likelihood_weights=True):
-    plotting = True
+                                     likelihood_weights=True,
+                                     plotting=True):
     K_it = int(np.ceil(K/iterations))
     data_mpi = DataMPI(comm, data)
 
@@ -295,7 +305,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
     data_subsamp = data
 
     while K_fix < K+int(noise_class):
-        mus, Sigmas, pis = EM_pooled(comm, data_subsamp, K+int(noise_class), 
+        mus, Sigmas, pis = EM_pooled(comm, data_subsamp, K+int(noise_class),
                                      mus_fixed=mus_fixed, Sigmas_fixed=Sigmas_fixed,
                                      pis_fixed=pis_fixed)
         if plotting:
@@ -303,7 +313,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
             ax = fig.add_subplot(111)
             ax.scatter(data_subsamp[0][:, 0], data_subsamp[0][:, 1])
             component_plot(mus, Sigmas, [0, 1], ax, colors=[(1, 0, 0)]*len(mus), lw=2)
-            component_plot(mus_fixed, Sigmas_fixed, [0, 1], ax, 
+            component_plot(mus_fixed, Sigmas_fixed, [0, 1], ax,
                            colors=[(0, 1, 0)]*len(mus_fixed), lw=2)
             plt.show()
 
@@ -348,8 +358,8 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
     if noise_class:
         mus = mus[1:]
         Sigmas = Sigmas[1:]
-        pis = pis[1:]        
-        
+        pis = pis[1:]
+
     return mus, Sigmas, pis
 
 if __name__ == '__main__':
@@ -394,7 +404,7 @@ if __name__ == '__main__':
         k_fixed = [3, 4]
         print "normalize_pi(pi, k_fixed) = {}".format(normalize_pi(pi, k_fixed))
         print "sum(normalize_pi(pi, k_fixed)) = {}".format(sum(normalize_pi(pi, k_fixed)))
-    if 0:
+    if 1:
         d = 2
         mus = [m*np.ones(d)+np.random.normal(0, m*0.1) for m in [1, 2, 6]]
         Sigmas = [m*np.eye(d) for m in [1, 0.5, 3]]
@@ -407,7 +417,8 @@ if __name__ == '__main__':
         K = 5
         (mus_fitted, Sigmas_fitted,
          pis_fitted) = EM_weighted_iterated_subsampling(comm, data, K, N/10,
-                                                        iterations=3, iter_final=3)
+                                                        iterations=3, iter_final=3,
+                                                        plotting=False)
         # print "mus_fitted = {}".format(mus_fitted)
         # print "Sigmas_fitted = {}".format(Sigmas_fitted)
         # print "pis_fitted = {}".format(pis_fitted)
@@ -418,7 +429,7 @@ if __name__ == '__main__':
                        colors=[(1, 1, 0)]*len(mus_fitted), lw=2)
         plt.show()
 
-    if 1:
+    if 0:
         # Test with noise class
         d = 2
         mus = [m*np.ones(d)+np.random.normal(0, 0.1) for m in [1, 2, 6, 4.5]]
@@ -432,7 +443,7 @@ if __name__ == '__main__':
         K = 5
         (mus_fitted, Sigmas_fitted,
          pis_fitted) = EM_weighted_iterated_subsampling(comm, data, K, N/10,
-                                                        noise_class=True, 
+                                                        noise_class=True,
                                                         noise_mu=5, noise_sigma=10**2,
                                                         iterations=3, iter_final=3)
         # print "mus_fitted = {}".format(mus_fitted)
