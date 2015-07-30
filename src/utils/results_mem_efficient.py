@@ -191,20 +191,26 @@ class Mres(object):
         self.mergeind += [sucos[s] for s in np.unique(suco_assign[suco_assign > -1])]
         self.mergeind += [[k] for k in np.nonzero(suco_assign == -1)[0]]
 
-    def get_median_overlap(self,fixvalind=[],fixval=-1):
+    def get_median_overlap(self,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         overlap = []
         for clust in self.clusts:
             overlap.append(clust.get_overlap())
         return self.get_medprop_pers(overlap,fixvalind,fixval)
     
-    def get_median_bh_dist_data(self,fixvalind=[],fixval=-1):
+    def get_median_bh_dist_data(self,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         bhd = []
         for clust in self.clusts:
             bhd.append(clust.get_bh_dist_data())
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
         return self.get_medprop_pers(bhd,fixvalind,fixval)
 
-    def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
+    def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
@@ -215,7 +221,9 @@ class Mres(object):
             mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         return mbhd  
 
-    def get_median_bh_dt_dist_dip2(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
+    def get_median_bh_dt_dist_dip2(self,bhatthr,dipthr,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         mbhd = self.get_median_bh_dist_data(fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
@@ -356,7 +364,9 @@ class Mres(object):
         return pdipsummary
 
     @staticmethod
-    def get_medprop_pers(prop,fixvalind=[],fixval=-1):
+    def get_medprop_pers(prop,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         med_prop = np.empty(prop[0].shape)
         for k in range(med_prop.shape[0]):
             for l in range(med_prop.shape[1]):
@@ -778,7 +788,9 @@ class Components(object):
                 bhd[j][k,k] = 0
         return bhd
         
-    def get_median_bh_dist(self,fixvalind=[],fixval=-1):
+    def get_median_bh_dist(self,fixvalind=None,fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
         bhd = self.get_bh_dist()
         return self.get_medprop_pers(bhd,fixvalind,fixval)
 
