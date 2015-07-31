@@ -539,6 +539,14 @@ class hierarical_mixture_mpi(object):
 
         self.set_location_prior(prior)
         self.set_var_prior(prior)
+        
+        if hasattr(prior,'nu_sw'):
+            for GMM in self.GMMs:
+                GMM.nu_sw = prior.nu_sw
+
+        if hasattr(prior,'Sigma_mu_sw'):
+            for GMM in self.GMMs:
+                GMM.Sigma_mu_sw = prior.Sigma_mu_sw
 
         for GMM in self.GMMs:
             GMM.alpha_vec = prior.a

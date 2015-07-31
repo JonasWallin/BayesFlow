@@ -204,6 +204,12 @@ class Prior(object):
             self.n_Psi = c*self.n_Psi
             self.H = (self.n_Psi-self.d-1)/self.n_Psi * (n_Psi_old-self.d-1)/n_Psi_old
 
+    def relaxed_switch(self, nu_sw = None, Sigma_mu_sw = None):
+        if not nu_sw is None:
+            self.nu_sw = nu_sw
+        if not Sigma_mu_sw is None:
+            self.Sigma_mu_sw = Sigma_mu_sw
+
 class PostProcPar(object):
 
     def __init__(self,postproc,mergemeth=None,**kw):

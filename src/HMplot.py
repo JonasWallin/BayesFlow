@@ -472,7 +472,7 @@ class CompPlot(object):
         if fig is None:
             fig = plt.figure()
         distquo = self.comp.get_latent_bhattacharyya_overlap_quotient()
-        fig = plot.plot_diagnostics(distquo,0,3,1,self.comp_ord,'Distance to mean quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
+        fig = plot.plot_diagnostics(distquo,0,3,1,self.comp_ord,'Bhattacharyya overlap quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
         return fig
     
     def center_distance_quotient(self,fig=None,totplots=1,plotnbr=1):
@@ -495,6 +495,7 @@ class CompPlot(object):
         '''
         distF = self.comp.get_cov_dist(norm)
         plot.plot_diagnostics(np.log10(distF),-5,0,-3,self.comp_ord,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
+        return fig
 
 class TracePlot(object):
     
