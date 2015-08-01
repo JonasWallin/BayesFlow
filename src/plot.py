@@ -25,6 +25,50 @@ def autocorr(x_in, lag=100):
         res[t] = np.corrcoef(np.array([x[0:len(x)-t], x[t:len(x)]]))[0,1]
     return res
 
+def hist2d(dat,dim,bins,quan=[0.5,99.5],quan_plot = [5, 95],ax=None,lims=None,labels=None):
+
+    if ax is None:
+        ax = plt.figure().add_subplot(111)
+
+    i,j = dim
+
+    if lims is None:
+        index_i = (dat[:,i] > np.percentile(dat[:,i], quan[0])) * (dat[:,i] < np.percentile(dat[:,i], quan[1]))
+        index_j = (dat[:,j] > np.percentile(dat[:,j], quan[0]) ) * (dat[:,j] < np.percentile(dat[:,j], quan[1]))
+        q1_y = np.percentile(dat[index_j*index_i ,j], quan_plot[0])
+        q2_y = np.percentile(dat[index_j*index_i ,j], quan_plot[1])
+        q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
+        q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
+    else:
+        try:
+            q1_x =lims[i, 0]
+            q2_x =lims[i, 1]
+            q1_y =lims[j, 0]
+            q2_y =lims[j, 1]
+        except TypeError:
+            q1_x,q2_x = lims
+            q1_y,q2_y = lims
+        index_i = (dat[:,i] > q1_x) * (dat[:,i] < q2_x)
+        index_j = (dat[:,j] > q1_y) * (dat[:,j] < q2_y)        
+
+
+    dat_j  = dat[index_i*index_j ,j]
+    #dat_j[dat_j == 0] = 1.
+    dat_i  = dat[index_i*index_j ,i]
+    #dat_i[dat_i == 0] = 1.
+    
+    ax.hist2d(dat_i, dat_j, bins = bins, norm=colors.LogNorm(),vmin=1)
+    ax.patch.set_facecolor('white')
+    ax.axes.xaxis.set_ticks(np.linspace(q1_x, q2_x,num=4))
+    ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    ax.axes.yaxis.set_ticks(np.linspace(q1_y, q2_y,num=4))
+    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    ax.tick_params(axis='both', which='major', labelsize=8)
+    if not labels is None:
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel(labels[j])
+
+
 def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None, 
            lims = None, labels = None):
     
@@ -52,7 +96,10 @@ def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None,
         if lims is None:
             ax.set_xlim(xlims[0],xlims[1])
         else:
-            ax.set_xlim(lims[i, 0],lims[i, 1])
+            try:
+                ax.set_xlim(lims[i, 0],lims[i, 1])
+            except TypeError:
+                ax.set_xlim(lims[0],lims[1])
         if not labels is None:
             ax.set_xlabel(labels[i])                
         for j in range(i+1,nv):
@@ -63,10 +110,14 @@ def histnd(dat, bins, quan = [0.5,99.5], quan_plot = [5, 95], f = None,
                 q1_x = np.percentile(dat[index_j*index_i ,i], quan_plot[0])
                 q2_x = np.percentile(dat[index_j*index_i ,i], quan_plot[1])
             else:
-                q1_x =lims[i, 0]
-                q2_x =lims[i, 1]
-                q1_y =lims[j, 0]
-                q2_y =lims[j, 1]
+                try:
+                    q1_x =lims[i, 0]
+                    q2_x =lims[i, 1]
+                    q1_y =lims[j, 0]
+                    q2_y =lims[j, 1]
+                except TypeError:
+                    q1_x,q2_x = lims
+                    q1_y,q2_y = lims
             ax = f.add_subplot(gs[nv*i + j])
             count += 1
             dat_j  = dat[index_i*index_j ,j]
@@ -262,6 +313,24 @@ def plot_diagnostics(diagn,ymin,ymax,ybar = None,order=None,name = '',log=False,
         ax.axes.yaxis.set_ticks([])
         ax.axes.xaxis.set_ticks([])
     return fig
+
+def plot_pbars(data,ymin,ymax,order=None,colors=None,log=False,ax=None):
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+    K = len(data)
+    if order is None:
+        order = range(K)
+    if colors is None:
+        colors = (1,0,0)*K
+    xloc = np.arange(K)+.5
+    bar_width = 0.35
+    for k,xl in enumerate(xloc):
+        ax.bar(xl,data[order[k]],color=colors[order[k]],log=log)
+    ax.set_ylim(ymin,ymax)
+    ax.axes.yaxis.set_ticks([])
+    ax.axes.xaxis.set_ticks([])
+    return ax
     
 def pca_biplot(data,comp,ax=None,varcol=None,varlabels=None,varlabsh=None,sampleid=None,sampmarkers=None):
     '''

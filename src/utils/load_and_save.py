@@ -41,16 +41,23 @@ def save_object(obj, savedir, filename=None, objtype=None):
         print "saving file {}".format(filename)
         save_object_to_file(obj,savedir+filename)
 
-def eventfilename(savedir,Nevent,i):
+def eventfilename(savedir,Nevent,i,name=None):
+    if not savedir[-1] == '/':
+        savedir += '/'
+    eventdir = savedir+'eventinds/'
+    if not os.path.exists(eventdir):
+        os.mkdir(eventdir)
+    eventfile = 'eventind'
+    if not name is None:
+        eventfile += '_'+name
     if not Nevent is None:
-        eventfile = 'eventind_%d_%d.json' % (Nevent,i)
-    else:
-        eventfile = 'eventind_%d.json' % i
-    return savedir+eventfile
+        eventfile += '_%d' % Nevent
+    eventfile += '_%d.json' % i
+    return eventdir+eventfile
 
-def save_eventind(eventind_dict,savedir,Nevent):
+def save_eventind(eventind_dict,savedir,Nevent,name=None):
     i = 0
-    eventfile = eventfilename(savedir,Nevent,i)
+    eventfile = eventfilename(savedir,Nevent,i,name)
     while os.path.exists(eventfile):
         i += 1
         eventfile = eventfilename(savedir,Nevent,i)
@@ -62,32 +69,53 @@ def save_eventind(eventind_dict,savedir,Nevent):
     with open(eventfile,'w') as f:
         json.dump(eventind_dict,f)
 
-def load_eventind(savedir,Nevent=None,i=0):
-    eventfile = eventfilename(savedir,Nevent,i)
-    if os.path.exists(eventfile):
-        with open(eventfile, 'r') as f:
-            try:
-                line1 = f.readline()
-                eventind_dic = yaml.load(line1)
-            except:
-                print "Loading eventind Matlab style"
-                lines = [line1]+f.readlines()
-                line = ' '.join(lines)
-                line = line.replace('\r','')
-                line = line.replace('\t','')
-                line = line.replace('\n','')
-                line = re.sub('\[([0-9]+)\]','\\1',line)
-                eventind_dic = yaml.load(line)
-        print "Events loaded ok"
-        for key in eventind_dic:
-            eventind_dic[key] = np.array(eventind_dic[key])
-        return eventind_dic
-    print "No .json file with events exist, loading .pkl file instead"
-    try:
+def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False):
+    if pkl:
         return pickle.load(open(savedir+'eventind.pkl','rb'))
-    except:
-        print "Eventinds not saved previously, returning empty dictionary"
-    return {}
+    eventfile = eventfilename(savedir,Nevent,i,name)
+    with open(eventfile, 'r') as f:
+        try:
+            line1 = f.readline()
+            eventind_dic = yaml.load(line1)
+        except:
+            print "Loading eventind Matlab style"
+            lines = [line1]+f.readlines()
+            line = ' '.join(lines)
+            line = line.replace('\r','')
+            line = line.replace('\t','')
+            line = line.replace('\n','')
+            line = re.sub('\[([0-9]+)\]','\\1',line)
+            eventind_dic = yaml.load(line)
+    print "Events loaded ok"
+    for key in eventind_dic:
+        eventind_dic[key] = np.array(eventind_dic[key])
+    return eventind_dic
+
+# def load_percentilescale(datadir,q,scaleKey):
+#      q1,q2 = q
+#      lower_q = load_percentile(datadir,q1,scaleKey)
+#      upper_q = load_percentile(datadir,q2,scaleKey)
+#      intercept = lower_q
+#      slope = upper_q - lower_q
+#      return intercept,slope
+ 
+#  def percentilename(datadir,q,scaleKey):
+#      if datadir[-1] != '/':
+#          datadir += '/'
+#      savedir = datadir + 'scale_dat/'
+#      if not os.path.exists(savedir):
+#          os.mkdir(savedir)
+#      return savedir+'percentile_'+str(q)+scaleKey+'.txt'
+ 
+#  def load_percentile(datadir,q,scaleKey):
+#      filename = percentilename(datadir,q,scaleKey)
+#      return np.loadtxt(filename)
+ 
+#  def save_percentile(percentile,datadir,q,scaleKey):
+#      if datadir[-1] != '/':
+#          datadir += '/'
+#      filename = percentilename(datadir,q,scaleKey)
+#      np.savetxt(filename,percentile)
 
 def load_burnlog(savedir):
     return load_HMlogB(savedir)

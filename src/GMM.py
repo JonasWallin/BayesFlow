@@ -70,24 +70,45 @@ class mixture(PurePython.GMM.mixture):
 		
 		
 		
-	def likelihood_prior(self, mu, Sigma, k, R_S_mu = None, log_det_Q = None, R_S = None):
+	def likelihood_prior(self, mu, Sigma, k, R_S_mu = None, log_det_Q = None, R_S = None, switchprior = False):
 			"""
 					Computes the prior that is 
 					\pi( \mu | \theta[k], \Sigma[k]) \pi(\Sigma| Q[k], \nu[k]) = 
 					N(\mu; \theta[k], \Sigma[k]) IW(\Sigma; Q[k], \nu[k])
+
+					If switchprior = True, special values of nu and Sigma_mu
+					are used if the parameters nu_sw and Sigma_mu_sw are set
+					respectively. This enables use of "relaxed" priors
+					facilitating label switch. NB! This makes the kernel
+					non-symmetric, hence it cannot be used in a stationary state.
 			"""
+
+			if switchprior:			
+				try:
+					nu = self.nu_sw
+				except:
+					nu = self.prior[k]['sigma']['nu']
+				try:
+					Sigma_mu = self.Sigma_mu_sw
+				except:
+					Sigma_mu = self.prior[k]['mu']['Sigma']
+				Q = self.prior[k]['sigma']['Q']*nu/self.prior[k]['sigma']['nu']
+			else:
+				nu = self.prior[k]['sigma']['nu']
+				Sigma_mu = self.prior[k]['mu']['Sigma']
+				Q = self.prior[k]['sigma']['Q']
 			
 			if np.isnan(mu[0]) == 1:
 					return 0, None, None, None
 			
 			if R_S_mu is None:
-					R_S_mu = GMM_util.cholesky(self.prior[k]['mu']['Sigma'])
-					#R_S_mu = sla.cho_factor(self.prior[k]['mu']['Sigma'],check_finite = False)
+					R_S_mu = GMM_util.cholesky(Sigma_mu)
+					#R_S_mu = sla.cho_factor(Sigma_mu,check_finite = False)
 					
 			
 			
 			if log_det_Q is None:
-					log_det_Q = GMM_util.log_det(self.prior[k]['sigma']['Q'])
+					log_det_Q = GMM_util.log_det(Q)
 			
 			if R_S is None:
 					R_S = GMM_util.cholesky(Sigma)
@@ -95,10 +116,10 @@ class mixture(PurePython.GMM.mixture):
 			
 			
 			
-			lik = GMM_util.likelihood_prior(mu.reshape((self.d,1)),  self.prior[k]['mu']['theta'],  self.prior[k]['mu']['theta'], R_S_mu, R_S, self.prior[k]['sigma']['nu'],
-										self.prior[k]['sigma']['Q'])
-			lik = lik +  (self.prior[k]['sigma']['nu'] * 0.5) * log_det_Q
-			lik = lik - self.ln_gamma_d(0.5 * self.prior[k]['sigma']['nu']) - 0.5 * np.log(2) * (self.prior[k]['sigma']['nu'] * self.d)
+			lik = GMM_util.likelihood_prior(mu.reshape((self.d,1)),  self.prior[k]['mu']['theta'],  self.prior[k]['mu']['theta'], R_S_mu, R_S, nu,
+										Q)
+			lik = lik +  (nu * 0.5) * log_det_Q
+			lik = lik - self.ln_gamma_d(0.5 * nu) - 0.5 * np.log(2) * (nu * self.d)
 			
 			return lik, R_S_mu, log_det_Q, R_S
 		

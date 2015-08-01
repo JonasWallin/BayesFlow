@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import plot
+import copy
 
 class ClustPlot(object):
     
@@ -25,33 +26,6 @@ class ClustPlot(object):
         
     def set_population_lab(self,pop_lab):
         self.pop_lab = pop_lab
-        
-    def prob(self,fig=None,totplots=1,plotnbr=1):
-        '''
-            Plot probabilities of belonging to each cluster
-        '''
-        if fig is None:
-            fig = plt.figure()
-        nbr_cols = 2*totplots-1
-        col_start = 2*(plotnbr-1)
-            
-        prob = self.clust.p
-        J = prob.shape[0]
-        K = prob.shape[1]
-
-        for k in range(K):
-            ax = fig.add_subplot(K,nbr_cols,k*nbr_cols + col_start+1)
-            ax.scatter(range(J), prob[:,self.order[k]])
-            ax.set_yscale('log')
-            ax.set_ylim(1e-3,1)
-            ax.axes.yaxis.set_ticks([1e-2,1e-1])
-            xlim = ax.get_xlim()
-            ax.plot([xlim[0],xlim[1]],[1e-2,1e-2],color='grey')
-            ax.plot([xlim[0],xlim[1]],[1e-1,1e-1],color='grey')
-            ax.axes.xaxis.set_ticks([])
-            ax.set_xlim(-1,J)
-    
-        return fig
         
     def box(self,fig=None,totplots=1,plotnbr=1):
         '''
@@ -259,7 +233,7 @@ class CompPlot(object):
     def set_sampnames(self,names):
         self.sampnames = names
         
-    def center(self,suco=True,fig=None,totplots=1,plotnbr=1,yscale=False):
+    def center(self,suco=True,fig=None,totplots=1,plotnbr=1,yscale=False,ks=None):
         '''
             The centers of all components (mu param) are plotted along one dimension.
             
@@ -270,11 +244,26 @@ class CompPlot(object):
             fig = plt.figure()
             
         if suco:
-            comps_list = self.comp.mergeind
-            order = self.suco_ord
+            comps_list = copy.deepcopy(self.comp.mergeind)
+            order = list(self.suco_ord)[:]
         else:
             comps_list = [[k] for k in range(self.comp.K)]
-            order = self.comp_ord
+            order = list(self.comp_ord)[:]
+
+        if not ks is None:
+            ks = [self.comp_ord[k] for k in ks]
+            s = 0
+            while s < len(comps_list):
+                comp = comps_list[s]
+                for k in comp:
+                    if k not in ks:
+                        comp.remove(k)
+                if len(comp) == 0:
+                    comps_list.pop(s)
+                    order.remove(s)
+                    order = [o-1 if o > s else o for o in order]
+                else:
+                    s += 1
     
         nbr_cols = 2*totplots-1
         col_start = 2*(plotnbr-1)
@@ -329,7 +318,19 @@ class CompPlot(object):
             
         return ax
 
-    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab = False,plot_new_th=True,lw=2):
+    @staticmethod
+    def set_lims(ax,lims,dim):
+        try:
+            xlim = lims[dim[0],:]
+            ylim = lims[dim[1],:]
+        except TypeError,ValueError:
+            xlim = lims
+            ylim = lims
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+    def latent(self,dim,ax=None,ks=None,plim=[0,1],plotlab=False,plotlabx=False,plotlaby=False,
+               plot_new_th=True,lw=2,lims=None):
         '''
             Plot visualization with ellipses of the latent components.
             Canonical colors are used (see BMplot).
@@ -361,12 +362,18 @@ class CompPlot(object):
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
         
-        if plotlab:
+        if plotlab or plotlabx:
             ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
+        if plotlab or plotlaby:
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
+
+        if not lims is None:
+            self.set_lims(ax,lims,dim)
+
         return q
 
-    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,names=None,plotlab=False,plot_new_th=True,lw=1):
+    def allsamp(self,dim,ax=None,ks=None,plim=[0,1],js=None,names=None,plotlab=False,plotlabx=False,plotlaby=False,
+                plot_new_th=True,lw=1,lims=None):
 
         '''
             Plot visualization of mixture components for all samples.
@@ -406,9 +413,14 @@ class CompPlot(object):
         if hasattr(self.comp,'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:,dim[0]],self.comp.new_thetas[:,dim[1]],s=40,c='k',marker='+')
 
-        if plotlab:
+        if plotlab or plotlabx:
             ax.set_xlabel(self.marker_lab[dim[0]],fontsize=16)
+        if plotlab or plotlaby:
             ax.set_ylabel(self.marker_lab[dim[1]],fontsize=16)
+
+        if not lims is None:
+            self.set_lims(ax,lims,dim)
+
         return q
         
     def within_plim(self,plim):
@@ -451,6 +463,17 @@ class CompPlot(object):
 
             plot.set_component_plot_tics([ax1,ax2],plot.mergeQ(ql,qa))
         return fig
+
+    def bhattacharyya_overlap_quotient(self,fig=None,totplots=1,plotnbr=1):
+        '''
+            Diagnostic plot showing quotient between distance to correct latent
+            center and distance to nearest wrong latent center.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        distquo = self.comp.get_latent_bhattacharyya_overlap_quotient()
+        fig = plot.plot_diagnostics(distquo,0,3,1,self.comp_ord,'Bhattacharyya overlap quotient',fig=fig,totplots=totplots,plotnbr=plotnbr)
+        return fig
     
     def center_distance_quotient(self,fig=None,totplots=1,plotnbr=1):
         '''
@@ -472,6 +495,7 @@ class CompPlot(object):
         '''
         distF = self.comp.get_cov_dist(norm)
         plot.plot_diagnostics(np.log10(distF),-5,0,-3,self.comp_ord,'Covariance matrix distance (norm {})'.format(norm),False,fig=fig,totplots=totplots,plotnbr=plotnbr)
+        return fig
 
 class TracePlot(object):
     
@@ -535,7 +559,7 @@ class FCplot(object):
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
 
-    def hist2d(self,dim,Nsamp=None,bins=50,ax=None,xlim=None,ylim=None):
+    def hist2d(self,dim,Nsamp=None,bins=50,quan=[0.5,99.5],quan_plot=[5, 95],ax=None,lims=None):
         '''
             Plot 2D histograms of a given sample (synthetic or real).
         '''
@@ -543,12 +567,13 @@ class FCplot(object):
             fig = plt.figure()
             ax = fig.add_subplot(111)
         data = self.fcsample.get_data(Nsamp)
-        ax.hist2d(data[:,dim[0]],data[:,dim[1]],bins = bins,norm=colors.LogNorm(),vmin=1)
-        ax.patch.set_facecolor('white')
-        if not xlim is None:
-            ax.set_xlim(*xlim)
-        if not ylim is None:
-            ax.set_ylim(*ylim)     
+        plot.hist2d(data,dim,bins,quan,quan_plot,ax,lims,labels=self.marker_lab)
+        #ax.hist2d(data[:,dim[0]],data[:,dim[1]],bins = bins,norm=colors.LogNorm(),vmin=1)
+        #ax.patch.set_facecolor('white')
+        #if not xlim is None:
+        #    ax.set_xlim(*xlim)
+        #if not ylim is None:
+        #    ax.set_ylim(*ylim)     
 
     def histnd(self,Nsamp=None,bins=50,fig=None,xlim=None,ylim=None):
         '''
@@ -566,15 +591,15 @@ class FCplot(object):
                 if ax.get_ylim()[1] < 5:
                     ax.set_ylim(*ylim)
         
-class BMplot(object):
+class HMplot(object):
     
     def __init__(self,bmres,marker_lab = None):
         self.bmres = bmres
         self.comp_colors,self.suco_colors,self.comp_ord,self.suco_ord = self.get_colors_and_order()
         
-        self.clp_nm = ClustPlot(bmres.clust_nm,self.comp_colors,self.comp_ord)
-        if hasattr(bmres,'clust_m'):
-            self.clp_m = ClustPlot(bmres.clust_m,self.suco_colors,self.suco_ord)
+        #self.clp_nm = ClustPlot(bmres.clust_nm,self.comp_colors,self.comp_ord)
+        #if hasattr(bmres,'clust_m'):
+        #    self.clp_m = ClustPlot(bmres.clust_m,self.suco_colors,self.suco_ord)
         self.cop = CompPlot(bmres.components,self.comp_colors,self.comp_ord,self.suco_ord)
         self.trp = TracePlot(bmres.traces,self.comp_ord)
         
@@ -594,9 +619,9 @@ class BMplot(object):
         
     def set_marker_lab(self,marker_lab):
         self.marker_lab = marker_lab
-        self.clp_nm.set_marker_lab(marker_lab)
-        if hasattr(self,'clp_m'):
-            self.clp_m.set_marker_lab(marker_lab)
+        #self.clp_nm.set_marker_lab(marker_lab)
+        #if hasattr(self,'clp_m'):
+        #    self.clp_m.set_marker_lab(marker_lab)
         self.cop.set_marker_lab(marker_lab)
         for mc in self.mcsp:
             self.mcsp[mc].set_marker_lab(marker_lab)
@@ -620,27 +645,75 @@ class BMplot(object):
         '''      
         comp_col,suco_col,comp_ord,suco_ord = self.bmres.get_colors_and_order()
         
-        #maxnbrsucocol = 8
-        ##for s,suco in enumerate(self.bmres.mergeind):
-        ##    sc_ord = np.argsort(-np.array(np.sum(self.bmres.p,axis=0)[suco]))
-        ##    self.bmres.mergeind[s] = [suco[i] for i in sc_ord] # Change order within each super component
-        ##prob_mer = [np.sum(self.bmres.p[:,scind]) for scind in self.bmres.mergeind]
-        ##suco_ord = np.argsort(-np.array(prob_mer))
-        #mergeind_sort = [self.bmres.mergeind[i] for i in suco_ord]
-        ##print "mergeind_sort = {}".format(mergeind_sort)
-        ##comp_ord = [ind for suco in mergeind_sort for ind in suco]
-        #cm = plt.get_cmap('gist_rainbow')
-        #nbrsucocol = min(maxnbrsucocol,len(suco_ord))  
-        #suco_col = [(0,0,0)]*len(suco_ord)
-        #colors = [(0,0,0)]*len(comp_ord)
-        #for s,suco in enumerate(mergeind_sort):
-        #    #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
-        #    suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
-        #    if s > maxnbrsucocol:
-        #        suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)
-        #    for i,k in enumerate(suco):
-        #        colors[k] = plot.black_ip(suco_col[suco_ord[s]],i,len(suco))
         return comp_col,suco_col,comp_ord,suco_ord
+
+    def prob_bars(self,suco=True,fig=None,js = None):
+        if fig is None:
+            fig = plt.figure()
+
+        if suco:
+            order = self.suco_ord
+            colors = self.suco_colors
+            prob = self.bmres.p_merged
+        else:
+            order = self.comp_ord
+            colors = self.comp_colors
+            prob = self.bmres.p
+
+        if js is None:
+            js = range(self.bmres.J)
+
+        prob_list = [prob[j,:] for j in js]
+        J = len(js)
+        ymax = 1.2*np.max(prob_list)
+
+        for i,j in enumerate(js):
+            ax = fig.add_subplot(J,1,i+1)
+            plot.plot_pbars(prob[i],0,ymax,order=order,colors=colors,ax=ax)
+
+        return fig
+
+    def prob(self,suco=True,fig=None,totplots=1,plotnbr=1,ks=None):
+            '''
+                Plot probabilities of belonging to each cluster
+            '''
+            if fig is None:
+                fig = plt.figure()
+            nbr_cols = 2*totplots-1
+            col_start = 2*(plotnbr-1)
+
+
+            if suco:
+                order = self.suco_ord
+                prob = self.bmres.p_merged
+            else:
+                order = self.comp_ord
+                prob = self.bmres.p
+                
+            if ks is None:
+                K = prob.shape[1]
+                ks = range(K)
+            else:
+                K = len(ks)
+                if suco:
+                    raise ValueError, "Selection of ks not supported for super components"
+
+            J = prob.shape[0]
+            #K = prob.shape[1]
+
+            for i,k in enumerate(ks):
+                ax = fig.add_subplot(K,nbr_cols,i*nbr_cols + col_start+1)
+                ax.scatter(range(J), prob[:,order[k]])
+                ax.set_yscale('log')
+                ax.set_ylim(1e-3,1)
+                ax.axes.yaxis.set_ticks([1e-2,1e-1])
+                xlim = ax.get_xlim()
+                ax.plot([xlim[0],xlim[1]],[1e-2,1e-2],color='grey')
+                ax.plot([xlim[0],xlim[1]],[1e-1,1e-1],color='grey')
+                ax.axes.xaxis.set_ticks([])
+                ax.set_xlim(-1,J)
+
+            return fig
 
     def pca_biplot(self,comp,ax=None,poplabsh=None,sampmarkers=None):
         '''
@@ -658,47 +731,68 @@ class BMplot(object):
         #    poplabsh = [[0,0],[0,-.02],[0,0],[-.1,0],[.22,0],[.06,-.06]]
         if not hasattr(self,'pop_lab'):
             self.pop_lab = None
-        plot.pca_biplot(self.bmres.clust_m.p,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
+        plot.pca_biplot(self.bmres.p_merged,comp,ax,varcol=self.suco_colors,varlabels=self.pop_lab,
                    varlabsh=poplabsh,sampleid=self.bmres.meta_data.samp['donorid'],sampmarkers=sampmarkers)        
 
     def pca_screeplot(self,ax=None):
         plot.pca_screeplot(self.bmres.p,ax)
 
+    def scatter(self,dim,j,ax=None):
+        '''
+            Plots the scatter plot of the data over dim.
+            Clusters are plotted with their canonical colors (see BMPlot).
+        '''
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+                
+        samp_clust = self.bmres.clusts[j]
+        data = samp_clust.data[:,dim]
+        x = samp_clust.x_sample
+
+        if len(dim) == 2:
+            for k in range(self.bmres.K):
+                ax.plot(data[x==k,0],data[x==k, 1],'+',label='k = %d'%(k+1),color=self.comp_colors[k])
+            ax.plot(data[x==self.bmres.K,0],data[x==self.bmres.K,1],'+',label='outliers',color='black')
+        
+        elif len(dim) == 3:
+            for k in range(self.bmres.K):
+                ax.plot(data[x==k,0],data[x==k,1],data[x==k,2],'+',label='k = %d'%(k+1),color=self.comp_colors[k])
+            ax.plot(data[x==self.bmres.K,0],data[x==self.bmres.K,1],data[x==self.bmres.K,2],'+',label='outliers',color='black')
+                            
+        return ax
+
     def component_fit(self,plotdim,name='pooled',lim=[-.2,1.2],bins=100,fig=None):
         if fig is None:
             fig = plt.figure()
-        labels = self.bmres.meta_data.marker_lab
+        #labels = self.bmres.meta_data.marker_lab
         if name == 'pooled':
             names = self.sampnames
         else:
             names = [name]
         for m in range(len(plotdim)):
             ax = plt.subplot2grid((len(plotdim), 4), (m, 0))
-            ql = self.cop.latent(plotdim[m],ax=ax)
-            ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
-            ax.set_ylabel(labels[plotdim[m][1]],fontsize=16)
+            ql = self.cop.latent(plotdim[m],ax=ax,plotlab=True)
+            #ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
+            #ax.set_ylabel(labels[plotdim[m][1]],fontsize=16)
             ax.set_xlim(*lim)
             ax.set_ylim(*lim)
             
             ax = plt.subplot2grid((len(plotdim), 4), (m, 1))
-            qa = self.cop.allsamp(plotdim[m],names=names,ax=ax)
-            ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
+            qa = self.cop.allsamp(plotdim[m],names=names,ax=ax,plotlabx=True)
+            #ax.set_xlabel(labels[plotdim[m][0]],fontsize=16)
             ax.set_xlim(*lim)
             ax.set_ylim(*lim)
             
             ax = plt.subplot2grid((len(plotdim), 4), (m, 2))
-            self.mcsp[name].realplot.hist2d(plotdim[m],bins=bins,ax=ax,xlim=lim,ylim=lim)
+            self.mcsp[name].realplot.hist2d(plotdim[m],bins=bins,ax=ax,lims=lim)
             if m == 0:
                 ax.set_title(name+'(real)')
-            #ax.set_xlim(*lim)
-            #ax.set_ylim(*lim)
             
             ax = plt.subplot2grid((len(plotdim), 4), (m, 3))
-            self.mcsp[name].synplot.hist2d(plotdim[m],bins=bins,ax=ax,xlim=lim,ylim=lim)
+            self.mcsp[name].synplot.hist2d(plotdim[m],bins=bins,ax=ax,lims=lim)
             if m == 0:
                 ax.set_title(name+'(synthetic)')
-            #ax.set_xlim(*lim)
-            #ax.set_ylim(*lim)
 
         return fig
 

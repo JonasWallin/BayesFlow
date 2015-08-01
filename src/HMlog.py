@@ -3,66 +3,17 @@ from mpi4py import MPI
 import numpy as np
 import collections
 import warnings
+from utils import mpiutil
+from utils.jsonutil import ObjJsonEncoder,class_decoder
+from scipy import io,sparse
+import os
+import cPickle as pickle
+import json
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 warnings.filterwarnings('ignore',message='using a non-integer number.*',category= DeprecationWarning)
-
-def collect_arrays(data,nbr_col,nptype,mpitype):
-
-    nbr_row = collect_data_1d([dat.shape[0] for dat in data],'i',MPI.INT)
-    
-    if len(data) > 0:
-        data_stack = np.vstack([np.array(dat,dtype=nptype).reshape((-1,nbr_col)) for dat in data])
-    else:
-        data_stack = np.empty((0,nbr_col),dtype=nptype)
-
-    data_all_stack = collect_array_(data_stack,nbr_col,nptype,mpitype)
-    
-    if not data_all_stack is None:
-        if len(nbr_row) > 0:
-            data_all = np.split(data_all_stack, np.cumsum(nbr_row[0:-1]))
-        else:
-            data_all = data_all_stack
-    else:
-        data_all = None
-        
-    return data_all
-
-def collect_data(data,nbr_col,nptype,mpitype):
-
-    if len(data) > 0:
-        data_array = np.array(data,dtype=nptype).reshape((-1,nbr_col))
-    else:
-        data_array = np.empty((0,nbr_col),dtype=nptype)
-        
-    data_all = collect_array_(data_array,nbr_col,nptype,mpitype)
-    return data_all
-
-def collect_data_1d(data,nptype,mpitype):
-
-    data_all = collect_data(data,1,nptype,mpitype)
-    if not data_all is None:
-        data_all = data_all.reshape((-1,))    
-    return data_all
-
-def collect_array_(data_array,nbr_col,nptype,mpitype):
-
-    if rank == 0:
-        nbr_row = np.empty(comm.Get_size(),dtype = 'i')
-    else:
-        nbr_row = 0
-    comm.Gather(sendbuf=[np.array(data_array.shape[0],dtype='i'), MPI.INT], recvbuf=[nbr_row, MPI.INT], root=0)
-    counts = nbr_row*nbr_col
-    #print "counts = {} at rank {}".format(counts,rank)    
-    
-    if rank == 0:
-        data_all_array = np.empty((sum(nbr_row),nbr_col),dtype = nptype)
-    else:
-        data_all_array = None
-    comm.Gatherv(sendbuf=[data_array,mpitype],recvbuf=[data_all_array,(counts,None),mpitype],root=0)
-    return data_all_array
 
 class HMlogB(object):
     '''
@@ -80,6 +31,7 @@ class HMlogB(object):
         self.K = hGMM.K
         self.d = hGMM.d
         self.noise_class = hGMM.noise_class
+        self.names_loc = [GMM.name for GMM in hGMM.GMMs]
         self.set_names(hGMM)
         self.active_komp_loc = np.zeros((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
         self.active_komp_curr_loc = np.ones((len(hGMM.GMMs),self.K+self.noise_class),dtype = 'i')
@@ -121,7 +73,6 @@ class HMlogB(object):
         self.active_komp_curr_loc = np.copy(self.tmp_active_comp_curr_loc)
         if debug:
             print "savesim ok at iter {} at rank {}".format(self.i,rank)
-
 
         return nus
         
@@ -170,77 +121,56 @@ class HMlogB(object):
         return self.nu_sim[int(self.i/self.savefrq),:]
 
     def set_lab_sw(self):
-        lab_sw_all = collect_data(self.lab_sw_loc,2,'i',MPI.INT)
+        lab_sw_all = mpiutil.collect_data(self.lab_sw_loc,2,'i',MPI.INT)
         if rank == 0:
             self.lab_sw = lab_sw_all
         del self.lab_sw_loc
-        
-#    def set_lab_sw_old(self):
-#        print "self.lab_sw = {}".format(self.lab_sw)
-#        if len(self.lab_sw) > 0:
-#            lab_sw_loc = np.array(np.vstack(self.lab_sw),dtype = 'i')
-#        else:
-#            lab_sw_loc = np.empty((0,2))    
-#            
-#        if rank == 0:
-#            counts = np.empty(comm.Get_size(),dtype = 'i')
-#        else:
-#            counts = 0
-#        comm.Gather(sendbuf=[np.array(lab_sw_loc.shape[0] * lab_sw_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
-#        
-#        if rank == 0:
-#            lab_sw_all = np.empty((sum(counts)/lab_sw_loc.shape[1],lab_sw_loc.shape[1]),dtype = 'i')
-#        else:
-#            lab_sw_all = None
-#        comm.Gatherv(sendbuf=[lab_sw_loc,MPI.INT],recvbuf=[lab_sw_all,(counts,None),MPI.INT],root=0)
-#        if rank == 0:
-#            self.lab_sw = lab_sw_all  
-
+         
     def set_active_komp(self):
-        active_komp_all = collect_data(self.active_komp_loc,self.K+self.noise_class,'i',MPI.INT)
+        active_komp_all = mpiutil.collect_data(self.active_komp_loc,self.K+self.noise_class,'i',MPI.INT)
         if rank == 0:
             self.active_komp = active_komp_all/self.sim
         del self.active_komp_loc
 
-#    def set_active_komp_old(self):
-#        if rank == 0:
-#            counts = np.empty(comm.Get_size(),dtype = 'i')
-#        else:
-#            counts = 0
-#        print "self.active_komp_loc at rank {}: \n {}".format(rank,self.active_komp_loc)
-#        comm.Gather(sendbuf=[np.array(self.active_komp_loc.shape[0] * self.active_komp_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
-#
-#        if rank == 0:
-#            active_komp_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
-#        else:
-#            active_komp_all = None
-#        comm.Gatherv(sendbuf=[self.active_komp_loc,MPI.INT],recvbuf=[active_komp_all,(counts,None),MPI.INT],root=0)
-#        if rank == 0:
-#            self.active_komp = active_komp_all/self.sim
-
     def set_names(self,hGMM):
         name_data = [np.array([ch for ch in GMM.name]) for GMM in hGMM.GMMs]
-        name_all = collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
+        name_all = mpiutil.collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
         if rank == 0:
             self.names = [''.join(nam.reshape((-1,))) for nam in name_all]
-            
-#    def set_names_old(self,hGMM):
-#        names_loc = ":".join([GMM.name for GMM in hGMM.GMMs])
-#        names_loc += ':'
-#        if rank == 0:
-#            counts = np.empty(comm.Get_size(),dtype = 'i')
-#        else:
-#            counts = 0
-#        comm.Gather(sendbuf=[np.array(len(names_loc),dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
-#
-#        if rank == 0:
-#            names_all = np.chararray(sum(counts))
-#        else:
-#            names_all = None
-#        comm.Gatherv(sendbuf=[np.array(list(names_loc)),MPI.CHAR],recvbuf=[names_all,(counts,None),MPI.CHAR],root=0)
-#        if rank == 0:
-#            names_all = "".join(names_all)
-#            self.names = names_all.split(':')[0:-1]
+
+    def encode_json(self):
+        jsondict = {'__type__':'HMlogB'}
+        for arg in ['savefrq','nbrsave','sim','K','d','noise_class','names',
+                    'active_komp','lab_sw']:
+            jsondict.update({arg:getattr(self,arg)})
+        #print "jsondict= {}".format(jsondict)
+        #with open('jsondump.pkl','w') as f:
+        #    pickle.dump(jsondict,f,-1)
+        return jsondict    
+
+    def save(self,savedir,logname='blog'):
+        if rank == 0:
+            if not savedir[-1] == '/':
+                savedir += '/'
+            with open(savedir+logname+'.json','w') as f:
+                json.dump(self,f,cls=ObjJsonEncoder)
+            with open(savedir+logname+'_theta_sim.npy','w') as f:
+                np.save(f,self.theta_sim)
+            with open(savedir+logname+'_nu_sim.npy','w') as f:
+                np.save(f,self.nu_sim)
+
+    @classmethod
+    def load(cls,savedir,logname='blog'):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        with open(savedir+logname+'.json','r') as f:
+            hmlog = json.load(f,object_hook=lambda obj: class_decoder(obj,cls))
+        if rank == 0:
+            with open(savedir+logname+'_theta_sim.npy','r') as f:
+                hmlog.theta_sim = np.load(f)
+            with open(savedir+logname+'_nu_sim.npy','r') as f:
+                hmlog.nu_sim = np.load(f)
+        return hmlog
 
 class HMlog(HMlogB):
     '''
@@ -273,6 +203,8 @@ class HMlog(HMlogB):
             print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,rank)
             print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),rank)
             self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
+            if rank == 0:
+                self.savesampnames = savesampnames
         else:
             if rank == 0:
                 self.savesamp_loc = savesamp
@@ -320,9 +252,11 @@ class HMlog(HMlogB):
     def cat(self):
         print "cat not implemented yet for this object type"
 
-    def postproc(self):
+    def postproc(self,high_memory = False):
         '''
             Post-processing production iterations
+
+            high_memory     - set to True if root can handle data from all workers
         '''
         super(HMlog,self).postproc()
         if rank == 0:
@@ -345,10 +279,11 @@ class HMlog(HMlogB):
             self.prob_sim_mean[~self.active_komp.astype('bool')] = np.nan
             self.prob_sim_mean /= self.active_komp
             self.prob_sim_mean[np.isnan(self.prob_sim_mean)] = 0
-            
-        self.set_savesampnames()
-        self.set_savesamp()
-        self.set_Y_sim()
+        
+        if high_memory:    
+            self.set_savesampnames()
+            self.set_savesamp()
+            self.set_Y_sim()
          
     def append_Y(self,Y,j):
         self.Y_sim_loc[j][int(self.i/self.savefrqy),:] = Y
@@ -386,13 +321,13 @@ class HMlog(HMlogB):
             self.J = sum(J_locs)
 
     def set_Y_sim(self):
-        self.Y_sim = collect_arrays(self.Y_sim_loc,self.d,'d',MPI.DOUBLE)
+        self.Y_sim = mpiutil.collect_arrays(self.Y_sim_loc,self.d,'d',MPI.DOUBLE)
 
     def set_savesampnames(self):
         #print "self.savesampnames_loc at rank {}: {}".format(rank,self.savesampnames_loc)
         name_data = [np.array([ch for ch in name]) for name in self.savesampnames_loc]
         #print "name_data at rank {}".format(name_data,rank)
-        name_all = collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
+        name_all = mpiutil.collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
         if rank == 0:
             self.savesampnames = [''.join(nam.reshape((-1,))) for nam in name_all]
             #print "self.savesampnames at rank 0: {}".format(self.savesampnames)
@@ -401,6 +336,69 @@ class HMlog(HMlogB):
         if rank == 0:
             self.savesamp = [self.names.index(name) for name in self.savesampnames]
 
+    def set_syndata_dir(self,dirname):
+        if not dirname[-1] == '/':
+            dirname += '/'
+        self.syndata_dir = dirname
+
+    def encode_json(self):
+        jsondict = super(HMlog,self).encode_json()
+        jsondict['__type__'] = 'HMlog'
+        for arg in ['theta_sim_mean','Sigmaexp_sim_mean','mupers_sim_mean','Sigmapers_sim_mean',
+                    'prob_sim_mean','J','savesampnames']:
+            jsondict.update({arg:getattr(self,arg)})
+        try:
+            jsondict['syndata_dir'] = self.syndata_dir
+        except:
+            pass
+        return jsondict
+
+    def save(self,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        self.syndata_dir = savedir + 'syndata/'
+        if rank == 0:
+            if not os.path.exists(self.syndata_dir):
+                os.mkdir(self.syndata_dir)
+        comm.Barrier()
+        try:
+            for j,name in enumerate(self.savesampnames_loc):
+                with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
+                    pickle.dump(self.Y_sim_loc[j],f,-1)
+        except:
+            if rank == 0:
+                for j,name in enumerate(self.savesampnames):
+                    with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
+                        pickle.dump(self.Y_sim[j],f,-1)
+        if rank == 0:
+            with open(self.syndata_dir+'pooled_MODEL.pkl','w') as f:
+                pickle.dump(self.Y_pooled_sim,f,-1)
+            if not hasattr(self,'savesampnames'):
+                self.set_savesampnames()
+        super(HMlog,self).save(savedir,logname='log')
+
+    @classmethod
+    def load(cls,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        hmlog = super(HMlog,cls).load(savedir,logname='log')
+        try:
+            syndata_dir = hmlog.syndata_dir
+        except:
+            syndata_dir = savedir+'syndata/'
+
+        # TODO! Load dat to all cores instead
+        if rank == 0:
+            hmlog.Y_sim = []
+            for j,name in enumerate(hmlog.savesampnames):
+                with open(syndata_dir+name+'_MODEL.pkl','r') as f:
+                    hmlog.Y_sim.append(pickle.load(f))
+        if rank == 0:
+            with open(syndata_dir+'pooled_MODEL.pkl','r') as f:
+                hmlog.Y_pooled_sim = pickle.load(f) 
+        return hmlog       
+
+
 class HMElog(HMlog):
     '''
         Class for saving results from sampling of posterior distribution
@@ -408,13 +406,14 @@ class HMElog(HMlog):
         thus makes it possible to create Clustering object.
     '''
     
-    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None):
+    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None,
+                 high_memory=False):
         super(HMElog,self).__init__(hGMM,sim,savesamp,savesampnames,nbrsave,savefrq,nbrsavey,savefrqy)
         self.batch = 1000
         self.ii = -1
         self.init_classif(hGMM)
         self.set_ns()
-        if rank == 0:
+        if rank == 0 and high_memory:
             self.classif_freq_all = np.zeros((sum(self.ns),self.K+self.noise_class))
 
     def init_classif(self,hGMM):
@@ -432,42 +431,65 @@ class HMElog(HMlog):
             self.ii = 0
         for j,GMM in enumerate(hGMM.GMMs):
             self.classif[j][:,self.ii] = GMM.x[:]
-            
-    def postproc(self):
+
+    def postproc(self,high_memory=False):
         '''
             Post-processing production iterations
         '''
-        super(HMElog,self).postproc()
+        super(HMElog,self).postproc(high_memory)
         if not self.ii == self.batch:
             self.add_classif_fr()
         del self.classif
-        if rank == 0:
-            self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
-            del self.classif_freq_all        
-        
+        if rank == 0 and high_memory:
+            self.classif_freq = mpiutil.collect_arrays(self.classif_freq_loc)     
+            
+    # def postproc_old(self):
+    #     '''
+    #         Post-processing production iterations
+    #     '''
+    #     super(HMElog,self).postproc()
+    #     if not self.ii == self.batch:
+    #         self.add_classif_fr()
+    #     del self.classif
+    #     if rank == 0:
+    #         self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
+    #         del self.classif_freq_all        
+
     def add_classif_fr(self):
-        classif_freqs_loc = [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
+        try:
+            classif_freq_loc = self.classif_freq_loc
+        except:
+            classif_freq_loc= [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
         for j,cl in enumerate(self.classif):
             for ii in range(cl.shape[0]):
                 cnt = collections.Counter(cl[ii,:])
                 del cnt[-1]
-                classif_freqs_loc[j][ii,cnt.keys()] = cnt.values()
-        classif_freq_loc = np.array(np.vstack(classif_freqs_loc),dtype = 'i')
-        #classif_freq_loc = classif_freq_loc[0:100,:]
-        if rank == 0:
-            counts = np.empty(comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        comm.Gather(sendbuf=[np.array(classif_freq_loc.shape[0] * classif_freq_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+                classif_freq_loc[j][ii,cnt.keys()] += cnt.values()
+        self.classif_freq_loc = classif_freq_loc
+
+    # def add_classif_fr_old(self):
+    #     classif_freqs_loc = [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
+    #     for j,cl in enumerate(self.classif):
+    #         for ii in range(cl.shape[0]):
+    #             cnt = collections.Counter(cl[ii,:])
+    #             del cnt[-1]
+    #             classif_freqs_loc[j][ii,cnt.keys()] = cnt.values()
+    #     classif_freq_loc = np.array(np.vstack(classif_freqs_loc),dtype = 'i')
+    #     #classif_freq_loc = classif_freq_loc[0:100,:]
+    #     if rank == 0:
+    #         counts = np.empty(comm.Get_size(),dtype = 'i')
+    #     else:
+    #         counts = 0
+    #     comm.Gather(sendbuf=[np.array(classif_freq_loc.shape[0] * classif_freq_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
         
-        if rank == 0:
-            classif_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
-            #print "classif_all.shape = {}".format(classif_all.shape)
-        else:
-            classif_all = None
-        comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
-        if rank == 0:
-            self.classif_freq_all += classif_all
+    #     if rank == 0:
+    #         classif_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
+    #         #print "classif_all.shape = {}".format(classif_all.shape)
+    #     else:
+    #         classif_all = None
+    #     comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
+    #    if rank == 0:
+    #        self.classif_freq_all += classif_all
 
     def set_ns(self):
         ns_loc = np.array([cl.shape[0] for cl in self.classif],dtype='i')
@@ -486,8 +508,58 @@ class HMElog(HMlog):
         if rank == 0:
             self.ns = ns
 
+    def encode_json(self):
+        jsondict = super(HMElog,self).encode_json()
+        jsondict['__type__'] = 'HMElog'
+        try:
+            jsondict['classif_freq_dir'] = self.classif_freq_dir
+        except:
+            pass
+        return jsondict
 
+    def save(self,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        self.classif_freq_dir = savedir+'classif_freq/'
+        if rank == 0:
+            if not os.path.exists(self.classif_freq_dir):
+                os.mkdir(self.classif_freq_dir)
+        comm.Barrier()
+        try:
+            print "names_loc at rank {}: {}".format(rank,self.names_loc)            
+            for j,name in enumerate(self.names_loc):
+                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))
+        except:
+            if rank == 0:
+                for j,name in enumerate(self.names):
+                    io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
+        super(HMElog,self).save(savedir)
 
+    @classmethod
+    def load(cls,savedir):
+        if not savedir[-1] == '/':
+            savedir += '/'
+        hmlog = super(HMElog,cls).load(savedir)
+        try:
+            classif_freq_dir = hmlog.classif_freq_dir
+        except:
+            classif_freq_dir = savedir+'classif_freq/'
 
+        # TODO! Load classif freq to all cores
+        if rank == 0:
+            hmlog.classif_freq = []
+            for j,name in enumerate(hmlog.names):
+                hmlog.classif_freq.append(io.mmread(classif_freq_dir+name+'_CLASSIF_FREQ.mtx'))
+        return hmlog       
+
+#if 0:
+#    homedir = '/Users/johnsson/'
+#else:
+#    homedir = '/home/johnsson/'
+#expdir = homedir+'Forskning/Experiments/FlowCytometry/BHM/FCI/StemCell/'
+#expname = 'CYTO'
+#run = 19
+#loaddirres = expdir+expname+'/' + 'run'+str(run)+'/'
+#HMElog.load(loaddirres)
 
 

@@ -9,6 +9,8 @@ import numpy as np
 from mpi4py import MPI
 import os
 import inspect
+import shutil
+from utils.mpiutil import bcast_int
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -39,9 +41,11 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
             if not os.path.exists(dr):
                 os.makedirs(dr)
         simfile = inspect.getouterframes(inspect.currentframe())[1][1]
-        os.system("cp \""+simfile+"\" "+savedir)
+        shutil.copy(simfile,savedir)
+        #os.system("cp \""+simfile+"\" "+savedir)
         if not setupfile is None:
-            os.system("cp \""+setupfile+"\" "+savedir)
+            shutil.copy(setupfile,savedir)
+            #os.system("cp \""+setupfile+"\" "+savedir)
         for kw in kws:
             if not kw is None:
                 with open(savedir+kw+'.dat','w') as f:
@@ -52,9 +56,10 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
     if rank == 0:
         with open(savedir+'seed.dat','w') as f:
             f.write(str(seed))        
-    comm.Barrier()
-    with open(savedir+'seed.dat','r') as f:
-        seed = np.int(f.readline())
+    seed = bcast_int(seed)
+    #comm.Barrier()
+    #with open(savedir+'seed.dat','r') as f:
+    #    seed = np.int(f.readline())
     np.random.seed(seed)
     print "seed set to {} at rank {}".format(seed,rank)
 
@@ -198,6 +203,12 @@ class Prior(object):
             n_Psi_old = self.n_Psi
             self.n_Psi = c*self.n_Psi
             self.H = (self.n_Psi-self.d-1)/self.n_Psi * (n_Psi_old-self.d-1)/n_Psi_old
+
+    def relaxed_switch(self, nu_sw = None, Sigma_mu_sw = None):
+        if not nu_sw is None:
+            self.nu_sw = nu_sw
+        if not Sigma_mu_sw is None:
+            self.Sigma_mu_sw = Sigma_mu_sw
 
 class PostProcPar(object):
 

@@ -13,6 +13,7 @@ import scipy.special as sps
 #import matplotlib.pyplot as plt
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
+from BayesFlow.utils.Bhattacharyya import bhattacharyya_dist
 import cPickle as pickle
 
 def log_betapdf(p, a, b):
@@ -553,11 +554,11 @@ class mixture(object):
 				if np.sum(self.active_komp[labels]) == 0:
 						return np.array([-1,-1])
 					
-				lik_old, R_S_mu0, log_det_Q0, R_S0  = self.likelihood_prior(self.mu[labels[0]],self.sigma[labels[0]], labels[0])
-				lik_oldt, R_S_mu1, log_det_Q1, R_S1 = self.likelihood_prior(self.mu[labels[1]],self.sigma[labels[1]], labels[1])
+				lik_old, R_S_mu0, log_det_Q0, R_S0  = self.likelihood_prior(self.mu[labels[0]],self.sigma[labels[0]], labels[0], switchprior = True)
+				lik_oldt, R_S_mu1, log_det_Q1, R_S1 = self.likelihood_prior(self.mu[labels[1]],self.sigma[labels[1]], labels[1], switchprior = True)
 				lik_old += lik_oldt
-				lik_star = self.likelihood_prior(self.mu[labels[1]],self.sigma[labels[1]], labels[0], R_S_mu0, log_det_Q0, R_S1)[0]
-				lik_star += self.likelihood_prior(self.mu[labels[0]],self.sigma[labels[0]], labels[1], R_S_mu1,log_det_Q1, R_S0)[0]
+				lik_star = self.likelihood_prior(self.mu[labels[1]],self.sigma[labels[1]], labels[0], R_S_mu0, log_det_Q0, R_S1, switchprior = True)[0]
+				lik_star += self.likelihood_prior(self.mu[labels[0]],self.sigma[labels[0]], labels[1], R_S_mu1,log_det_Q1, R_S0, switchprior = True)[0]
 				if np.log(npr.rand()) < lik_star - lik_old:
 						self.active_komp[labels[0]], self.active_komp[labels[1]] = self.active_komp[labels[1]], self.active_komp[labels[0]]
 						self.mu[labels[0]], self.mu[labels[1]] = self.mu[labels[1]], self.mu[labels[0]]
@@ -569,21 +570,43 @@ class mixture(object):
 		return np.array([-1,-1])
 		
 
-	def likelihood_prior(self, mu, Sigma, k, R_S_mu = None, log_det_Q = None, R_S = None):
+	def likelihood_prior(self, mu, Sigma, k, R_S_mu = None, log_det_Q = None, R_S = None, switchprior = False):
 			"""
 					Computes the prior that is 
 					\pi( \mu | \theta[k], \Sigma[k]) \pi(\Sigma| Q[k], \nu[k]) = 
-					N(\mu; \theta[k], \Sigma[k]) IW(\Sigma; Q[k], \nu[k])
+					N(\mu; \theta[k], \Sigma[k]) IW(\Sigma; Q[k], \nu[k]) 
+
+					If switchprior = True, special values of nu and Sigma_mu
+					are used if the parameters nu_sw and Sigma_mu_sw are set
+					respectively. This enables use of "relaxed" priors
+					facilitating label switch. NB! This makes the kernel
+					non-symmetric, hence it cannot be used in a stationary state.
 			"""
+
+			if switchprior:			
+				try:
+					nu = self.nu_sw
+				except:
+					nu = self.prior[k]['sigma']['nu']
+				try:
+					Sigma_mu = self.Sigma_mu_sw
+				except:
+					Sigma_mu = self.prior[k]['mu']['Sigma']
+				Q = self.prior[k]['sigma']['Q']*nu/self.prior[k]['sigma']['nu']
+			else:
+				nu = self.prior[k]['sigma']['nu']
+				Sigma_mu = self.prior[k]['mu']['Sigma']
+				Q = self.prior[k]['sigma']['Q']
+
 			if np.isnan(mu[0]) == 1:
 					return 0, None, None, None
 			
 			if R_S_mu is None:
-					R_S_mu = sla.cho_factor(self.prior[k]['mu']['Sigma'],check_finite = False)
+					R_S_mu = sla.cho_factor(Sigma_mu,check_finite = False)
 			log_det_Sigma_mu = 2 * np.sum(np.log(np.diag(R_S_mu[0])))
 			
 			if log_det_Q is None:
-					R_Q = sla.cho_factor(self.prior[k]['sigma']['Q'],check_finite = False)
+					R_Q = sla.cho_factor(Q,check_finite = False)
 					log_det_Q = 2 * np.sum(np.log(np.diag(R_Q[0])))
 			
 			if R_S is None:
@@ -596,11 +619,11 @@ class mixture(object):
 			# N(\mu; \theta[k], \Sigma[k])
 			
 			lik = - np.dot(mu_theta.T, sla.cho_solve(R_S_mu, mu_theta, check_finite = False))  /2
-			lik = lik - 0.5 * (self.prior[k]['sigma']['nu'] + self.d + 1.) * log_det_Sigma
-			lik = lik +  (self.prior[k]['sigma']['nu'] * 0.5) * log_det_Q
+			lik = lik - 0.5 * (nu + self.d + 1.) * log_det_Sigma
+			lik = lik +  (nu * 0.5) * log_det_Q
 			lik = lik - 0.5 * log_det_Sigma_mu
-			lik = lik - self.ln_gamma_d(0.5 * self.prior[k]['sigma']['nu']) - 0.5 * np.log(2) * (self.prior[k]['sigma']['nu'] * self.d)
-			lik = lik - 0.5 * np.sum(np.diag(sla.cho_solve(R_S, self.prior[k]['sigma']['Q'])))
+			lik = lik - self.ln_gamma_d(0.5 * nu) - 0.5 * np.log(2) * (nu * self.d)
+			lik = lik - 0.5 * np.sum(np.diag(sla.cho_solve(R_S, Q)))
 			return lik, R_S_mu, log_det_Q, R_S
 
 			
@@ -829,9 +852,13 @@ class mixture(object):
 			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
 		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
-	def deactivate_outlying_components(self,aquitted=None):
+	def deactivate_outlying_components(self,aquitted=None,bhat_dist=False):
 		any_deactivated = 0
 		thetas = np.vstack([self.prior[k]['mu']['theta'].reshape(1,self.d) for k in range(self.K)])
+		if bhat_dist:
+			Qs = [self.prior[k]['sigma']['Q'] for k in range(self.K)]
+			nus = [self.prior[k]['sigma']['nu'] for k in range(self.K)]
+			Sigmas_latent = [Qs[k]/(nus[k]-self.d-1) for k in range(self.K)]
 		for k in range(self.K):
 			aquitted_k = [k]
 			if not aquitted is None:
@@ -840,7 +867,10 @@ class mixture(object):
 						aquitted_k = aqu
 						break
 			if not np.isnan(self.mu[k]).any():
-				dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+				if not bhat_dist:
+					dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
+				else:
+					dist = [-bhattacharyya_dist(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
 					#print "thetas = {}".format(thetas)
 					#print "mu = {}".format(self.mu)
