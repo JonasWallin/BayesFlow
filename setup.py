@@ -42,23 +42,14 @@ def setup_package():
 	include_dirs_.append(get_include())
 	lib_dirs_ = [dirs for dirs in sysinfo.default_lib_dirs]
 	if platform.system() == "Linux":
-		print("HELLLO")
-		libraries_ = ['gfortran','m','cblas','atlas']
+		libraries_ = ['gfortran','m','blas','lapack_atlas']
 		for atlas_dirs in sysinfo.get_info('atlas')['include_dirs']:
 			include_dirs_.append(atlas_dirs)
 		for atlas_dirs in sysinfo.get_info('atlas')['library_dirs']:
 			lib_dirs_.append(atlas_dirs)
 	else:
 		libraries_ = ['gfortran','m','blas','cblas','lapack']
-	
-	import time
-	print("the include paths are:")
-	print(include_dirs_)
-	print("the lib paths are:")
-	print(lib_dirs_)
-	print("platform:")
-	print(platform.system())
-	time.sleep(2)  
+
 
 	metadata = dict(name='BayesFlow',
 	version='0.1',
