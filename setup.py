@@ -75,7 +75,7 @@ def setup_package():
 									"src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
 						   library_dirs = lib_dirs_,
-						   libraries=['gfortran','m'],
+						   libraries=libraries_,
 						   language='c'),
 				 Extension("BayesFlow.distribution.distribution_cython",
 						   sources=["src/distribution/distribution_cython.pyx",
