@@ -7,7 +7,7 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-from BayesFlow.PurePython.distribution import wishart
+from BayesFlow.PurePython.distribution import wishart, multivariatenormal, logisticMNormal
 from BayesFlow.PurePython.GMM import sample_mu_Xbar, sample_mu, log_dir, log_betapdf, sample_sigma, sample_sigma_xxT
 import scipy.special as sps
 #import matplotlib.pyplot as plt
@@ -120,6 +120,7 @@ class mixture_repeat_measurements(object):
 		
 		self.mu  = []	 
 		self.sigma = []		
+		self.alphas = []
 		self.K = K
 			
 		self.high_memory = high_memory
@@ -260,6 +261,7 @@ class mixture_repeat_measurements(object):
 			self.sigma = []
 			self.sigma_eps = []
 			
+			kk = 0
 			for i in self.unique_meas:
 				index = self.measurement == i
 				mean_data = np.mean(data[index,:],0)
@@ -270,7 +272,9 @@ class mixture_repeat_measurements(object):
 					mu_i.append(npr.multivariate_normal(mean_data,cov_data*0.1))
 					
 				self.mu_eps.append(mu_i)
-				
+				self.alphas.append(logisticMNormal(prior = {"mu":np.zeros((self.K-1 ,1)) ,"Sigma":10**2*np.eye(self.K-1) }))
+				self.alphas[kk].set_alpha(np.zeros((self.K-1,1)))
+				kk += 1
 			
 			mean_data = np.mean(data,0)
 			cov_data  = np.cov(data.transpose())
@@ -279,17 +283,17 @@ class mixture_repeat_measurements(object):
 				self.mu.append(npr.multivariate_normal(mean_data,cov_data*0.1))
 				self.sigma.append(cov_data)
 				self.sigma_eps.append(cov_data*0.01)
-
 			self.mu_eps = np.array(self.mu_eps)
 			self.sigma = np.array(self.sigma)
 			self.mu = np.array(self.mu)
 		mu_prior = {"theta":np.zeros((self.d ,1)),"Sigma":np.diag(np.diag(cov_data))*10**4 }
 		sigma_prior = {"nu":self.d, "Q":np.eye(self.d )*10**-6}
+		self.alpha_prior = multivariatenormal(param = {"Sigma":10**2*np.eye(self.K-1)}, prior = {"mu":np.zeros((self.K-1 ,1)) ,"Sigma":10**2*np.eye(self.K-1) })
 		self.alpha_vec = 0.5*np.ones(self.K) 
 		if self.prior is None:
 			self.prior =[]
 			for i in range(self.K):  # @UnusedVariable
-				self.prior.append({"mu":cp.deepcopy(mu_prior), "sigma": cp.deepcopy(sigma_prior),"p": 1/2.})
+				self.prior.append({"mu":cp.deepcopy(mu_prior), "sigma": cp.deepcopy(sigma_prior)})
 		
 		self.p = np.ones((self.n_measurements, self.K), dtype=np.double)/self.K 
 		
@@ -315,7 +319,8 @@ class mixture_repeat_measurements(object):
 		self.sample_mu()
 		self.sample_mu_eps()
 		self.sample_sigma()
-		#self.sample_p()
+		#self.sample_sigma_mult()
+		self.sample_p()
 		#self.sample_active_komp()
 		#self.lab = self.sample_labelswitch()
 	
@@ -453,9 +458,22 @@ class mixture_repeat_measurements(object):
 					self.sigma[k] = np.NAN * np.ones((self.d, self.d))
 	
 	
-	@underconstruct
 	def sample_p(self):
-		pass
+		#FOR EACH population we need to sample an alpha
+		# they are joint through an joint multivariate normal
+		# self.n_x[l][k]
+		for l in range(self.n_measurements):
+			self.alphas[l].set_data(self.n_x[l])
+			self.alphas[l].sample()
+			self.p[l,:] = self.alphas[l].get_p().reshape(self.p[l,:].shape)
+		
+		
+		
+		self.alpha_prior.set_data(np.array([self.alphas[l].alpha for l in range(self.n_measurements)]))
+		self.alpha_prior.sample()
+		
+		for l in range(self.n_measurements):
+			self.alphas[l].set_mu(self.alpha_prior.X)
 	
 	
 	@underconstruct
@@ -536,17 +554,22 @@ class mixture_repeat_measurements(object):
 			
 		if AMCMC:
 			self.compute_ProbX_AMCMC(norm, mu_eps, sigma, p, active_komp)
-			
+		else:
+			self.compute_ProbX_full(norm, mu_eps, sigma, p, active_komp)
 			
 		if self.AMCMC:
 			self.update_AMCMC()
 
 	
 	
-	def compute_ProbX_full(self, norm =True, mu_eps = None, sigma = None, p =None, active_komp = None):
+	def compute_ProbX_full(self, norm =True, mu_eps = None, sigma = None, p =None, active_komp = None, i_meas = None):
 		"""
 			Computes the E[x=i|\mu,\Sigma,p,Y] 
 		"""
+		
+		if i_meas is None:
+			i_meas = range(self.n_measurements)
+		
 		if mu_eps is None:
 			mu_eps = self.mu_eps
 			sigma = self.sigma
@@ -562,7 +585,7 @@ class mixture_repeat_measurements(object):
 			Qs[k] = np.linalg.inv(sigma[k])
 			log_const[k] = np.log(np.linalg.det(Qs[k]))/2. - (self.d/2.)* np.log(2 * np.pi)
 		
-		for l in range(self.n_measurements):
+		for l in i_meas:
 			for k in range(self.K):
 				if active_komp[l][k] == True:
 					
