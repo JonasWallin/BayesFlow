@@ -41,7 +41,7 @@ def setup_package():
 	include_dirs_ = [lib_ for lib_ in sysinfo.default_lib_dirs]
 	include_dirs_.append(get_include())
 	if platform.system() == "Linux":
-		libraries_ = ['gfortran','m', 'blas', 'lapack_atlas']
+		libraries_ = ['gfortran','m', 'blas', 'cblas','lapack_atlas']
 		include_dirs_.append(sysinfo.get_info('atlas')['include_dirs'][0])
 	else:
 		libraries_ = ['gfortran','m','blas','cblas','lapack']
@@ -54,6 +54,7 @@ def setup_package():
 	author_email='jonas.wallin81@gmail.com',
 	requires=['numpy (>=1.3.0)',
 			'cython (>=0.17)',
+			'scipy',
 			'matplotlib',
 			'mpi4py'
 			'yaml',
