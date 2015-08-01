@@ -16,7 +16,7 @@ NB! If you use MKL, in addition to the usual arguments to the compiler, you also
 ## Dependencies
 
 The package has the following dependencies:
-- Python, including packages scipy, numpy, cython, matplotlib, mpi4py, yaml, json, (rpy2)
+- Python, including packages scipy, numpy, cython, matplotlib, mpi4py, yaml, json, (rpy2), scikit-learn
 - OpenMPI
 - Libraries for linear algebra computations with c interfaces, e.g. CBLAS and CLAPACK or MKL. 
 
