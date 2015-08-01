@@ -82,7 +82,7 @@ def setup_package():
 									"src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
 						   library_dirs = lib_dirs_,
-						   libraries=['gfortran','m'],
+						   libraries= libraries_,
 						   language='c'),
 	Extension("BayesFlow.distribution.logisticNormal",sources=["src/distribution/logisticNormal.pyx","src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
