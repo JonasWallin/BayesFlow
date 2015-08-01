@@ -38,7 +38,8 @@ def setup_package():
 	import numpy.distutils.system_info as sysinfo
 	from Cython.Distutils import build_ext
 
-	include_dirs_ = [sysinfo.default_lib_dirs, get_include()]
+	include_dirs_ = [lib_ for lib_ in sysinfo.default_lib_dirs]
+	include_dirs_.append(get_include())
 	if platform.system() == "Linux":
 		libraries_ = ['gfortran','m', 'blas', 'lapack_atlas']
 		include_dirs_.append(sysinfo.get_info('atlas')['include_dirs'][0] + '/atlas')
@@ -68,19 +69,19 @@ def setup_package():
 									"src/mixture_util/c/draw_x.c",
 									"src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
-						   library_dirs = [sysinfo.default_lib_dirs],
+						   library_dirs = [dirs for dirs in sysinfo.default_lib_dirs],
 						   libraries=['gfortran','m'],
 						   language='c'),
 				 Extension("BayesFlow.distribution.distribution_cython",
 						   sources=["src/distribution/distribution_cython.pyx",
 									"src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
-						   library_dirs = [sysinfo.default_lib_dirs],
+						   library_dirs = [dirs for dirs in sysinfo.default_lib_dirs],
 						   libraries=['gfortran','m'],
 						   language='c'),
 	Extension("BayesFlow.distribution.logisticNormal",sources=["src/distribution/logisticNormal.pyx","src/distribution/c/distribution_c.c"],
 						   include_dirs = include_dirs_,
-						   library_dirs = [sysinfo.default_lib_dirs],
+						   library_dirs = [dirs for dirs in sysinfo.default_lib_dirs],
 						   libraries   = libraries_,
 						   language='c')],
 	)
