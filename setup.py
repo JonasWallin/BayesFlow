@@ -42,7 +42,7 @@ def setup_package():
 	include_dirs_.append(get_include())
 	lib_dirs_ = [dirs for dirs in sysinfo.default_lib_dirs]
 	if platform.system() == "Linux":
-		libraries_ = ['gfortran','m','f77blas','cblas','atlas','lapack']
+		libraries_ = ['gfortran','m','f77blas','cblas','atlas','liblapack_atlas']
 		if len(sysinfo.get_info('atlas')) > 0:
 			
 			for atlas_dirs in sysinfo.get_info('atlas')['include_dirs']:
