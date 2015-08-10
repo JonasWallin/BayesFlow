@@ -16,6 +16,15 @@ extern "C" {
 #include <stdlib.h> 
 #include <string.h>
 
+
+/*
+ *
+ *  Takes the outer product of a vector Y and then sums it up
+ * Y   - (nxd)
+ * YYt - (dxd)
+ * n
+ * d
+ */
 void outer_Y(double* YYt, const double* Y, const int n, const int d)
 {
 	// d(N), n(K), 1(alpha), Y, d(leading dimension of Y), 0 (beta), d(leading dimension of YYt)

@@ -144,7 +144,7 @@ class nu_class(object):
 		
 		self.iter += 1
 		self.amcmc_count += 1
-		nu_star = npr.randint(self.nu - self.sigma, self.nu + self.sigma + 1)
+		nu_star = npr.randint(self.nu - self.sigma, self.nu + self.sigma + 1) # rounding
 		if nu_star == self.nu:
 			self.acc += 1
 			self.amcmc_accept += 1
@@ -189,12 +189,12 @@ class nu_class(object):
 			loglik += self.prior_func(nu,**self.prior)
 		return loglik
 	
-	def set_AMCMC(self, batch = 50, accpate = 0.2, delta_rate = .5):
+	def set_AMCMC(self, batch = 50, accpate = 0.3, delta_rate = .5):
 		"""
 			Using AMCMC
 			
 			batch	   - (int) how often to update sigma_MCMC
-			accpate	   - [0,1] desired accpance rate (0.574)
+			accpate	   - [0,1] desired accpance rate (0.3)
 			delta_rate - [0,1] updating ratio for the amcmc
 		"""
 		

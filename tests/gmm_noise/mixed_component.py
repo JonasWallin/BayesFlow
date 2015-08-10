@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from BayesFlow.PurePython.GMMrep import mixture_repeat_measurements
 
-n  = 500
-m  = 200
+n  = 50
+m  = 20
 K = 3
 np.random.seed(0)
 mu    = np.array([[1. , 2.], [4.,0.],[-2.,1]])
@@ -73,6 +73,9 @@ mix_obj.AMCMC = True
 mix_obj.sample_mu_eps()
 
 
+
+#ADD test for sampling_p
+mix_obj.sample_p()
 
 #ADD test:
 # FOR n = 500, m= 200

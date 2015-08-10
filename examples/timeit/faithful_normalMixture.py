@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Running the Gibbs sampler on old faithfull data
+Testing the cost of objects on old normal
+Running the Gibbs sampler on old faithfull data 
 to profile use:
 %prun main():
      1000    0.048    0.000    0.067    0.000 GMM.py:40(sample_mu)

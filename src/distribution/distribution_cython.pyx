@@ -57,6 +57,9 @@ cdef class  multivariatenormal:
 
 
 	def __reduce__(self):
+		"""
+			method to help pickiling
+		"""
 		param  = {'Sigma':self.Sigma}
 		prior  = {'mu':self.mu_p, 'Sigma':self.Sigma_p}
 		data_obj = {'n':self.n, 'sumY':self.sumY}

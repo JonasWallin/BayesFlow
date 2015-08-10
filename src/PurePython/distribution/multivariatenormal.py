@@ -53,8 +53,10 @@ class multivariatenormal(object):
 		"""
 		
 		"""
-		self.mu_p = prior['mu']
-		self.Sigma_p = prior['Sigma']
+		self.mu_p = np.zeros_like(prior['mu'])
+		self.mu_p[:] = prior['mu'][:]
+		self.Sigma_p = np.zeros_like(prior['Sigma'])
+		self.Sigma_p[:] = prior['Sigma'][:]
 		self.Q_p = np.linalg.inv(self.Sigma_p)
 		self.Q_pmu_p = np.dot(self.Q_p,self.mu_p)
 		self.d = self.Q_pmu_p.shape[0]	
@@ -64,7 +66,8 @@ class multivariatenormal(object):
 			parameter should be a dictonray with 'Sigma'
 		
 		"""
-		self.Sigma = parameter['Sigma']
+		self.Sigma = np.zeros_like(parameter['Sigma'])
+		self.Sigma[:] = parameter['Sigma'][:]
 		self.Q = np.linalg.inv(self.Sigma)
 		self.d = self.Q.shape[0]
 		
@@ -72,9 +75,11 @@ class multivariatenormal(object):
 		"""
 			Y - (nxd) numpy vector
 		"""
-		self.Y = cp.deepcopy(Y)
+		self.Y    = np.zeros_like(Y)
+		self.Y[:] = Y[:]
 		self.sumY = np.sum(Y,0)
-		self.n = Y.shape[0]
+		self.n    = Y.shape[0]
+		
 	def sample(self):
 		"""
 			return X
@@ -89,6 +94,8 @@ class multivariatenormal(object):
 		R = np.linalg.cholesky(Sigma_sample)
 		X = np.linalg.solve(R, mu_sample)
 		X = np.linalg.solve(R.T, X + np.random.randn(self.d))
+		self.X = np.zeros_like(X)
+		self.X[:] = X[:]
 		return X
 	
 	
