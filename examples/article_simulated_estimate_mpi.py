@@ -20,11 +20,11 @@ import matplotlib.ticker as ticker
 from article_plotfunctions import plotQ_joint, plotQ, plot_theta
 folderFigs = "/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
 
-sim = 10**5
-nCells = 15000
+sim = 10**2
+nCells = 1500
 thin = 2
 nPers = 80
-save_fig = 1
+save_fig = 0
 Y = []
 
 
