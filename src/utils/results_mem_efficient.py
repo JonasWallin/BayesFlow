@@ -2,14 +2,13 @@ from __future__ import division
 import numpy as np
 import warnings
 from sklearn import mixture as skmixture
-from scipy.stats import multivariate_normal
-import numpy.random as npr
+#from scipy.stats import multivariate_normal
 
 from BayesFlow.PurePython.distribution.wishart import invwishartrand
 import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors
-
+from .random import rmvn
 
 class LazyProperty(object):
 
@@ -888,8 +887,8 @@ class Components(object):
         frobenius_dists = np.empty(Ntest)
         for k in range(self.K):
             for n in range(Ntest):
-                mu = npr.multivariate_normal(
-                    self.mulat[k, :], self.Sigma_mu[k, :, :], 1)
+                mu = rmvn(
+                    self.mulat[k, :], self.Sigma_mu[k, :, :])
                 frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
             percentiles[k] = np.percentile(frobenius_dists, q)
 
