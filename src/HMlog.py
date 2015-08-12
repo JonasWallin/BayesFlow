@@ -218,6 +218,7 @@ class HMlog(HMlogB):
         if rank == 0:
             self.Y_pooled_sim = np.empty((np.ceil(sim/self.savefrqy),self.d))
             self.theta_sim_mean = np.zeros((self.K,self.d))
+            self.Sigma_mu_sim_mean = np.zeros((self.K,self.d,self.d))
             self.Sigmaexp_sim_mean = np.zeros((self.K,self.d,self.d))
             self.mupers_sim_mean = np.zeros((self.J,self.K,self.d))
             self.Sigmapers_sim_mean = np.zeros((self.J,self.K,self.d,self.d))
@@ -230,6 +231,7 @@ class HMlog(HMlogB):
         '''
         super(HMlog,self).savesim(hGMM)
         thetas = hGMM.get_thetas()
+        Sigma_mus = hGMM.get_Sigma_mus()
         Qs = hGMM.get_Qs()
         mus = hGMM.get_mus()
         Sigmas = hGMM.get_Sigmas()
@@ -244,6 +246,7 @@ class HMlog(HMlogB):
             if self.i % self.savefrqy == 0:
                 self.append_pooled_Y(Y_pooled)
             self.add_theta(thetas)
+            self.add_Sigma_mu(Sigma_mus)
             self.add_Sigmaexp(Qs,self.get_last_nus())
             self.add_mupers(mus)
             self.add_Sigmapers(Sigmas)
@@ -261,6 +264,7 @@ class HMlog(HMlogB):
         super(HMlog,self).postproc()
         if rank == 0:
             self.theta_sim_mean /= self.sim
+            self.Sigma_mu_sim_mean /= self.sim
             self.Sigmaexp_sim_mean /= self.sim
             self.mupers_sim_mean /= self.sim
             self.Sigmapers_sim_mean /= self.sim
@@ -293,6 +297,10 @@ class HMlog(HMlogB):
 
     def add_theta(self,thetas):
         self.theta_sim_mean += thetas
+
+    def add_Sigma_mu(self,Sigma_mus):
+        for k in range(self.K):
+            self.Sigma_mu_sim_mean[k,:,:] += Sigma_mus[k]
         
     def add_Sigmaexp(self,Psis,nus):
         for k in range(self.K):
@@ -344,8 +352,9 @@ class HMlog(HMlogB):
     def encode_json(self):
         jsondict = super(HMlog,self).encode_json()
         jsondict['__type__'] = 'HMlog'
-        for arg in ['theta_sim_mean','Sigmaexp_sim_mean','mupers_sim_mean','Sigmapers_sim_mean',
-                    'prob_sim_mean','J','savesampnames']:
+        for arg in ['theta_sim_mean','Sigma_mu_sim_mean', 'Sigmaexp_sim_mean',
+                    'mupers_sim_mean','Sigmapers_sim_mean','prob_sim_mean',
+                    'J','savesampnames']:
             jsondict.update({arg:getattr(self,arg)})
         try:
             jsondict['syndata_dir'] = self.syndata_dir
@@ -390,9 +399,16 @@ class HMlog(HMlogB):
         # TODO! Load dat to all cores instead
         if rank == 0:
             hmlog.Y_sim = []
+            nofiles = []
             for j,name in enumerate(hmlog.savesampnames):
-                with open(syndata_dir+name+'_MODEL.pkl','r') as f:
-                    hmlog.Y_sim.append(pickle.load(f))
+                try:
+                    with open(syndata_dir+name+'_MODEL.pkl','r') as f:
+                        hmlog.Y_sim.append(pickle.load(f))
+                except IOError as e:
+                    print e
+                    nofiles.append(name)
+            hmlog.savesampnames = [name for name in hmlog.savesampnames 
+                                    if name not in nofiles]
         if rank == 0:
             with open(syndata_dir+'pooled_MODEL.pkl','r') as f:
                 hmlog.Y_pooled_sim = pickle.load(f) 

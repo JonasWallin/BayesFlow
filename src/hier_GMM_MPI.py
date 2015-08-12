@@ -677,6 +677,17 @@ class hierarical_mixture_mpi(object):
             
         return thetas
 
+    def get_Sigma_mus(self):
+
+        rank = self.comm.Get_rank()  # @UndefinedVariable
+        Sigma_mus = None    
+        
+        
+        if rank == 0:
+            Sigma_mus = np.array([npw.param['Sigma'] for npw in self.normal_p_wisharts])
+            
+        return Sigma_mus
+        
     def get_Qs(self):
         
         

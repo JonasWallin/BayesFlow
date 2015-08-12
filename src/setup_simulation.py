@@ -56,7 +56,7 @@ def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
     if rank == 0:
         with open(savedir+'seed.dat','w') as f:
             f.write(str(seed))        
-    seed = bcast_int(seed)
+    seed = comm.bcast(seed)
     #comm.Barrier()
     #with open(savedir+'seed.dat','r') as f:
     #    seed = np.int(f.readline())

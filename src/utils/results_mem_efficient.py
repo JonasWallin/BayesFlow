@@ -729,17 +729,27 @@ class Components(object):
         self.mupers = bmlog.mupers_sim_mean
         self.mulat = bmlog.theta_sim_mean
         try:
-            self.Sigma_mu = bmlog.Sigmamu_sim_mean
+            self.Sigma_mu = bmlog.Sigma_mu_sim_mean
         except AttributeError:
             print "Sigma mu not in bmlog, estimate from mupers and mulat used."
-            mu_centered = self.mupers - self.mulat[np.newaxis, :, :]
-            self.Sigma_mu = np.vstack([mu_centered[:, k, :].T.dot(
-                mu_centered[:, k, :]) for k in range(self.K)])/(self.J-1)
+            self.Sigma_mu = self.estimate_Sigma_mu()
         self.Sigmapers = bmlog.Sigmapers_sim_mean
         self.Sigmalat = bmlog.Sigmaexp_sim_mean
         self.nu = np.mean(bmlog.nu_sim, axis=0)
         self.p = p
         self.active_komp = bmlog.active_komp
+
+    def estimate_Sigma_mu(self):
+        Sigma_mu = np.empty((self.K, self.d, self.d))
+        mu_centered = self.mupers - self.mulat[np.newaxis, :, :]
+        for k in range(self.K):
+            mu_centered_k = mu_centered[:, k, :]
+            mu_centered_k = mu_centered_k[~np.isnan(mu_centered_k[:, 0]), :]
+            if mu_centered_k.shape[0] <=1:
+                Sigma_mu[k, :, :] = np.nan
+            else:
+                Sigma_mu[k, :, :] = mu_centered_k.T.dot(mu_centered_k)/(mu_centered_k.shape[0]-1)
+        return Sigma_mu
 
     def new_thetas_from_GMM_fit(self, Ks=None, n_init=10, n_iter=100,
                                 covariance_type='full'):
@@ -811,9 +821,10 @@ class Components(object):
         bhd = self.get_bh_dist()
         return self.get_medprop_pers(bhd, fixvalind, fixval)
 
-    def get_center_distance(self):
+    def get_center_dist(self):
         '''
-            Get distance from component mean to latent component mean for each component in each sample.
+            Get distance from component mean to latent 
+            component mean for each component in each sample.
         '''
         dist = np.zeros((self.J, self.K))
         for k in range(self.K):
@@ -821,14 +832,18 @@ class Components(object):
                 if self.active_komp[j, k] <= 0.05:
                     dist[j, k] = np.nan
                 else:
-                    dist[j, k] = np.linalg.norm(self.mupers[j, k, :] - self.mulat[k, :])
+                    dist[j, k] = np.linalg.norm(self.mupers[j, k, :] 
+                                                - self.mulat[k, :])
         return dist
 
     def get_cov_dist(self, norm='F'):
         '''
-            Get distance from component covariance matrix to latent covariance matrix for each component in each sample.
+            Get distance from component covariance matrix to 
+            latent covariance matrix for each component in 
+            each sample.
 
-            norm    -   'F' gives Frobenius distance, 2 gives operator 2-norm.
+            norm    -   'F' gives Frobenius distance, 
+                         2 gives operator 2-norm.
         '''
         covdist = np.zeros((self.J, self.K))
         for j in range(self.J):
@@ -837,23 +852,29 @@ class Components(object):
                     covdist[j, k] = np.nan
                 else:
                     if norm == 'F':
-                        covdist[j, k] = np.linalg.norm(self.Sigmapers[j, k, :, :]-self.Sigmalat[k, :, :])
+                        covdist[j, k] = np.linalg.norm(self.Sigmapers[j, k, :, :]
+                                                       -self.Sigmalat[k, :, :])
                     elif norm == 2:
-                        covdist[j, k] = np.linalg.norm(self.Sigmapers[j, k, :, :]-self.Sigmalat[k, :, :], ord=2)
+                        covdist[j, k] = np.linalg.norm(self.Sigmapers[j, k, :, :]
+                                                       -self.Sigmalat[k, :, :], ord=2)
         return covdist
 
     def get_center_distance_quotient(self):
         '''
-            Get for each component in each sample, the quotient between the distance from the component mean to the correct latent component mean
-            and the distance from the component mean to the closest latent component mean which has not been merged into the component.
+            Get for each component in each sample, the quotient 
+            between the distance from the component mean to the 
+            correct latent component mean and the distance from 
+            the component mean to the closest latent component 
+            mean which has not been merged into the component.
         '''
         distquo = np.zeros((self.J, self.K))
         for suco in self.mergeind:
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
                 for j in range(self.J):
-                    corrdist = self.get_center_distance()
-                    wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] - self.mulat[otherind, :], axis=1))
+                    corrdist = self.get_center_dist()
+                    wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] 
+                        - self.mulat[otherind, :], axis=1))
                     distquo[j, k] = wrongdist/corrdist
         return distquo
 
@@ -863,13 +884,72 @@ class Components(object):
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
                 for j in range(self.J):
-                    corrdist = bhat.bhattacharyya_dist(self.mupers[j, k, :], self.Sigmapers[j, k, :, :], self.mulat[k, :], self.Sigmalat[k, :, :])
-                    wrongdist = max([bhat.bhattacharyya_dist(self.mupers[j, k, :], self.Sigmapers[j, k, :, :], self.mulat[kk, :], self.Sigmalat[kk, :, :]) for kk in otherind])
+                    corrdist = bhat.bhattacharyya_dist(self.mupers[j, k, :],
+                                                       self.Sigmapers[j, k, :, :],
+                                                       self.mulat[k, :],
+                                                       self.Sigmalat[k, :, :])
+                    wrongdist = max([bhat.bhattacharyya_dist(
+                        self.mupers[j, k, :], self.Sigmapers[j, k, :, :],
+                        self.mulat[kk, :], self.Sigmalat[kk, :, :])
+                                     for kk in otherind])
                     distquo[j, k] = corrdist/wrongdist
         return distquo
 
-    def Sigma_outliers(self, q=99.99, Ntest=100000):
-        percentiles = np.empty((1, self.K))
+    def mu_dist_percentiles(self, q=99.99, Ntest=100000):
+        try:
+            percentile_dict = self._mu_dist_percentiles
+        except AttributeError:
+            self._mu_dist_percentiles = {}
+            percentile_dict = self._mu_dist_percentiles
+        try:
+            return percentile_dict[(q,Ntest)]
+        except KeyError:
+            pass
+        percentiles = np.empty(self.K)
+        frobenius_dists = np.empty(Ntest)
+        for k in range(self.K):
+            if np.isnan(self.Sigma_mu[k, 0, 0]):
+                percentiles[k] = np.nan
+            else:
+                for n in range(Ntest):
+                    mu = multivariate_normal.rvs(
+                        self.mulat[k, :], self.Sigma_mu[k, :, :])
+                    frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
+                percentiles[k] = np.percentile(frobenius_dists, q)
+                print "Percentiles for {} out of {} computed".format(k+1, self.K)
+        percentile_dict[(q,Ntest)] = percentiles
+        return percentiles
+        
+    def mu_outliers(self, q=99.99, Ntest=100000):
+        '''
+            Find which components in which sample that have
+            locations (mu_jk values) that are outliers at a given
+            percentile, i.e. that have a Euclidean distance to the
+            latent mean (theta_k) that is larger than the given 
+            percentile in a sample of distances to the latent mean
+            with locations drawn from the prior model of mu_jk.
+            
+            q       - percentile
+            Ntest   - number of random samples
+            
+            Returns (J X K) matrix.
+        '''
+        centerd = self.get_center_dist()
+        outliers = (centerd - 
+                    self.mu_dist_percentiles(q, Ntest)[np.newaxis, :]) > 0
+        return outliers
+
+    def Sigma_dist_percentiles(self, q=99.99, Ntest=100000):
+        try:
+            percentile_dict = self._Sigma_dist_percentiles
+        except AttributeError:
+            self._Sigma_dist_percentiles = {}
+            percentile_dict = self._Sigma_dist_percentiles
+        try:
+            return percentile_dict[(q,Ntest)]
+        except KeyError:
+            pass
+        percentiles = np.empty(self.K)
         frobenius_dists = np.empty(Ntest)
         for k in range(self.K):
             for n in range(Ntest):
@@ -877,21 +957,26 @@ class Components(object):
                     self.nu[k], self.Sigmalat[k, :, :]*(self.nu[k]-self.d-1))
                 frobenius_dists[n] = np.linalg.norm(Sig - self.Sigmalat[k, :, :])
             percentiles[k] = np.percentile(frobenius_dists, q)
+            print "Percentiles for {} out of {} computed".format(k+1, self.K)
+        percentile_dict[(q,Ntest)] = percentiles
+        return percentiles
 
+    def Sigma_outliers(self, q=99.99, Ntest=100000):  
+        '''
+            Find which components in which sample that have
+            covariances (Sigma_jk values) that are outliers at a given
+            percentile, i.e. that have a Frobenius distance to the
+            latent covariance (Psi_k/(nu_k-d-1)) that is larger
+            than the given percentile in a sample of distances 
+            to the latent covariance matrix with matrices drawn
+            from the prior model of Sigma_jk.
+            
+            q       - percentile
+            Ntest   - number of random samples
+            
+            Returns (J X K) matrix.
+        '''
         covd = self.get_cov_dist()
-        outliers = (covd - percentiles) > 0
-        return outliers, covd, percentiles
+        outliers = (covd - self.Sigma_dist_percentiles(q, Ntest)[np.newaxis, :]) > 0
+        return outliers
 
-    def mu_outliers(self, q=99.99, Ntest=100000):
-        percentiles = np.empty((1, self.K))
-        frobenius_dists = np.empty(Ntest)
-        for k in range(self.K):
-            for n in range(Ntest):
-                mu = multivariate_normal.rvs(
-                    self.mulat[k, :], self.Sigma_mu[k, :, :])
-                frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
-            percentiles[k] = np.percentile(frobenius_dists, q)
-
-        centerd = self.get_center_dist()
-        outliers = (centerd - percentiles) > 0
-        return outliers, centerd, percentiles
