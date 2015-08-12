@@ -732,12 +732,12 @@ class hierarical_mixture_mpi(object):
         rank = self.comm.Get_rank()  # @UndefinedVariable
         
         if rank == 0:
-            recv_obj = np.empty((self.n_all,  2 ),dtype='d')
+            recv_obj = np.empty((self.n_all,  2 ),dtype='int')
         else:
             recv_obj = None
         
         
-        send_obj = np.array([GMM.lab.flatten()   for GMM in self.GMMs ],dtype='d')
+        send_obj = np.array([GMM.lab.flatten()   for GMM in self.GMMs ],dtype='int')
         self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, ((self.counts * 2 )/self.K , None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
 
         return recv_obj

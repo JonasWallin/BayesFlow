@@ -8,7 +8,7 @@ import numpy.random as npr
 import scipy.linalg as spl
 import BayesFlow.PurePython.GMM as GMM
 import BayesFlow.PurePython.distribution.wishart as wishart
-
+import BayesFlow.utils as util
 def simulate_data(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  [1., 1., 0.8, 0.1]):
 	"""
 		Simulates the data following the instruction presented in the article
@@ -34,7 +34,7 @@ def simulate_data(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  [1.
 		
 	act_Class = np.zeros((nPersons,4))
 	for i in range(nClass):
-		act_Class[:np.ceil(nPersons*ratio_P[i]),i] = 1.
+		act_Class[:np.int(np.ceil(nPersons*ratio_P[i])), i] = 1.
 	Y = []
 	
 	nu  = 100
@@ -45,7 +45,7 @@ def simulate_data(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  [1.
 		sigma_temp  = []
 		for j in range(nClass):
 			if act_Class[i, j] == 1:
-				theta_temp.append(Thetas[j] +  npr.multivariate_normal(np.zeros(3), Z_Sigma[j]))
+				theta_temp.append(Thetas[j] +  util.rmvn( np.zeros(3), Z_Sigma[j]) )
 				sigma_temp.append(wishart.invwishartrand(nu, (nu - dim - 1)* Sigmas[j]))
 			else:
 				theta_temp.append(np.ones(dim)*np.NAN)
