@@ -13,7 +13,7 @@ import scipy.special as sps
 #import matplotlib.pyplot as plt
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
-from BayesFlow.utils.Bhattacharyya import bhattacharyya_dist
+from BayesFlow.utils.Bhattacharyya import bhattacharyya_overlap
 import cPickle as pickle
 from ..utils import rmvn
 
@@ -872,7 +872,7 @@ class mixture(object):
 				if not bhat_dist:
 					dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
 				else:
-					dist = [-bhattacharyya_dist(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
+					dist = [-bhattacharyya_overlap(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
 					#print "thetas = {}".format(thetas)
 					#print "mu = {}".format(self.mu)

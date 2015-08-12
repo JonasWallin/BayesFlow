@@ -54,7 +54,7 @@ class HMres(Mres):
     def merge(self,method,thr,**mmfArgs):
         if rank == 0:
             if method == 'bhat':
-                super(HMres,self).greedy_merge(self.components.get_median_bh_dist,thr,**mmfArgs)
+                super(HMres,self).greedy_merge(self.components.get_median_bh_overlap,thr,**mmfArgs)
                 super(HMres,self).self.gclean()
             else:
                 super(HMres,self).merge(method,thr,**mmfArgs)

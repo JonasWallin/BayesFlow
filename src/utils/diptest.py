@@ -4,7 +4,7 @@ from rpy2.robjects.packages import importr, data
 from rpy2.rinterface import RRuntimeError
 import matplotlib.pyplot as plt
 
-    
+
 def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):
     '''
         Dip computed as distance between empirical distribution function (EDF) and
