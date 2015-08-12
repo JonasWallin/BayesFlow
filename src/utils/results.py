@@ -123,13 +123,13 @@ class Mres(object):
             self.hierarchical_merge(self.clust_m.get_median_overlap,thr,**mmfArgs)
             self.hclean()
         elif method == 'bhat_hier':
-            self.hierarchical_merge(self.clust_m.get_median_bh_dt_dist,thr,**mmfArgs)
+            self.hierarchical_merge(self.clust_m.get_median_bh_dt_overlap,thr,**mmfArgs)
             self.hclean()
         elif method == 'bhat_hier_dip':
             lowthr = mmfArgs.pop('lowthr')
             dipthr = mmfArgs.pop('dipthr')
-            self.hierarchical_merge(self.clust_m.get_median_bh_dt_dist,thr,**mmfArgs)
-            self.hierarchical_merge(self.clust_m.get_median_bh_dt_dist_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
+            self.hierarchical_merge(self.clust_m.get_median_bh_dt_overlap,thr,**mmfArgs)
+            self.hierarchical_merge(self.clust_m.get_median_bh_dt_overlap_dip,thr=lowthr,bhatthr=lowthr,dipthr=dipthr,**mmfArgs)
             self.hclean()
         elif method == 'no_merging':
             self.mergeind = [[k] for k in range(self.K)]
@@ -341,13 +341,13 @@ class Clustering(object):
         overlap = self.get_overlap()
         return get_medprop_pers(overlap,fixvalind,fixval)
     
-    def get_median_bh_dt_dist(self,fixvalind=[],fixval=-1):
-        bhd = self.get_bh_dist_data()
+    def get_median_bh_dt_overlap(self,fixvalind=[],fixval=-1):
+        bhd = self.get_bh_overlap_data()
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd,fixvalind,fixval))
         return get_medprop_pers(bhd,fixvalind,fixval)
 
-    def get_median_bh_dt_dist_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
-        bhd = self.get_bh_dist_data()
+    def get_median_bh_dt_overlap_dip(self,bhatthr,dipthr,fixvalind=[],fixval=-1):
+        bhd = self.get_bh_overlap_data()
         mbhd = get_medprop_pers(bhd,fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
@@ -369,7 +369,7 @@ class Clustering(object):
             overlap[j] /= self.sim**2
         return overlap
         
-    def get_bh_dist_data(self):
+    def get_bh_overlap_data(self):
         bhd = [-np.ones((self.K,self.K)) for j in range(self.J)]
         for j in range(self.J):
             for k in range(self.K):
@@ -390,7 +390,7 @@ class Clustering(object):
                                     #print "mul = {}".format(mul)
                                     #print "Sigmak = {}".format(Sigmak)
                                     #print "Sigmal = {}".format(Sigmal)
-                                    bhd[j][k,l] = bhat.bhattacharyya_dist(muk,Sigmak,mul,Sigmal)   
+                                    bhd[j][k,l] = bhat.bhattacharyya_overlap(muk,Sigmak,mul,Sigmal)   
                 bhd[j][k,k] = 0
             #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))                
@@ -588,7 +588,7 @@ class Components(object):
         dens[np.isnan(dens)] = -np.inf
         return np.argmax(dens,axis=1)
 
-    def get_bh_dist(self):
+    def get_bh_overlap(self):
         '''
             Get bhattacharyya distance between components.
         '''
@@ -608,12 +608,12 @@ class Components(object):
                     else:
                         mul = self.mulat[l,:]
                         Sigmal = self.Sigmalat[l,:,:]
-                    bhd[j][k,l] = bhat.bhattacharyya_dist(muk,Sigmak,mul,Sigmal)
+                    bhd[j][k,l] = bhat.bhattacharyya_overlap(muk,Sigmak,mul,Sigmal)
                 bhd[j][k,k] = 0
         return bhd
         
-    def get_median_bh_dist(self,fixvalind=[],fixval=-1):
-        bhd = self.get_bh_dist()
+    def get_median_bh_overlap(self,fixvalind=[],fixval=-1):
+        bhd = self.get_bh_overlap()
         return get_medprop_pers(bhd,fixvalind,fixval)
 
     def get_center_distance(self):

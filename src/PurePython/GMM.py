@@ -13,8 +13,9 @@ import scipy.special as sps
 #import matplotlib.pyplot as plt
 import scipy.linalg as sla
 from BayesFlow.utils.gammad import ln_gamma_d
-from BayesFlow.utils.Bhattacharyya import bhattacharyya_dist
+from BayesFlow.utils.Bhattacharyya import bhattacharyya_overlap
 import cPickle as pickle
+from ..utils import rmvn
 
 def log_betapdf(p, a, b):
 	
@@ -367,7 +368,8 @@ class mixture(object):
 		p_in = npr.beta(self.beta_act_param[0], self.beta_act_param[1])
 		p		   = (1.-p_in) * p
 		p[k_in]	 = p_in
-		mu[k_in]	= npr.multivariate_normal(self.prior[k_in]['mu']['theta'].reshape(self.d)	, self.prior[k_in]['mu']['Sigma'] ) 
+		mu[k_in]	= rmvn(self.prior[k_in]['mu']['theta'].reshape(self.d)	, self.prior[k_in]['mu']['Sigma'])
+		#npr.multivariate_normal(self.prior[k_in]['mu']['theta'].reshape(self.d)	, self.prior[k_in]['mu']['Sigma'], 1 ) 
 		sigma[k_in] = wishart.invwishartrand_prec(self.prior[k_in]['sigma']['nu'], self.prior[k_in]['sigma']['Q'])	
 		
 		
@@ -411,7 +413,7 @@ class mixture(object):
 			self.sigma = []
 			mean_data = np.mean(data,0)
 			for i in range(self.K):  # @UnusedVariable
-				self.mu.append(npr.multivariate_normal(mean_data,cov_data*0.1))
+				self.mu.append(rmvn(mean_data,cov_data*0.1)) #npr.multivariate_normal(mean_data,cov_data*0.1)
 				self.sigma.append(0.1*cov_data)
 		
 
@@ -849,8 +851,8 @@ class mixture(object):
 		#	p /= np.sum(p)
 		x = npr.choice(range(self.K+self.noise_class),p = p)
 		if x == self.K:
-			return npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
-		return npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
+			return rmvn(self.noise_mean, self.noise_sigma) # npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = 1)
+		return rmvn(self.mu[x], self.sigma[x]) # npr.multivariate_normal(self.mu[x], self.sigma[x],size = 1)
 	
 	def deactivate_outlying_components(self,aquitted=None,bhat_dist=False):
 		any_deactivated = 0
@@ -870,7 +872,7 @@ class mixture(object):
 				if not bhat_dist:
 					dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
 				else:
-					dist = [-bhattacharyya_dist(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
+					dist = [-bhattacharyya_overlap(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
 					#print "thetas = {}".format(thetas)
 					#print "mu = {}".format(self.mu)
