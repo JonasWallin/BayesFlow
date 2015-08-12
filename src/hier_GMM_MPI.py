@@ -575,12 +575,12 @@ class hierarical_mixture_mpi(object):
                 Sigmathprior['Q'] = Q[k]*np.eye(self.d)
                 Sigmathprior['nu'] = n_theta[k]
                 self.normal_p_wisharts[k].Sigma_class.set_prior(Sigmathprior)
-                
-    def set_Psi_prior(self,H,n_Psi):
+
+    def set_Psi_prior(self, H, n_Psi):
         if self.comm.Get_rank() == 0:
-            for k in range(self.K):                
+            for k in range(self.K):
                 Psiprior = {}
-                Psiprior['Qs'] = 1/H[k]*np.eye(self.d)
+                Psiprior['Qs'] = H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
 
