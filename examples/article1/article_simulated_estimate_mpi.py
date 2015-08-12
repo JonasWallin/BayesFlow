@@ -32,7 +32,7 @@ Y = []
 # COLLECTING THE DATA
 ####
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
-	Y,act_komp, mus, Thetas, Sigmas, P = np.array(article_simulatedata.simulate_data(nCells = nCells, nPersons = nPers))
+	Y,act_komp, mus, Thetas, Sigmas, P = np.array(article_simulatedata.simulate_data_v1(nCells = nCells, nPersons = nPers))
 	
 else:
 	Y = None
