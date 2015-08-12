@@ -726,7 +726,7 @@ class Components(object):
         self.Sigmalat = bmlog.Sigmaexp_sim_mean
         self.nu = np.mean(bmlog.nu_sim, axis=0)
         self.p = p
-        self.active_komp = bmlog.active_komp
+        self.active_komp = bmlog.active_komp[:,:self.K]  # excluding noise component
 
     def estimate_Sigma_mu(self):
         Sigma_mu = np.empty((self.K, self.d, self.d))

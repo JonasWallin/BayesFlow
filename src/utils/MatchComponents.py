@@ -1,5 +1,5 @@
 import numpy as np
-import bhat
+import Bhattacharyya as bhat
 from flow_match import flow_match
 
 import matplotlib.pyplot as plt
@@ -10,14 +10,15 @@ class SampleComponents(object):
     def __init__(self, components=None, j=None, act_thr=0.05):
         self.j = j
         if not components is None:
-            self.K = components.K
             if j is not None:
                 self.ks = np.nonzero(components.active_komp[j, :]
-                                     > act_thr)[0]
+                                     > act_thr)[0].tolist()
+                self.K = len(self.ks)
                 self.mus = [components.mupers[j, k, :] for k in self.ks]
                 self.Sigmas = [components.Sigmapers[j, k, :, :] for k in self.ks]
                 self.p = [components.p[j, k] for k in self.ks]
             else:
+                self.K = components.K
                 self.ks = range(self.K)
                 self.mus = [components.mulat[k, :] for k in self.ks]
                 self.Sigmas = [components.Sigmalat[k, :, :] for k in self.ks]
@@ -58,9 +59,9 @@ class SampleComponents(object):
 
     def merge_components(self, ks):
         comps = [self.get_component(k) for k in ks]
-        mus = [comps[0] for comp in comps]
-        Sigmas = [comps[1] for comp in comps]
-        p = [comps[2] for comp in comps]
+        mus = [comp[0] for comp in comps]
+        Sigmas = [comp[1] for comp in comps]
+        p = [comp[2] for comp in comps]
 
         new_p = sum(p)
         new_mu = sum([p[i]*mu for i, mu in enumerate(mus)])/new_p
@@ -77,7 +78,7 @@ class SampleComponents(object):
 
     def concatenate(self, samp_comp):
         for k in samp_comp.ks:
-            self.append_component(samp_comp.get_component(k))
+            self.append_component(*samp_comp.get_component(k), k = k)
 
     def move_unmatched_to_matched(self):
         self.concatenate(self.unmatched_comp)
@@ -93,7 +94,7 @@ class SampleComponents(object):
         '''
         bhd = np.empty((self.K, samp_comp.K))
         for k in range(self.K):
-            for l in range(self.K):
+            for l in range(samp_comp.K):
                 bhd[k, l] = bhat.bhattacharyya_distance(
                     self.mus[k], self.Sigmas[k],
                     samp_comp.mus[l], samp_comp.Sigmas[l])
@@ -101,7 +102,11 @@ class SampleComponents(object):
 
     def match_to(self, latent, lamb):
         bhd = self.bhattacharyya_distance_to(latent)
+        np.set_printoptions(precision=3, suppress = True)
+        print "bhd.shape = {}".format(bhd.shape)
         match12, match21, matching_cost, unmatch_penalty = flow_match(bhd, lamb)
+        print "match12 = {}".format(match12)
+        print "match21 = {}".format(match21)
 
         old_ks = self.ks[:]
         self.unmatched_comp = SampleComponents(j=self.j)
@@ -111,7 +116,7 @@ class SampleComponents(object):
         for i, ind in enumerate(match12):
             k = old_ks[i]
             if len(ind) == 0:  # sample component k is unmatched
-                self.unmatched_comp.append_component(self.get_component(k))
+                self.unmatched_comp.append_component(*self.get_component(k))
                 self.remove_component(k)
             elif len(ind) == 1:
                 # sample component k matches to exactly one latent
@@ -127,24 +132,29 @@ class SampleComponents(object):
             else:
                 # sample component k matches to more than one latent component.
                 # match to closest latent component of these.
-                new_ks_dict[k] = latent.ks[np.argmin(bhd[i, ind])]
+                new_ks_dict[k] = latent.ks[ind[np.argmin(bhd[i, ind])]]
 
         self.ks = [new_ks_dict[kk] for kk in self.ks]
 
 
-def match_components(comps):
-    samp_comps = [SampleComponents(comps, j) for j in comps.j]
+def match_components(comps, lamb):
+    samp_comps = [SampleComponents(comps, j) for j in range(comps.J)]
     latent = SampleComponents(comps)
 
-    for sc in samp_comps:
-        sc.match_to(latent)
+    for i, sc in enumerate(samp_comps):
+        print "matching components sample {}".format(i)
+        print "components sample {}: {}".format(i, sc.ks)
+        sc.match_to(latent, lamb)
 
-    new_latent = samp_comps[0].unmatched_comp.relabel(latent.K)
+    new_latent = samp_comps[0].unmatched_comp
+    new_latent.relabel(latent.K)
     samp_comps[0].move_unmatched_to_matched()
 
     for sc in samp_comps[1:]:
-        sc.unmatched_comp.match_to(new_latent)
+        print "new_latent.ks = {}".format(new_latent.ks)
+        sc.unmatched_comp.match_to(new_latent, lamb)
         sc.unmatched_comp.unmatched_comp.relabel(latent.K+new_latent.K)
+        print "sc.unmatched_comp.unmatched_comp.ks = {}".format(sc.unmatched_comp.unmatched_comp.ks)
         new_latent.concatenate(sc.unmatched_comp.unmatched_comp)
 
         sc.unmatched_comp.move_unmatched_to_matched()
@@ -163,7 +173,7 @@ def center_plot(samp_comps, latent, fig=None, totplots=1, plotnbr=1,
         if fig is None:
             fig = plt.figure()
 
-        d = latent.d
+        d = len(latent.mus[0])
 
         ks_ = latent.ks[:]
         if not ks is None:
@@ -177,7 +187,8 @@ def center_plot(samp_comps, latent, fig=None, totplots=1, plotnbr=1,
         for s, k in enumerate(ks_):
             ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
             for sc in samp_comps:
-                ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
+                if k in sc.ks:
+                    ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
             ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
             ax.plot([0, d-1], [.5, .5], color='grey')
             if s == S-1:
