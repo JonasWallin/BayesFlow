@@ -584,38 +584,47 @@ class hierarical_mixture_mpi(object):
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
 
-    def set_init(self,prior,thetas=None,Sigmas=None,method='random',**kw):
-        self.set_latent_init(prior,thetas=None,Sigmas=None,method=method,**kw)
+    def set_init(self, prior, thetas=None, Sigmas=None, method='random', **kw):
+        self.set_latent_init(prior, thetas=None, Sigmas=None,
+                             method=method, **kw)
         self.set_GMM_init()
-                
-    def set_latent_init(self,prior,thetas=None,Sigmas=None,method='random',**kw):
+
+    def set_latent_init(self, prior, thetas=None, Sigmas=None, method='random',
+                        **kw):
+
         rank = self.comm.Get_rank()
+
         if method == 'EMWIS':
             data = [GMM.data for GMM in self.GMMs]
-            thetas,Sigmas,_ = EM_weighted_iterated_subsampling(self.comm,data,self.K,**kw)
+            thetas, Sigmas, _ = EM_weighted_iterated_subsampling(
+                self.comm, data, self.K, **kw)
+
         if rank == 0:
             for k in range(self.K):
+                # Prior for mu_jk
                 npw = self.normal_p_wisharts[k]
                 npwparam = {}
                 if thetas is None:
                     npwparam['theta'] = npw.theta_class.mu_p
                     if k >= prior.K_inf:
-                        npwparam['theta'] = npwparam['theta'] + np.random.normal(0,.3,self.d)
+                        npwparam['theta'] = (npwparam['theta']
+                                             + np.random.normal(0, .3, self.d))
                 else:
                     npwparam['theta'] = thetas[k]
-                if Sigmas is None:
-                    npwparam['Sigma'] = npw.Sigma_class.Q/(npw.Sigma_class.nu-self.d-1)
-                else:
-                    npwparam['Sigma'] = Sigmas[k]
+                npwparam['Sigma'] = (npw.Sigma_class.Q /
+                                     (npw.Sigma_class.nu-self.d-1))
                 npw.set_parameter(npwparam)
-    
+
+                # Prior for Sigma_jk
                 wpn = self.wishart_p_nus[k]
                 wpnparam = {}
-                wpnparam['Q'] = np.linalg.inv(wpn.Q_class.Q_s)*wpn.Q_class.nu_s
                 wpnparam['nu'] = wpn.Q_class.nu_s
+                if Sigmas is None:
+                    wpnparam['Q'] = wpn.Q_class.Q_s * wpn.Q_class.nu_s
+                else:
+                    wpnparam['Q'] = Sigmas[k] * (wpnparam['nu']-self.d-1)
                 wpn.set_parameter(wpnparam)
                 wpn.nu_class.set_val(wpn.Q_class.nu_s)
-
 
     def set_GMM_init(self):
         self.set_GMMs_mu_Sigma_from_prior()
