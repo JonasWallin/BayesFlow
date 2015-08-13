@@ -22,7 +22,7 @@ y = []
 # COLLECTING THE DATA
 ####
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
-    y, act_komp, mus, Thetas, Sigmas, P = article_simulatedata.simulate_data_v2(
+    y, act_komp, mus, thetas, sigmas, weights = article_simulatedata.simulate_data_v2(
                                                          n_cells = N_CELLS, 
                                                          n_persons = N_PERSONS,
                                                          silent = True)

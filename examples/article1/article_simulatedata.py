@@ -21,9 +21,9 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 		simulating a larger data sets for article
 	"""
 
-	sigmas  = np.load('../../data/covs_.npy')
-	thetas  = np.load('../../data/means_.npy')
-	weights = np.load('../../data/weights_.npy')
+	sigmas  = np.load('covs_.npy')
+	thetas  = np.load('means_.npy')
+	weights = np.load('weights_.npy')
 	weights /= np.sum(weights) 
 	
 	
