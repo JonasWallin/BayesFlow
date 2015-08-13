@@ -1,44 +1,42 @@
 '''
-run with ex: mpiexec -n 10 python article_simulated_estimate_mpi.py
 Created on Jul 11, 2014
 
 @author: jonaswallin
 '''
 from __future__ import division
-import sys
 import article_simulatedata
 from mpi4py import MPI
-import numpy as np
-folderFigs = "/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
+import BayesFlow as bf
 
-sim = 10**2
+
+
+SIM = 10**2
 N_CELLS = 15000
-thin = 2
-N_PERSONS = 800
-save_fig = 0
-Y = []
+THIN = 2
+N_PERSONS = 10
+SAVE_FIG = 0
+y = []
 
 
 ####
 # COLLECTING THE DATA
 ####
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
-    Y,act_komp, mus, Thetas, Sigmas, P = article_simulatedata.simulate_data_v2(
+    y, act_komp, mus, Thetas, Sigmas, P = article_simulatedata.simulate_data_v2(
                                                          n_cells = N_CELLS, 
                                                          n_persons = N_PERSONS,
-                                                         silent = False)
+                                                         silent = True)
                                                                                                      
     
 else:
-    Y = None
+    y = None
     act_komp = None
     #npr.seed(123546)
 
 
-import matplotlib.pyplot as plt
-fig = plt.figure(figsize=(10, 10))
-import BayesFlow.plot as bm_plot
-print("enerting histnd")  
-sys.stdout.flush()  
-f_ = bm_plot.histnd(Y[0][:,:5],200,[0, 100],[0,100], f = fig)
-f_ = bm_plot.histnd(Y[1][:,:5],200,[0, 100],[0,100], f = fig)
+####
+# Setting up model
+####
+hier_gmm = bf.hierarical_mixture_mpi(K = 4)
+hier_gmm.set_data(y)
+print(hier_gmm.GMMs)
