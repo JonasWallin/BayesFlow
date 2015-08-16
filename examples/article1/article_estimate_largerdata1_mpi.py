@@ -10,7 +10,7 @@ import BayesFlow as bf
 
 
 
-SIM = 10
+SIM = 100
 N_CELLS = 15000
 THIN = 2
 N_PERSONS = 10
@@ -45,6 +45,8 @@ hier_gmm.update_prior()
 hier_gmm.toggle_timing()
 
 for i in range(SIM):
+	if MPI.COMM_WORLD.Get_rank() == 0:
+		print('i = {i}'.format(i = i))
 	hier_gmm.sample()
 	
 hier_gmm.print_timing()
