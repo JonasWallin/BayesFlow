@@ -7,15 +7,24 @@ from __future__ import division
 import article_simulatedata
 from mpi4py import MPI
 import BayesFlow as bf
-
-
-
-SIM = 100
-N_CELLS = 15000
-THIN = 2
-N_PERSONS = 10
+if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
+	SIM = 100
+	N_CELLS = 15000
+	THIN = 2
+	N_PERSONS = 10
+	data = {'SIM': SIM, 'N_CELLS': N_CELLS, 'THIN': THIN, 'N_PERSONS': N_PERSONS }
+else:
+	data = None
+	
 SAVE_FIG = 0
 y = []
+
+data = MPI.COMM_WORLD.bcast(data, root=0)
+locals().update(data)
+	
+
+	
+
 
 
 ####

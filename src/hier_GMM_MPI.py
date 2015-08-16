@@ -407,8 +407,12 @@ class hierarical_mixture_mpi(object):
 				self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
 
 		self.comm.Bcast([cl_off, MPI.INT])
+		
+		print('before cl_off in {rank}'.format(rank = rank))
 		if cl_off[0]:
 			warnings.warn('One cluster turned off in all samples')
+			
+		print('after cl_off in {rank}'.format(rank = rank))
 
 	def set_simulation_param(self,sim_par):
 		self.set_p_labelswitch(sim_par['p_sw'])
