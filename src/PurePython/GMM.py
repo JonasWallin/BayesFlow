@@ -16,6 +16,7 @@ from BayesFlow.utils.gammad import ln_gamma_d
 from BayesFlow.utils.Bhattacharyya import bhattacharyya_overlap
 import cPickle as pickle
 from ..utils import rmvn
+import time
 
 def log_betapdf(p, a, b):
 	
@@ -151,6 +152,8 @@ class mixture(object):
 		
 		self.name=  name
 		self.AMCMC = False
+		
+		self.timing = False
 			
 
 	
@@ -313,7 +316,7 @@ class mixture(object):
 		# pi(y, \theta) 
 		piy_vec	  = self.calc_lik_vec()
 		log_d	   = log_dir(self.p[self.active_komp == True], self.alpha_vec[self.active_komp == True] )   		
-		log_piy_div_piy_star = np.sum(np.log(piy_vec/piy_vec_star) )
+		log_piy_div_piy_star = np.sum(np.log(piy_vec) - np.log(piy_vec_star) )
 
 		
 		#pi(y, \theta_star)
@@ -324,7 +327,7 @@ class mixture(object):
 		if np.log(npr.rand()) < alpha:
 			self.p 			 = p
 			self.mu 		 = mu
-			self.sigma	   = sigma
+			self.sigma	     = sigma
 			self.active_komp = active_komp
 			
 	
@@ -438,15 +441,91 @@ class mixture(object):
 		
 	def sample(self):
 		
+		
+		if self.timing:
+			self.simulation_times['iteration'] += 1.
+			self.simulation_times['sample_x']       -= time.time()
+		
 		self.sample_x()
+		
+		if self.timing:
+			self.simulation_times['sample_x']  += time.time()	
+			self.simulation_times['sample_mu'] -= time.time()	
+		
 		self.sample_mu()
+		
+		if self.timing:
+			self.simulation_times['sample_mu']    += time.time()	
+			self.simulation_times['sample_sigma'] -= time.time()	
+		
 		self.sample_sigma()
+		
+		if self.timing:
+			self.simulation_times['sample_sigma']    += time.time()	
+			self.simulation_times['sample_p']        -= time.time()	
+			
 		self.sample_p()
+		
+		if self.timing:
+			self.simulation_times['sample_p']           += time.time()	
+			self.simulation_times['sample_activekomp']  -= time.time()	
+			
 		self.sample_active_komp()
+		
+		
+		if self.timing:
+			self.simulation_times['sample_activekomp']   += time.time()	
+			self.simulation_times['sample_labelswitch']  -= time.time()	
+		
 		self.lab = self.sample_labelswitch()
+		
+		
+		if self.timing:
+			self.simulation_times['sample_labelswitch']  += time.time()	
+			
 		#TODO: stores the components the average componentes
+
+	def toggle_timing(self, timing=True):
+		"""
+			turning on alternative off timer function
+			*timing* if true turn on, else turn off
+		"""
+		
+		if timing:
+			self.timing = True
+			
+			self.simulation_times = {
+									'iteration'          :  0.,
+									'sample_x'           :  0., 
+									'sample_mu'          :  0.,
+									'sample_sigma'       :  0.,
+									'sample_p'           :  0.,
+									'sample_activekomp'  :  0., 
+									'sample_labelswitch' :  0.}
+		else:
+			self.timing = False
 	
-	
+	def print_timing(self):
+		"""
+			priting timing results
+		"""
+			
+		if self.timing:
+			
+			iteration = self.simulation_times['iteration']
+			
+			if iteration == 0:
+				print('zero iteration so for')
+				return
+			
+			print('for {iteration} iterations the average times where:'.format(iteration = iteration))
+			for key in self.simulation_times.keys():
+				if key not in ['iteration']:
+					print('{name:18} : {time:.2e} sec/sim'.format(name = key,
+														      time = self.simulation_times[key] / iteration))
+			
+		else:
+			print("timing is turned off")
 	
 		
 	def updata_mudata(self):
@@ -883,7 +962,12 @@ class mixture(object):
 			print "All components deactivated"
 		return any_deactivated
 	
-	def deactivate_component(self,k_off):
+	def deactivate_component(self, k_off):
+		'''
+			turning of component *k_off*
+		'''
+		
+		
 		self.active_komp[k_off] = False
 		p_off		       = self.p[k_off]
 		self.p				   = self.p/(1. - p_off)

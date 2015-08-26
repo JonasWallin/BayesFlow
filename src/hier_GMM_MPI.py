@@ -24,6 +24,8 @@ import traceback
 import sys
 
 #TODO: change to geomtrical median instead of mean!!
+#TODO: if a cluster is turned off use the latent mean insead of mu
+#		and then it will work!
 def distance_sort(hGMM):
 	"""
 		sorts the clusters after the geometrical mean of the means
@@ -406,7 +408,7 @@ class hierarical_mixture_mpi(object):
 				self.normal_p_wisharts[k].set_data(mu_k[index,:])
 				self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
 
-		self.comm.Bcast([cl_off, MPI.INT])
+		self.comm.Bcast([cl_off, MPI.INT])  # @UndefinedVariable
 		
 		if cl_off[0]:
 			warnings.warn('One cluster turned off in all samples')
@@ -420,14 +422,20 @@ class hierarical_mixture_mpi(object):
 
 
 	def set_p_activation(self, p):
-		
+		'''
+			*p*   - probability of trying to switch on / switch off a cluster for a class
+		'''
 		for GMM in self.GMMs:
 			GMM.p_act   = p[0]
 			GMM.p_inact = p[1]
 	
 	
 	def set_prior_actiavation(self, komp_prior):
-		
+		'''
+			setting the expontial covariates on likelihood on that a component is active
+			exp(- sum(active_kmp) * komp_prior) * sum(active_kmp)
+			*komp_prior* - expontial prior? gamma prior?
+		'''
 		for GMM in self.GMMs:
 			GMM.komp_prior = komp_prior
 	
@@ -850,7 +858,7 @@ class hierarical_mixture_mpi(object):
 	
 		
 		
-	def plot_mus(self,dim, ax = None, cm = plt.get_cmap('gist_rainbow'), size_point = 1, colors = None):
+	def plot_mus(self, dim, ax = None, cm = plt.get_cmap('gist_rainbow'), size_point = 1, colors = None):
 		"""
 			plots all the posteriror mu's dimension dim into ax
 		
@@ -863,13 +871,13 @@ class hierarical_mixture_mpi(object):
 		
 		if self.comm.Get_rank() == 0:
 			
-			if colors != None:
+			if colors is None:
 				if len(colors) != self.K:
 					print "in hier_GMM_MPI.plot_mus: can't use colors aurgmen with length not equal to K"
 					return
 		
 			
-			if ax == None:
+			if ax is None:
 				f = plt.figure()
 				if len(dim) < 3:
 					ax = f.add_subplot(111)
@@ -893,7 +901,7 @@ class hierarical_mixture_mpi(object):
 					mu_k = np.empty((self.n_all,self.d)) 
 					mu_k[:] = mus[:,k,:]
 					index = np.isnan(mu_k[:,0])==False
-					if colors != None:
+					if colors is None:
 						ax.plot(mu_k[index,dim[0]],mu_k[index,dim[1]],'.',color=cm(k/self.K), s = size_point)
 					else:
 						ax.plot(mu_k[index,dim[0]],mu_k[index,dim[1]],'.',color=colors[k], s = size_point)
@@ -906,7 +914,7 @@ class hierarical_mixture_mpi(object):
 					mu_k = np.empty((self.n_all,self.d)) 
 					mu_k[:] = mus[:,k,:]
 					index = np.isnan(mu_k[:,0])==False
-					if colors == None:
+					if colors is None:
 						ax.scatter(mu_k[index,dim[0]],mu_k[index,dim[1]],mu_k[index,dim[2]],marker = '.',color=cm(k/self.K),edgecolor=cm(k/self.K), s=size_point)
 					else:
 						ax.scatter(mu_k[index,dim[0]],mu_k[index,dim[1]],mu_k[index,dim[2]],marker = '.',color=colors[k],edgecolor=colors[k], s=size_point)
@@ -972,19 +980,22 @@ class hierarical_mixture_mpi(object):
 			
 			if self.timing:
 				
-				
 				iteration = self.simulation_times['iteration']
 				
 				if iteration == 0:
 					print('zero iteration so for')
 					return
 				
-				
 				print('for {iteration} iterations the average times where:'.format(iteration = iteration))
 				for key in self.simulation_times.keys():
 					if key not in ['iteration']:
 						print('{name:12} : {time:.2e} sec/sim'.format(name = key,
 															      time = self.simulation_times[key] / iteration))
+				
+				
+				if len(self.GMMs) > 0:
+					print('for GMMs[0]:')
+					self.GMMs[0].print_timing()
 				
 			else:
 				print("timing is turned off")
@@ -1004,6 +1015,10 @@ class hierarical_mixture_mpi(object):
 									'sample_prior':0.,
 									'update_GMM':  0., 
 									'iteration' :  0.}
+			if self.comm.Get_rank() == 0:
+				if len(self.GMMs) > 0:
+					self.GMMs[0].toggle_timing()
+			
 		else:
 			self.timing = False
 

@@ -16,7 +16,8 @@ import scipy.spatial as ss
 import matplotlib.pyplot as plt
 
 n  =10**4
-sim = 30
+sim = 300
+c = 0.1*n
 
 ##
 #simulating data
@@ -48,7 +49,7 @@ plt.scatter(Y[:,1],Y[:,2],s=80,c = mix.x)
 #plt.figure()
 
 
-mix.set_AMCMC(4000)
+mix.set_AMCMC(c)
 
 mu_sample = list()
 for k in range(nClass):
