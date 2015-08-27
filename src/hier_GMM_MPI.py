@@ -14,7 +14,7 @@ from BayesFlow.utils.mpiutil import bcast_int
 from BayesFlow.utils.EM_weighted_iterated_subsampling import EM_weighted_iterated_subsampling
 import HMlog
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr
 import os
 import glob
@@ -112,10 +112,10 @@ class hierarical_mixture_mpi(object):
         self.GMMs = []
         self.comm = MPI.COMM_WORLD  # @UndefinedVariable
         rank = self.comm.Get_rank()  # @UndefinedVariable
-		#master
-		if rank == 0:
-			self.normal_p_wisharts = [ normal_p_wishart() for k in range(self.K)]  # @UnusedVariable
-			self.wishart_p_nus	 = [Wishart_p_nu() for k in range(self.K) ]  # @UnusedVariable
+        #master
+        if rank == 0:
+            self.normal_p_wisharts = [ normal_p_wishart() for k in range(self.K)]  # @UnusedVariable
+            self.wishart_p_nus	 = [Wishart_p_nu() for k in range(self.K) ]  # @UnusedVariable
 
         else:
             self.normal_p_wisharts = None 
@@ -125,8 +125,8 @@ class hierarical_mixture_mpi(object):
         if not prior is None:
             self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
 
-		self.timing = timing
-		self.high_memory = high_memory
+        self.timing = timing
+        self.high_memory = high_memory
 
 	def mpiexceptabort(self, type_in, value, tb):
 		traceback.print_exception(type_in, value, tb)

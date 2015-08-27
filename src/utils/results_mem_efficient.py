@@ -1,16 +1,15 @@
 from __future__ import division
 import numpy as np
 import warnings
-import os
-import json
 from sklearn import mixture as skmixture
+from mpi4py import MPI
 #from scipy.stats import multivariate_normal
 
 from BayesFlow.PurePython.distribution.wishart import invwishartrand
+from BayesFlow import HMlog
 import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors
-from utils.jsonutil import class_decoder
 from .random import rmvn
 
 class LazyProperty(object):
@@ -733,11 +732,9 @@ class Components(object):
         self.names = bmlog.names
 
     @classmethod
-    def load(cls, savedir):
-        with open(os.path.join(savedir, 'log.json'), 'r') as f:
-            hmlog = json.load(f, object_hook=lambda obj: class_decoder(obj, cls))
-        hmlog.nu_sim = [np.nan]
-        p = hmlog.p[:, :hmlog.K]
+    def load(cls, savedir, comm=MPI.COMM_WORLD):
+        hmlog = HMlog.load(savedir, comm)
+        p = hmlog.prob_sim_mean[:, :hmlog.K]
         return cls(hmlog, p)
 
     def estimate_Sigma_mu(self):

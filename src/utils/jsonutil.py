@@ -51,12 +51,12 @@ class ObjJsonEncoder(ArrayEncoder):
     Decoding
 '''
 
-def class_decoder(obj,Cls):
+def class_decoder(obj,Cls,**kwargs):
     if not '__type__'in obj or obj['__type__'] == 'np.ndarray':
         return array_decoder(obj)
-    classname = obj['__type__']
     del obj['__type__']
-    obj_decode = construct_from_dict(obj,Cls)
+    obj_decode = construct_from_dict(obj,Cls,**kwargs)
+    print "constructed from dict"
     for arg in obj:
         setattr(obj_decode,arg,obj[arg])
     return obj_decode
@@ -66,8 +66,9 @@ def array_decoder(obj):
         return np.asarray(obj['data'],dtype=obj['dtype'])
     return obj
 
-def construct_from_dict(dic,Cls):
+def construct_from_dict(dic,Cls,**kwargs):
     init_args,_,_,defaults = inspect.getargspec(Cls.__init__)
+    print "Cls = {}".format(Cls)
     print "init_args = {}".format(init_args)
     init_dict = {}
     for i in range(1,len(init_args)+1):
@@ -75,16 +76,19 @@ def construct_from_dict(dic,Cls):
         try:
             init_dict[arg] = dic[arg]
             del dic[arg]
-        except:
+        except KeyError:
             try:
-                init_dict[arg] = defaults[-i]
-            except:
-                if arg == 'self':
-                    continue
-                if arg == 'hGMM':
-                    init_dict[arg] = construct_from_dict(dic,hier_mixture_mpi_mimic)
-                    continue
-                raise KeyError, 'Attribute needed for constructor not provided'
+                init_dict[arg] = kwargs[arg]
+            except KeyError:
+                try:
+                    init_dict[arg] = defaults[-i]
+                except:
+                    if arg == 'self':
+                        continue
+                    if arg == 'hGMM':
+                        init_dict[arg] = construct_from_dict(dic,hier_mixture_mpi_mimic)
+                        continue
+                    raise KeyError, 'Attribute {} needed for constructor not provided'.format(arg)
     return Cls(**init_dict)
 
 
