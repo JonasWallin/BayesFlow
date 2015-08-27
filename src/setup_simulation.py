@@ -10,63 +10,63 @@ from mpi4py import MPI
 import os
 import inspect
 import shutil
-from utils.mpiutil import bcast_int
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-def setup_sim(expdir,seed,setupfile=None,**kws):#tightfac=1,i_th=None):
+
+def setup_sim(expdir, seed, setupfile=None, **kws):
     '''
-        Define save and load directories, create save directories and copy experiment setup
+        Define save and load directories, create save directories
+        and copy experiment setup.
     '''
 
     if expdir[-1] != '/':
         expdir += '/'
 
-    if rank == 0:
-        runarr = np.array([1],dtype='i')
-        while os.path.exists(expdir+'run'+str(runarr[0])+'/'):
-            runarr += 1
-    else:
-        runarr = np.array([0],dtype='i')
-    comm.Bcast([runarr, MPI.INT],root=0)
-    run = runarr[0]
+    if not os.path.exists(expdir):
+        os.mkdir(expdir)
 
-    savedir = expdir +'run'+str(run)+'/'
+    if rank == 0:
+        run = 1
+        while os.path.exists(expdir+'run'+str(run)+'/'):
+            run += 1
+    else:
+        run = None
+    comm.bcast(run)
+
+    savedir = expdir+'run'+str(run)+'/'
     #if simpar.loadinit:
     #    loaddir = expdir + 'run'+str(simpar.loadrond)+'/hGMM/burn/'
 
     if rank == 0:
-        for dr in [savedir,savedir+'hGMM/burn/',savedir+'hGMM/prod/']:
+        for dr in [savedir, savedir+'hGMM/burn/', savedir+'hGMM/prod/']:
             if not os.path.exists(dr):
                 os.makedirs(dr)
         simfile = inspect.getouterframes(inspect.currentframe())[1][1]
-        shutil.copy(simfile,savedir)
-        #os.system("cp \""+simfile+"\" "+savedir)
+        shutil.copy(simfile, savedir)
+
         if not setupfile is None:
-            shutil.copy(setupfile,savedir)
-            #os.system("cp \""+setupfile+"\" "+savedir)
+            shutil.copy(setupfile, savedir)
         for kw in kws:
             if not kw is None:
-                with open(savedir+kw+'.dat','w') as f:
+                with open(savedir+kw+'.dat', 'w') as f:
                     f.write(str(kws[kw]))
     '''
         Set seed
     '''
     if rank == 0:
-        with open(savedir+'seed.dat','w') as f:
-            f.write(str(seed))        
+        with open(savedir+'seed.dat', 'w') as f:
+            f.write(str(seed))
     seed = comm.bcast(seed)
-    #comm.Barrier()
-    #with open(savedir+'seed.dat','r') as f:
-    #    seed = np.int(f.readline())
     np.random.seed(seed)
-    print "seed set to {} at rank {}".format(seed,rank)
+    print "seed set to {} at rank {}".format(seed, rank)
 
-    return savedir,run
+    return savedir, run
 
+ 
 class Prior(object):
-    
+
     def __init__(self,J,n_J,d,K):
         """
             J   -   number of flow cytometry samples

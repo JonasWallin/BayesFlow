@@ -4,8 +4,8 @@ import numpy as np
 import collections
 import warnings
 from utils import mpiutil
-from utils.jsonutil import ObjJsonEncoder,class_decoder
-from scipy import io,sparse
+from utils.jsonutil import ObjJsonEncoder, class_decoder
+from scipy import io, sparse
 import os
 import cPickle as pickle
 import json

@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
 import warnings
+import os
+import json
 from sklearn import mixture as skmixture
 #from scipy.stats import multivariate_normal
 
@@ -8,6 +10,7 @@ from BayesFlow.PurePython.distribution.wishart import invwishartrand
 import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors
+from utils.jsonutil import class_decoder
 from .random import rmvn
 
 class LazyProperty(object):
@@ -726,7 +729,16 @@ class Components(object):
         self.Sigmalat = bmlog.Sigmaexp_sim_mean
         self.nu = np.mean(bmlog.nu_sim, axis=0)
         self.p = p
-        self.active_komp = bmlog.active_komp[:,:self.K]  # excluding noise component
+        self.active_komp = bmlog.active_komp[:, :self.K]  # excluding noise component
+        self.names = bmlog.names
+
+    @classmethod
+    def load(cls, savedir):
+        with open(os.path.join(savedir, 'log.json'), 'r') as f:
+            hmlog = json.load(f, object_hook=lambda obj: class_decoder(obj, cls))
+        hmlog.nu_sim = [np.nan]
+        p = hmlog.p[:, :hmlog.K]
+        return cls(hmlog, p)
 
     def estimate_Sigma_mu(self):
         Sigma_mu = np.empty((self.K, self.d, self.d))
@@ -734,7 +746,7 @@ class Components(object):
         for k in range(self.K):
             mu_centered_k = mu_centered[:, k, :]
             mu_centered_k = mu_centered_k[~np.isnan(mu_centered_k[:, 0]), :]
-            if mu_centered_k.shape[0] <=1:
+            if mu_centered_k.shape[0] <= 1:
                 Sigma_mu[k, :, :] = np.nan
             else:
                 Sigma_mu[k, :, :] = mu_centered_k.T.dot(mu_centered_k)/(mu_centered_k.shape[0]-1)
@@ -932,17 +944,17 @@ class Components(object):
             Find which components in which sample that have
             locations (mu_jk values) that are outliers at a given
             percentile, i.e. that have a Euclidean distance to the
-            latent mean (theta_k) that is larger than the given 
+            latent mean (theta_k) that is larger than the given
             percentile in a sample of distances to the latent mean
             with locations drawn from the prior model of mu_jk.
-            
+
             q       - percentile
             Ntest   - number of random samples
-            
+
             Returns (J X K) matrix.
         '''
         centerd = self.get_center_dist()
-        outliers = (centerd - 
+        outliers = (centerd -
                     self.mu_dist_percentiles(q, Ntest)[np.newaxis, :]) > 0
         return outliers
 
@@ -953,7 +965,7 @@ class Components(object):
             self._Sigma_dist_percentiles = {}
             percentile_dict = self._Sigma_dist_percentiles
         try:
-            return percentile_dict[(q,Ntest)]
+            return percentile_dict[(q, Ntest)]
         except KeyError:
             pass
         percentiles = np.empty(self.K)
@@ -965,7 +977,7 @@ class Components(object):
                 frobenius_dists[n] = np.linalg.norm(Sig - self.Sigmalat[k, :, :])
             percentiles[k] = np.percentile(frobenius_dists, q)
             print "Percentiles for {} out of {} computed".format(k+1, self.K)
-        percentile_dict[(q,Ntest)] = percentiles
+        percentile_dict[(q, Ntest)] = percentiles
         return percentiles
 
     def Sigma_outliers(self, q=99.99, Ntest=100000):  

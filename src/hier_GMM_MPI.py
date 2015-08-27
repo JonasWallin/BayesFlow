@@ -88,16 +88,14 @@ class SimulationError(Exception):
         self.name = name
         self.iteration = it
 
-#class NoClusterError(Exception):
-#    def __init__(self,msg):
-#        self.msg = msg
-        
+
 class hierarical_mixture_mpi(object):
     """    
         Comment about noise_class either all mpi hier class are noise class or none!
         either inconsistency can occur when loading
     """
-    def __init__(self, K = None, data = None, sampnames = None, prior = None, thetas = None,high_memory=True ):
+    def __init__(self, K=None, data=None, sampnames=None, prior=None,
+                 thetas=None, expSigmas=None, high_memory=True):
         """
             starting up the class and defning number of classes
             
@@ -124,7 +122,7 @@ class hierarical_mixture_mpi(object):
             
         self.set_data(data,sampnames)
         if not prior is None:
-            self.set_prior(prior,init=True,thetas=thetas)
+            self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
 
         self.timing = False
         self.high_memory = high_memory
@@ -531,28 +529,28 @@ class hierarical_mixture_mpi(object):
         #storing the size of the data used later when sending data
         self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
 
-    def set_prior(self, prior, init = False, thetas = None, Sigmas = None):
-        
+    def set_prior(self, prior, init=False, thetas=None, expSigmas=None):
+
         self.set_prior_param0()
         if prior.noise_class:
-            self.add_noise_class(mu = prior.noise_mu, Sigma = prior.noise_Sigma)
+            self.add_noise_class(mu=prior.noise_mu, Sigma=prior.noise_Sigma)
 
         self.set_location_prior(prior)
         self.set_var_prior(prior)
-        
-        if hasattr(prior,'nu_sw'):
+
+        if hasattr(prior, 'nu_sw'):
             for GMM in self.GMMs:
                 GMM.nu_sw = prior.nu_sw
 
-        if hasattr(prior,'Sigma_mu_sw'):
+        if hasattr(prior, 'Sigma_mu_sw'):
             for GMM in self.GMMs:
                 GMM.Sigma_mu_sw = prior.Sigma_mu_sw
 
         for GMM in self.GMMs:
             GMM.alpha_vec = prior.a
-            
+
         if init:
-            self.set_latent_init(prior,thetas,Sigmas)
+            self.set_latent_init(prior, thetas, expSigmas)
             self.set_GMM_init()
 
     def set_location_prior(self,prior):
@@ -584,19 +582,19 @@ class hierarical_mixture_mpi(object):
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
 
-    def set_init(self, prior, thetas=None, Sigmas=None, method='random', **kw):
-        self.set_latent_init(prior, thetas=None, Sigmas=None,
+    def set_init(self, prior, thetas=None, expSigmas=None, method='random', **kw):
+        self.set_latent_init(prior, thetas=thetas, expSigmas=expSigmas,
                              method=method, **kw)
         self.set_GMM_init()
 
-    def set_latent_init(self, prior, thetas=None, Sigmas=None, method='random',
-                        **kw):
+    def set_latent_init(self, prior, thetas=None, expSigmas=None,
+                        method='random', **kw):
 
         rank = self.comm.Get_rank()
 
         if method == 'EMWIS':
             data = [GMM.data for GMM in self.GMMs]
-            thetas, Sigmas, _ = EM_weighted_iterated_subsampling(
+            thetas, expSigmas, _ = EM_weighted_iterated_subsampling(
                 self.comm, data, self.K, **kw)
 
         if rank == 0:
@@ -619,10 +617,10 @@ class hierarical_mixture_mpi(object):
                 wpn = self.wishart_p_nus[k]
                 wpnparam = {}
                 wpnparam['nu'] = wpn.Q_class.nu_s
-                if Sigmas is None:
+                if expSigmas is None:
                     wpnparam['Q'] = wpn.Q_class.Q_s * wpn.Q_class.nu_s
                 else:
-                    wpnparam['Q'] = Sigmas[k] * (wpnparam['nu']-self.d-1)
+                    wpnparam['Q'] = expSigmas[k] * (wpnparam['nu']-self.d-1)
                 wpn.set_parameter(wpnparam)
                 wpn.nu_class.set_val(wpn.Q_class.nu_s)
 
@@ -631,19 +629,6 @@ class hierarical_mixture_mpi(object):
         for GMM in self.GMMs:
             GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
             GMM.active_komp = np.ones(self.K+self.noise_class,dtype='bool')
-
-    def set_theta_to_median(self):
-        mus = self.get_mus()
-        if self.comm.Get_rank() == 0:
-            medians = np.median(mus,axis=0)
-            for k in range(self.K):
-                npw = self.normal_p_wisharts[k]
-                npwparam = {}
-                npwparam['theta'] = medians[k,:]
-                npwparam['Sigma'] = npw.param['Sigma']
-                npw.set_parameter(npwparam)            
-        self.comm.Barrier()
-        self.update_GMM()
 
     def set_GMMs_mu_Sigma_from_prior(self):
         param = [None]*self.K
@@ -671,6 +656,19 @@ class hierarical_mixture_mpi(object):
         self.comm.Bcast([any_deactivated, MPI.INT],root=0)
         
         return any_deactivated
+
+    def set_theta_to_median(self):
+        mus = self.get_mus()
+        if self.comm.Get_rank() == 0:
+            medians = np.median(mus,axis=0)
+            for k in range(self.K):
+                npw = self.normal_p_wisharts[k]
+                npwparam = {}
+                npwparam['theta'] = medians[k,:]
+                npwparam['Sigma'] = npw.param['Sigma']
+                npw.set_parameter(npwparam)            
+        self.comm.Barrier()
+        self.update_GMM()
 
     def get_thetas(self):
         """

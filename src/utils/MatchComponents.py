@@ -37,6 +37,27 @@ class SampleComponents(object):
         i = self.ks.index(k)
         return self.mus[i], self.Sigmas[i], self.p[i]
 
+    def get_mu(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan*np.zeros_like(self.mus[0])
+        return self.mus[i]
+
+    def get_Sigma(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan*np.zeros_like(self.Sigmas[0])
+        return self.Sigmas[i]
+
+    def get_p(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan
+        return self.p[i]
+
     def remove_component(self, k):
         i = self.ks.index(k)
         self.ks.pop(i)
@@ -78,7 +99,7 @@ class SampleComponents(object):
 
     def concatenate(self, samp_comp):
         for k in samp_comp.ks:
-            self.append_component(*samp_comp.get_component(k), k = k)
+            self.append_component(*samp_comp.get_component(k), k=k)
 
     def move_unmatched_to_matched(self):
         self.concatenate(self.unmatched_comp)
@@ -102,11 +123,10 @@ class SampleComponents(object):
 
     def match_to(self, latent, lamb):
         bhd = self.bhattacharyya_distance_to(latent)
-        np.set_printoptions(precision=3, suppress = True)
-        print "bhd.shape = {}".format(bhd.shape)
+        np.set_printoptions(precision=3, suppress=True)
         match12, match21, matching_cost, unmatch_penalty = flow_match(bhd, lamb)
-        print "match12 = {}".format(match12)
-        print "match21 = {}".format(match21)
+        #print "match12 = {}".format(match12)
+        #print "match21 = {}".format(match21)
 
         old_ks = self.ks[:]
         self.unmatched_comp = SampleComponents(j=self.j)
