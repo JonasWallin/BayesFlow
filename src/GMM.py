@@ -137,6 +137,7 @@ class mixture(PurePython.GMM.mixture):
 					self.sigma[k] =  GMM_util.sample_mix_sigma_zero_mean(self.data_mu[k],self.x_index,self.x_count, k,
 					 self.prior[k]["sigma"]["Q"],
 					 self.prior[k]["sigma"]["nu"])
+					
 				else:
 					self.sigma[k] = np.NAN * np.ones((self.d, self.d))
 		else:

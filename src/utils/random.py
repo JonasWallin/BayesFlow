@@ -13,8 +13,6 @@ def rmvn(mu, sigma):
 		*mu*    mean
 		*sigma* covariance
 	"""
-	
-	
 	L = np.linalg.cholesky(sigma)
 	return( mu.reshape(mu.shape[0]) + np.dot(L, np.random.randn(sigma.shape[0])))
 	
