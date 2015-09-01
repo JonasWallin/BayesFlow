@@ -187,38 +187,38 @@ def match_components(comps, lamb):
 
 def center_plot(samp_comps, latent, fig=None, totplots=1, plotnbr=1,
                 yscale=False, ks=None):
-        '''
-            The centers of all components, mu, are plotted along one dimension.
-        '''
-        if fig is None:
-            fig = plt.figure()
+    '''
+        The centers of all components, mu, are plotted along one dimension.
+    '''
+    if fig is None:
+        fig = plt.figure()
 
-        d = len(latent.mus[0])
+    d = len(latent.mus[0])
 
-        ks_ = latent.ks[:]
-        if not ks is None:
-            ks_ = list(set(ks_).intersection(ks))
-        ks_.sort(key=lambda k: latent.get_component(k)[2])  # sort by size
+    ks_ = latent.ks[:]
+    if not ks is None:
+        ks_ = list(set(ks_).intersection(ks))
+    ks_.sort(key=lambda k: latent.get_component(k)[2])  # sort by size
 
-        S = len(ks_)
-        nbr_cols = 2*totplots-1
-        col_start = 2*(plotnbr-1)
+    S = len(ks_)
+    nbr_cols = 2*totplots-1
+    col_start = 2*(plotnbr-1)
 
-        for s, k in enumerate(ks_):
-            ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
-            for sc in samp_comps:
-                if k in sc.ks:
-                    ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
-            ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
-            ax.plot([0, d-1], [.5, .5], color='grey')
-            if s == S-1:
-                ax.axes.xaxis.set_ticks(range(d))
-                #ax.set_xticklabels(self.marker_lab)
-            else:
-                ax.axes.xaxis.set_ticks([])
-            if not yscale:
-                ax.axes.yaxis.set_ticks([])
-                ax.set_ylim(0, 1)
-            else:
-                ax.axes.yaxis.set_ticks([.2, .8])
-                ax.set_ylim(-.1, 1.1)
+    for s, k in enumerate(ks_):
+        ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
+        for sc in samp_comps:
+            if k in sc.ks:
+                ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
+        ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
+        ax.plot([0, d-1], [.5, .5], color='grey')
+        if s == S-1:
+            ax.axes.xaxis.set_ticks(range(d))
+            #ax.set_xticklabels(self.marker_lab)
+        else:
+            ax.axes.xaxis.set_ticks([])
+        if not yscale:
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, 1)
+        else:
+            ax.axes.yaxis.set_ticks([.2, .8])
+            ax.set_ylim(-.1, 1.1)

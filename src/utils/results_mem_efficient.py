@@ -134,10 +134,16 @@ class Mres(object):
         elif method == 'bhat_hier_dip':
             lowthr = mmfArgs.pop('lowthr')
             dipthr = mmfArgs.pop('dipthr')
+            if 'tol' in mmfArgs:
+                tol = mmfArgs.pop('tol')
+            else:
+                tol = 1./4
             print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
             self.hierarchical_merge(self.get_median_bh_overlap_data, thr, **mmfArgs)
-            print "Merging components with median Bhattacharyya overlap at least {} and robust dip test at least {}".format(lowthr, dipthr)
-            self.hierarchical_merge(self.get_median_bh_dt_overlap_dip2, thr=lowthr, bhatthr=lowthr, dipthr=dipthr, **mmfArgs)
+            print """Merging components with median Bhattacharyya overlap
+                     at least {} and robust dip test at least {}""".format(lowthr, dipthr)
+            self.hierarchical_merge(self.get_median_bh_dt_overlap_dip2, thr=lowthr,
+                                    bhatthr=lowthr, dipthr=dipthr, tol=tol, **mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
             pass
@@ -155,7 +161,8 @@ class Mres(object):
         mm = mergeMeasureFun(**mmfArgs)
         ind = np.unravel_index(np.argmax(mm), mm.shape)
         if mm[ind] > thr:
-            print "Threshold passed at value {} for {} and {}, merging".format(mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
+            print "Threshold passed at value {} for {} and {}, merging".format(
+                mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
             self.merge_kl(ind)
             self.hierarchical_merge(mergeMeasureFun, thr, **mmfArgs)
 
@@ -193,18 +200,12 @@ class Mres(object):
     def get_median_overlap(self, fixvalind=None, fixval=-1):
         if fixvalind is None:
             fixvalind = []
-        # overlap = []
-        # for clust in self.clusts:
-        #     overlap.append(clust.get_overlap())
         overlap = [clust.get_overlap() for clust in self.clusts]
         return self.get_medprop_pers(overlap, fixvalind, fixval)
 
     def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1):
         if fixvalind is None:
             fixvalind = []
-        # bhd = []
-        # for clust in self.clusts:
-        #     bhd.append(clust.get_bh_overlap_data())
         bhd = [clust.get_bh_overlap_data() for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_medprop_pers(bhd, fixvalind, fixval)
@@ -222,14 +223,14 @@ class Mres(object):
             mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
         return mbhd
 
-    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, fixvalind=None, fixval=-1):
+    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, fixvalind=None, fixval=-1):
         if fixvalind is None:
             fixvalind = []
         mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
             print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
-            if self.okdiptest2(ind, dipthr):
+            if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
             fixvalind.append(ind)
             mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
@@ -253,7 +254,11 @@ class Mres(object):
             print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
-    def okdiptest2(self, ind, thr):
+    def okdiptest2(self, ind, thr, tol=1./4):
+        '''
+            tol is the proportion of samples that is allowed to
+            be below dip test threshold thr.
+        '''
         k, l = ind
         dims = [None]+self.get_dims_with_low_bhat_overlap(ind)
         for dim in dims:
@@ -266,7 +271,7 @@ class Mres(object):
                 except EmptyClusterError:
                     nbr_computable -= 1
 
-                if below > np.floor(nbr_computable/4):
+                if below > np.floor(nbr_computable*tol):
                     print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
             print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
@@ -494,11 +499,17 @@ class Cluster(object):
 
     @LazyProperty
     def wXXT(self):
-        wXXT = np.zeros((self.data.shape[1], self.data.shape[1]))
-        for i, ind in enumerate(self.indices):
-            x = self.data[ind, :].reshape(1, -1)
-            wXXT += self.weights[i]*x.T.dot(x)
+        d = self.data.shape[1]
+        dat = self.data[self.indices, :]
+        wXXT = (dat*self.weights.reshape(-1, 1)).T.dot(dat)
+        if wXXT.shape != (d, d):
+            raise ValueError
         return wXXT
+        #wXXT = np.zeros((self.data.shape[1], self.data.shape[1]))
+#        for i, ind in enumerate(self.indices):
+#            x = self.data[ind, :].reshape(1, -1)
+#            wXXT += self.weights[i]*x.T.dot(x)
+#        return wXXT
 
     def get_pdip(self, dims=None):
         if dims is None:
@@ -932,7 +943,8 @@ class Components(object):
                         self.mulat[k, :], self.Sigma_mu[k, :, :])
                     frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
                 percentiles[k] = np.percentile(frobenius_dists, q)
-                print "Percentiles for {} out of {} computed".format(k+1, self.K)
+                print "\r Percentiles for {} out of {} computed".format(k+1, self.K),
+        print ''
         percentile_dict[(q,Ntest)] = percentiles
         return percentiles
         
@@ -973,7 +985,8 @@ class Components(object):
                     self.nu[k], self.Sigmalat[k, :, :]*(self.nu[k]-self.d-1))
                 frobenius_dists[n] = np.linalg.norm(Sig - self.Sigmalat[k, :, :])
             percentiles[k] = np.percentile(frobenius_dists, q)
-            print "Percentiles for {} out of {} computed".format(k+1, self.K)
+            print "\r Percentiles for {} out of {} computed".format(k+1, self.K),
+        print ''
         percentile_dict[(q, Ntest)] = percentiles
         return percentiles
 

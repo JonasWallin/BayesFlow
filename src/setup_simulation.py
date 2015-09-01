@@ -33,7 +33,7 @@ def setup_sim(expdir, seed, setupfile=None, **kws):
             run += 1
     else:
         run = None
-    comm.bcast(run)
+    run = comm.bcast(run)
 
     savedir = expdir+'run'+str(run)+'/'
     #if simpar.loadinit:

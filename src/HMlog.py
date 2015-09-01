@@ -166,7 +166,6 @@ class HMlogB(object):
         if not savedir[-1] == '/':
             savedir += '/'
         with open(savedir+logname+'.json','r') as f:
-            print "loading with communicator size {}".format(comm.Get_size())
             hmlog = json.load(f,object_hook=lambda obj: class_decoder(obj,cls,comm=comm))
         print "load burnlog json"
         if comm.Get_rank() == 0:
@@ -194,9 +193,7 @@ class HMlog(HMlogB):
             self.savefrqy = max(np.floor((sim/nbrsavey)),1)
         self.nbrsavey = np.ceil(sim/self.savefrqy)
         self.J_loc = len(hGMM.GMMs)
-        print "before set J"
         self.set_J(hGMM)
-        print "after set J"
         
         if savesamp is None:
             self.savesamp_loc = []
@@ -551,12 +548,14 @@ class HMElog(HMlog):
         self.comm.Barrier()
         try:
             print "names_loc at rank {}: {}".format(self.rank,self.names_loc)            
-            for j,name in enumerate(self.names_loc):
-                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))
-        except:
+        except AttributeError as e:
+            print e
             if self.rank == 0:
                 for j,name in enumerate(self.names):
                     io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
+        else:
+            for j,name in enumerate(self.names_loc):
+                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))            
         super(HMElog,self).save(savedir)
 
     @classmethod
