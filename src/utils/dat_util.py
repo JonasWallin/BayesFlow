@@ -71,9 +71,8 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
         be automatically loaded when a new subsampling of the same 
         size is requested.
     '''
-    if datadir[-1] != '/':
-        datadir += '/'
-    datafile = datadir + name + ext
+
+    datafile = os.path.join(datadir, name + ext)
     data = loadfilef(datafile)[startrow:,startcol:]
 
     try:
@@ -130,11 +129,13 @@ def percentilescale(data,q = (1.,99.), qvalues = None):
 def sampnames_mpi(comm,datadir,ext,Nsamp=None,namerule=None):
     rank = comm.Get_rank()
     if rank == 0:
-        if datadir[-1] != '/':
-            datadir += '/'
-        datafiles = glob.glob(datadir+'*'+ext)
-        sampnames_all = [datafile.replace(datadir,'').replace(' ','').\
-                                  replace(ext,'') for datafile in datafiles]
+#        if datadir[-1] != '/':
+#            datadir += '/'
+        datafiles = glob.glob(os.path.join(datadir, '*'+ext)) #datadir+'*'+ext)
+        sampnames_all = [os.path.basename(datafile).replace(' ', '').\
+                            replace(ext, '') for datafile in datafiles]
+#        sampnames_all = [datafile.replace(datadir,'').replace(' ','').\
+#                                  replace(ext,'') for datafile in datafiles]
         #print "sampnames_all = {}".format(sampnames_all)
         if not namerule is None:
             sampnames_all = [name for name in sampnames_all if namerule(name)]

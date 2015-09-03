@@ -234,7 +234,7 @@ class CompPlot(object):
         self.sampnames = names
         
     def center(self, suco=True, fig=None, totplots=1, plotnbr=1, yscale=False,
-               ks=None, with_outliers=True):
+               ks=None, with_outliers=True, alpha=1):
         '''
             The centers of all components (mu param) are plotted along one dimension.
             
@@ -243,6 +243,8 @@ class CompPlot(object):
         '''
         if fig is None:
             fig = plt.figure()
+            
+        colors = [col[:-1]+(alpha,) for col in self.comp_colors]
             
         if suco:
             comps_list = copy.deepcopy(self.comp.mergeind)
@@ -283,7 +285,7 @@ class CompPlot(object):
                 if not with_outliers:
                     mu_ks = mu_ks[~outliers[:,k],:]
                 for j in range(self.comp.J):
-                    ax.plot(range(self.comp.d),mu_ks[j,:],color=self.comp_colors[k])
+                    ax.plot(range(self.comp.d),mu_ks[j,:],color=colors[k])
                 ax.plot([0,self.comp.d-1],[.5,.5],color='grey')
             if s == S-1:
                 ax.axes.xaxis.set_ticks(range(self.comp.d))

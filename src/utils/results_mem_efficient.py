@@ -899,11 +899,11 @@ class Components(object):
         for suco in self.mergeind:
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
-                for j in range(self.J):
-                    corrdist = self.get_center_dist()
+                corrdist = self.get_center_dist()
+                for j in range(self.J):                
                     wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] 
                         - self.mulat[otherind, :], axis=1))
-                    distquo[j, k] = wrongdist/corrdist
+                    distquo[j, k] = wrongdist/corrdist[j, k]
         return distquo
 
     def get_latent_bhattacharyya_overlap_quotient(self):
