@@ -3,6 +3,7 @@ import numpy as np
 import warnings
 from sklearn import mixture as skmixture
 from mpi4py import MPI
+from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
 
 from BayesFlow.PurePython.distribution.wishart import invwishartrand
@@ -11,6 +12,7 @@ import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors
 from .random import rmvn
+
 
 class LazyProperty(object):
 
@@ -922,7 +924,7 @@ class Components(object):
                     distquo[j, k] = corrdist/wrongdist
         return distquo
 
-    def mu_dist_percentiles(self, q=99.99, Ntest=100000):
+    def mu_dist_percentiles(self, q=99.99, Ntest=100000, robust_Sigma_mu=False):
         try:
             percentile_dict = self._mu_dist_percentiles
         except AttributeError:
@@ -932,6 +934,13 @@ class Components(object):
             return percentile_dict[(q,Ntest)]
         except KeyError:
             pass
+
+        if not robust_Sigma_mu:
+            Sigma_mu = self.Sigma_mu
+        else:
+            mcd = MinCovDet().fit(self.mupers)
+            Sigma_mu = mcd.covariance_
+            print "Number of MCD outliers: {}".format(np.sum(~mcd.support_))
         percentiles = np.empty(self.K)
         frobenius_dists = np.empty(Ntest)
         for k in range(self.K):
@@ -940,7 +949,7 @@ class Components(object):
             else:
                 for n in range(Ntest):
                     mu = rmvn(
-                        self.mulat[k, :], self.Sigma_mu[k, :, :])
+                        self.mulat[k, :], Sigma_mu[k, :, :])
                     frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
                 percentiles[k] = np.percentile(frobenius_dists, q)
                 print "\r Percentiles for {} out of {} computed".format(k+1, self.K),
