@@ -83,10 +83,16 @@ class Prior(object):
         """
             Priors on latent cluster means
 
-            t_inf   -   (K_inf x d) matrix. Expected values for components with informative priors.
-            t_ex    -   scalar or (1 x d) matrix. Expected value for components with non-informative priors.
-            Sk_inf  -   (K_inf x d) matrix. Variance in each dimension for components with informative priors.
-            Sk_ex   -   scalar or (1 x d) matrix. Variance for components with non-informataive priors.
+            t_inf   -   (K_inf x d) matrix. Expected latent location for
+                        components with informative priors.
+            t_ex    -   scalar or (1 x d) matrix. Expected latent location 
+                        for components with non-informative priors.
+            Sk_inf  -   (K_inf x d) matrix. Prior latent location variance
+                        in each dimension for components with informative
+                        priors.
+            Sk_ex   -   scalar or (1 x d) matrix. Prior latent location
+                        variance for components
+                        with non-informative priors.
         """
         if rank == 0:
             if t_inf is None:
@@ -108,15 +114,18 @@ class Prior(object):
 
     def component_location_variance(self,nt=None,q=None,n_theta=None,Q=None):
         """
-            Prior on covariance of sample component locations within latent component
+            Prior on covariance of sample component locations
+            within latent component
 
-            nt      -   scalar. If n_theta is not provided, n_theta will be determined based
-                        on n_J and K with nt as a scaling factor.
-            q       -   scalar. If Q is not provided, Q will be determined based on n_theta,
-                        d, and J, with q as a scaling factor.
+            nt      -   scalar. If n_theta is not provided, n_theta
+                        will be determined based on n_J and K with
+                        nt as a scaling factor.
+            q       -   scalar. If Q is not provided, Q will be
+                        determined based on n_theta, d, and J, with
+                        q as a scaling factor.
             n_theta -   scalar. Degrees of freedom.
-            Q       -   scalar. The scale matrix will be diagonal with Q as its diagonal 
-                        elements.
+            Q       -   scalar. The scale matrix will be diagonal with
+                        Q as its diagonal elements.
 
         """
         if rank == 0:
@@ -132,15 +141,18 @@ class Prior(object):
         """
             Prior on component covariance shape
 
-            nps         -   scalar. If n_Psi is not provided, n_Psi will be determined based on
-                            n_J and K with nps as a scaling constant. The value will not be smaller 
-                            than min_n_Psi.
-            min_n_Psi   -   minimal value for n_Psi if set through scaling constant.
-            h           -   scalar. If H is not provided, H will be determined based on n_Psi, d
-                            and J, with h as a scaling constant.
+            nps         -   scalar. If n_Psi is not provided, n_Psi
+                            will be determined based on n_J and K with
+                            nps as a scaling constant. The value will
+                            not be smaller than min_n_Psi.
+            min_n_Psi   -   minimal value for n_Psi if set through
+                            scaling constant.
+            h           -   scalar. If H is not provided, H will be
+                            determined based on n_Psi, d and J, with h
+                            as a scaling constant.
             n_Psi       -   scalar. Degrees of freedom.
-            H           -   scalar. The scale matrix will be diagonal with H as its diagonal
-                            elements.
+            H           -   scalar. The scale matrix will be diagonal
+                            with H as its diagonal elements.
         """
         if rank == 0:
             if n_Psi is None:
@@ -187,7 +199,8 @@ class Prior(object):
     def resize_Sigma_theta_prior(self,c):
         """
             Resize Sigma_theta prior with factor c.
-            With c >> 1 this can be used to force sample component locations together.
+            With c >> 1 this can be used to force sample
+            component locations together.
         """
         if rank == 0:
             n_theta_old = self.n_theta
@@ -197,7 +210,8 @@ class Prior(object):
     def resize_Psi_prior(self,c):
         """
             Resize Psi prior with factor c.
-            With c >> 1 this can be used to force sample components to same shape.
+            With c >> 1 this can be used to force sample
+            components to same shape.
         """
         if rank == 0:
             n_Psi_old = self.n_Psi
@@ -209,6 +223,101 @@ class Prior(object):
             self.nu_sw = nu_sw
         if not Sigma_mu_sw is None:
             self.Sigma_mu_sw = Sigma_mu_sw
+
+            
+class BalancedPrior(Prior):
+    """
+        Prior constructed such that it has same strength for
+        informative parameters independently of number of data points
+        per sample and number of samples and number of components.
+    """
+
+    def latent_cluster_means(self, t_inf=None, t_ex=np.nan, alpha_Sk=None,
+                             Sk_ex=np.nan,alpha_sk=None):
+        """
+            Priors on latent cluster means
+
+            t_inf   -   (K_inf x d) matrix. Expected latent location for
+                        components with informative priors.
+            t_ex    -   scalar or (1 x d) matrix. Expected latent location 
+                        for components with non-informative priors.
+            alpha_Sk-   scale factor for informative priors. 
+            Sk_ex   -   scalar or (1 x d) matrix. Prior latent location
+                        variance for components
+                        with non-informative priors.
+        """
+        if rank == 0:
+            if t_inf is None:
+                ts = np.zeros((0, self.d))
+                Sks = np.zeros((0, self.d))
+            else:
+                ts = t_inf
+                Sks = alpha_Sk/(self.n_J*self.J)*np.ones((t_inf.shape[0], self.d))
+            
+            if ts.shape[0] < self.K:
+                self.K_inf = ts.shape[0]
+                ts = np.vstack([ts,t_ex*np.ones((self.K-self.K_inf,self.d))])
+                Sks  = np.vstack([Sks,Sk_ex*np.ones((self.K-self.K_inf,self.d))])
+            else:
+                self.K_inf = 0
+
+            self.t = ts
+            self.S = Sks       
+
+    def component_location_variance(self,nt=None,q=None):
+        """
+            Prior on covariance of sample component locations
+            within latent component
+
+            nt      -   scalar. n_theta will be determined based on n_J
+                        and K with nt as a scaling factor.                 
+            q       -   scalar. Q will be determined based on n_theta,
+                        d, and J, with q as a scaling factor.
+
+        """
+        if rank == 0:
+            n_theta = int(nt*self.n_J/self.K)
+            self.n_theta = n_theta*np.ones(self.K,dtype='i')
+
+            Q = q*self.J
+            self.Q = Q*np.ones(self.K)
+     
+    def component_shape(self,nps=None,min_n_Psi=12,h=None,n_Psi=None,H=None):   
+        """
+            Prior on component covariance shape
+
+            nps         -   scalar. n_Psi will be determined based on
+                            n_J and K with nps as a scaling constant.
+                            The value will not be smaller than 
+                            min_n_Psi.
+            min_n_Psi   -   minimal value for n_Psi.
+            h           -   scalar. H will be determined based on n_Psi,
+                            d and J, with h as a scaling constant.
+        """
+        if rank == 0:
+            n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
+            self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
+            
+            self.H = h/self.J
+
+    def resize_Sigma_theta_prior(self,c):
+        """
+            Resize Sigma_theta prior with factor c.
+            With c >> 1 this can be used to force sample
+            component locations together.
+        """
+        if rank == 0:
+            self.n_theta = c*self.n_theta
+
+    def resize_Psi_prior(self,c):
+        """
+            Resize Psi prior with factor c.
+            With c >> 1 this can be used to force sample
+            components to same shape.
+        """
+        if rank == 0:
+            self.n_Psi = c*self.n_Psi
+    
 
 class PostProcPar(object):
 
