@@ -97,7 +97,8 @@ class hierarical_mixture_mpi(object):
         either inconsistency can occur when loading
     """
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
-                 thetas=None, expSigmas=None, high_memory=True, timing=False):
+                 thetas=None, expSigmas=None, high_memory=True, timing=False,
+                 comm=MPI.COMM_WORLD):
         """
             starting up the class and defning number of classes
             
@@ -108,9 +109,9 @@ class hierarical_mixture_mpi(object):
         self.d = 0
         self.n = 0
         self.n_all = -1
-        self.noise_class = 0 
+        self.noise_class = 0
         self.GMMs = []
-        self.comm = MPI.COMM_WORLD  # @UndefinedVariable
+        self.comm = comm
         rank = self.comm.Get_rank()  # @UndefinedVariable
         #master
         if rank == 0:
@@ -562,6 +563,8 @@ class hierarical_mixture_mpi(object):
             self.set_latent_init(prior, thetas, expSigmas)
             self.set_GMM_init()
 
+        self.prior = prior
+
     def set_location_prior(self,prior):
         if self.comm.Get_rank() == 0:
             for k in range(self.K):
@@ -569,11 +572,13 @@ class hierarical_mixture_mpi(object):
                 thetaprior['mu'] = prior.t[k,:]
                 thetaprior['Sigma'] = np.diag(prior.S[k,:])
                 self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
-                
-    def set_var_prior(self,prior):
+
+    def set_var_prior(self, prior=None):
+        if prior is None:
+            prior = self.prior
         if self.comm.Get_rank() == 0:
-            self.set_Sigma_theta_prior(prior.Q,prior.n_theta)
-            self.set_Psi_prior(prior.H,prior.n_Psi)
+            self.set_Sigma_theta_prior(prior.Q, prior.n_theta)
+            self.set_Psi_prior(prior.H, prior.n_Psi)
 
     def set_Sigma_theta_prior(self, Q, n_theta):
         if self.comm.Get_rank() == 0:
@@ -590,6 +595,10 @@ class hierarical_mixture_mpi(object):
                 Psiprior['Qs'] = H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
+
+    def resize_var_priors(self, c):
+        self.prior.resize_var_priors(c)
+        self.set_var_prior()
 
     def set_init(self, prior, thetas=None, expSigmas=None, method='random', **kw):
         self.set_latent_init(prior, thetas=thetas, expSigmas=expSigmas,
@@ -1028,16 +1037,14 @@ class hierarical_mixture_mpi(object):
         else:
             self.timing = False
 
-    def simulate(self,simpar,name='simulation',printfrq=100,stop_if_cl_off=True):
-        
-        
+    def simulate(self, simpar, name='simulation', printfrq=100, stop_if_cl_off=True):
+
         sys.excepthook = self.mpiexceptabort
         if stop_if_cl_off:
-            warnings.filterwarnings("error",'One cluster turned off in all samples')
+            warnings.filterwarnings("error", 'One cluster turned off in all samples')
         else:
-            warnings.filterwarnings("default",'One cluster turned off in all samples') 
-            
-            
+            warnings.filterwarnings("default", 'One cluster turned off in all samples')
+
         if self.timing:
             t_GMM = 0
             t_load = 0
@@ -1045,108 +1052,74 @@ class hierarical_mixture_mpi(object):
             t_save = 0
         iterations = np.int(simpar['iterations'])
         self.set_simulation_param(simpar)
-        hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
-        
-        for i in range(iterations):
-            if i%printfrq == 0 and self.comm.Get_rank() == 0:
-                print "{} iteration = {}".format(name,i)
-                if self.timing:
-                    print "{} iteration = {}".format(name,i)
-                    print("hgmm GMM  %.4f sec/sim"%(t_GMM/(i+1)))
-                    print("hgmm load  %.4f sec/sim"%(t_load/(i+1)))
-                    print("hgmm rank=0  %.4f sec/sim"%(t_rest/(i+1)))
-                    print("save  %.4f sec/sim"%(t_save/(i+1)))                    
+        hmlog = getattr(HMlog, simpar['logtype'])(self, iterations,
+                                                  **simpar['logpar'])
+
+        try:
+            for i in range(iterations):
+                if i % printfrq == 0 and self.comm.Get_rank() == 0:
+                    print "{} iteration = {}".format(name, i)
+                    if self.timing:
+                        print "{} iteration = {}".format(name, i)
+                        print("hgmm GMM  %.4f sec/sim" % (t_GMM/(i+1)))
+                        print("hgmm load  %.4f sec/sim" % (t_load/(i+1)))
+                        print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
+                        print("save  %.4f sec/sim" % (t_save/(i+1)))
+
+                    if not self.timing:
+                        self.sample()
+                        hmlog.savesim(self)
+                    else:
+                        if self.comm.Get_rank() == 0:
+                            t0 = time.time()
+
+                        for GMM in self.GMMs:
+                            GMM.sample()
+
+                        if self.comm.Get_rank() == 0:
+                            t1 = time.time()
+                            t_GMM += np.double(t1-t0)
+
+                        self.update_prior()
+
+                        if self.comm.Get_rank() == 0:
+                            t2 = time.time()
+                            t_load += np.double(t2-t1)
+
+                        if self.comm.Get_rank() == 0:
+                            for k in range(self.K):
+                                self.normal_p_wisharts[k].sample()
+                                self.wishart_p_nus[k].sample()
+                        self.comm.Barrier()
+                        self.update_GMM()
+
+                        if self.comm.Get_rank() == 0:
+                            t3 = time.time()
+                            t_rest += np.double(t3-t2)
+
+                        hmlog.savesim(self)
+
+                        if self.comm.Get_rank() == 0:
+                            t4 = time.time()
+                            t_save += np.double(t4-t3)
+
+        except UserWarning as w:
+            raise SimulationError(str(w), name=name, it=i)
+        hmlog.postproc()
+        if simpar['logtype'] == 'HMlogB':
             try:
-                if not self.timing:
-                    self.sample()
-                    hmlog.savesim(self)
-                else:
-                    if self.comm.Get_rank() == 0:
-                        t0 = time.time()
-                        
-                    for GMM in self.GMMs:
-                        GMM.sample() 
-                                                    
-                    if self.comm.Get_rank() == 0:
-                        t1 = time.time()
-                        t_GMM += np.double(t1-t0) 
-                        
-                    self.update_prior()
-                                                
-                    if self.comm.Get_rank() == 0:
-                        t2 = time.time()
-                        t_load += np.double(t2-t1) 
-                        
-                    if self.comm.Get_rank() == 0:
-                        for k in range(self.K):
-                            self.normal_p_wisharts[k].sample()
-                            self.wishart_p_nus[k].sample()
-                    self.comm.Barrier()
-                    self.update_GMM()
-                    
-                    if  self.comm.Get_rank() == 0:
-                        t3 = time.time()
-                        t_rest += np.double(t3-t2) 
-          
-                    hmlog.savesim(self)
-                    
-                    if  self.comm.Get_rank() == 0:
-                        t4 = time.time()
-                        t_save += np.double(t4-t3)
+                self.blog = self.blog.cat(hmlog)
+            except:
+                self.blog = hmlog
+        else:
+            self.log = hmlog
 
-            except UserWarning as w:
-                raise SimulationError(str(w),name=name,it=i)
-        hmlog.postproc()
-        
         return hmlog
 
-    def simulate_timed(self,simpar,name='simulation',printfrq=100):
-        t_GMM = 0
-        t_load = 0
-        t_rest = 0
-        t_save = 0
-        debug = False
-        iterations = np.int(simpar['iterations'])
-        self.set_simulation_param(simpar)
-        hmlog = getattr(HMlog,simpar['logtype'])(self,iterations,**simpar['logpar'])
-        for i in range(iterations):
-            if i%printfrq == 0 and self.comm.Get_rank() == 0:
-                print "{} iteration = {}".format(name,i)
-                print("hgmm GMM  %.4f sec/sim"%(t_GMM/(i+1)))
-                print("hgmm load  %.4f sec/sim"%(t_load/(i+1)))
-                print("hgmm rank=0  %.4f sec/sim"%(t_rest/(i+1)))
-                print("save  %.4f sec/sim"%(t_save/(i+1)))
-            if  self.comm.Get_rank() == 0:
-                t0 = time.time()
-                for GMM in self.GMMs:
-                    GMM.sample() 
-                                            
-            if  self.comm.Get_rank() == 0:
-                t1 = time.time()
-                t_GMM += np.double(t1-t0) 
-                self.update_prior()
-                                        
-            if  self.comm.Get_rank() == 0:
-                t2 = time.time()
-                t_load += np.double(t2-t1) 
-                if self.comm.Get_rank() == 0:
-                    for k in range(self.K):
-                        self.normal_p_wisharts[k].sample()
-                        self.wishart_p_nus[k].sample()
-                self.comm.Barrier()
-                self.update_GMM()
-            if  self.comm.Get_rank() == 0:
-                t3 = time.time()
-                t_rest += np.double(t3-t2) 
-  
-            hmlog.savesim(self)
-            if  self.comm.Get_rank() == 0:
-                t4 = time.time()
-                t_save += np.double(t4-t3) 
-        if debug:
-            print "Iterations done at rank {}".format(self.comm.Get_rank())
-        hmlog.postproc()
-        if debug:
-            print "Postproc done"
-        
-        return hmlog
+    def save_burnlog(self, savedir):
+        self.blog.save(savedir)
+        del self.blog
+
+    def save_log(self, savedir):
+        self.log.save(savedir)
+        del self.log

@@ -11,15 +11,20 @@ import os
 import inspect
 import shutil
 
+from utils.seed import get_seed
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 
-def setup_sim(expdir, seed, setupfile=None, **kws):
+def setup_sim(expdir, seed=None, setupfile=None, **kws):
     '''
         Define save and load directories, create save directories
         and copy experiment setup.
     '''
+
+    if seed is None:
+        seed = get_seed()
 
     if expdir[-1] != '/':
         expdir += '/'
