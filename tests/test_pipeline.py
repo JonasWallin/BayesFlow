@@ -4,6 +4,7 @@ import tempfile
 import imp
 from mpi4py import MPI
 import numpy as np
+import matplotlib.pyplot as plt
 
 import BayesFlow as bf
 from BayesFlow.PurePython.GMM import mixture
@@ -129,7 +130,26 @@ class Pipeline(object):
         pass
 
     def plot(self):
-        pass
+
+        plotdim = [[i, j] for i in range(self.d) for j in range(i+1, self.d)]
+
+        fig = plt.figure(figsize=(18, 9))
+        self.res.components.plot.center_distance_quotient(fig=fig, totplots=2, plotnbr=1)
+        self.res.components.plot.bhattacharyya_overlap_quotient(fig=fig, totplots=2, plotnbr=2)
+
+        fig = plt.figure(figsize=(9, 9))
+        self.res.components.plot.cov_dist(fig=fig)
+
+        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)))
+        self.res.traces.plot.nu()
+
+        fig_m = plt.figure(figsize=(18, 12))
+        self.res.components.plot.center(yscale=True, fig=fig_m, totplots=4, plotnbr=1, alpha=0.3)
+        self.res.plot.prob(fig=fig_m, totplots=4, plotnbr=2)
+        self.res.components.plot.center(suco=False, yscale=True, fig=fig_m, totplots=4, plotnbr=3, alpha=0.3)
+        self.res.plot.prob(suco=False, fig=fig_m, totplots=4, plotnbr=4)
+
+
 
     def clean_up(self):
         print "remove savedir {}".format(self.savedir)
