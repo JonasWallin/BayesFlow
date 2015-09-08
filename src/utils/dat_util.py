@@ -61,7 +61,7 @@ def load_fcdata(sampnames=None,scale='percentilescale',q=(1,99),comm=MPI.COMM_WO
 
     return data
 
-def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
+def load_fcsample(name,ext,loadfilef,startrow=0,startcol=0,datadir=None,
                   Nevent=None,
                   rm_extreme=True,perturb_extreme=False,
                   i_eventind_load = 0):
@@ -71,6 +71,9 @@ def load_fcsample(name,ext,loadfilef,startrow,startcol,datadir,
         be automatically loaded when a new subsampling of the same 
         size is requested.
     '''
+
+    if datadir is None:
+        raise ValueError('No datadir provided')
 
     datafile = os.path.join(datadir, name + ext)
     data = loadfilef(datafile)[startrow:,startcol:]

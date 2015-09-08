@@ -24,7 +24,7 @@ def setup_sim(expdir, seed=None, setupfile=None, **kws):
     '''
 
     if seed is None:
-        seed = get_seed()
+        seed = get_seed(expdir)
 
     if expdir[-1] != '/':
         expdir += '/'
@@ -269,7 +269,7 @@ class BalancedPrior(Prior):
             self.t = ts
             self.S = Sks       
 
-    def component_location_variance(self,nt=None,q=None):
+    def component_location_variance(self,nt,q):
         """
             Prior on covariance of sample component locations
             within latent component
@@ -287,7 +287,7 @@ class BalancedPrior(Prior):
             Q = q*self.J
             self.Q = Q*np.ones(self.K)
      
-    def component_shape(self,nps=None,min_n_Psi=12,h=None,n_Psi=None,H=None):   
+    def component_shape(self,nps,h,min_n_Psi=12):   
         """
             Prior on component covariance shape
 
@@ -303,7 +303,7 @@ class BalancedPrior(Prior):
             n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
             self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
             
-            self.H = h/self.J
+            self.H = h*np.ones(self.K)/self.J
 
     def resize_Sigma_theta_prior(self,c):
         """

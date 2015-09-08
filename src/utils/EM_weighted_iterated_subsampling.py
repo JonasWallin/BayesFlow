@@ -288,7 +288,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
                                      noise_mu=0.5, noise_sigma=0.5**2, noise_pi=0.001,
                                      iterations=10, iter_final=2, rho=3,
                                      likelihood_weights=True,
-                                     plotting=True):
+                                     plotting=False):
     K_it = int(np.ceil(K/iterations))
     data_mpi = DataMPI(comm, data)
 

@@ -595,6 +595,7 @@ class hierarical_mixture_mpi(object):
                 Psiprior['Qs'] = H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
+                print "psiprior = {}".format(Psiprior)
 
     def resize_var_priors(self, c):
         self.prior.resize_var_priors(c)
@@ -1039,7 +1040,8 @@ class hierarical_mixture_mpi(object):
 
     def simulate(self, simpar, name='simulation', printfrq=100, stop_if_cl_off=True):
 
-        sys.excepthook = self.mpiexceptabort
+        if self.comm.Get_size() > 1:        
+            sys.excepthook = self.mpiexceptabort
         if stop_if_cl_off:
             warnings.filterwarnings("error", 'One cluster turned off in all samples')
         else:
