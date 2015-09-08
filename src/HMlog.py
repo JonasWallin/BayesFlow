@@ -1,4 +1,4 @@
-#from __future__ import division
+from __future__ import division
 from mpi4py import MPI
 import numpy as np
 import collections

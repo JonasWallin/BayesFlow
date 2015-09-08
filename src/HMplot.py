@@ -8,7 +8,7 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+#import matplotlib.colors as colors
 import plot
 import copy
 
@@ -293,8 +293,9 @@ class CompPlot(object):
             else:
                 ax.axes.xaxis.set_ticks([])
             if not yscale:
-                ax.axes.yaxis.set_ticks([])
-                ax.set_ylim(0,1)
+                pass                
+                #ax.axes.yaxis.set_ticks([])
+                #ax.set_ylim(0,1)
             else:
                 ax.axes.yaxis.set_ticks([.2,.8])
                 ax.set_ylim(-.1,1.1)		
@@ -331,7 +332,7 @@ class CompPlot(object):
         try:
             xlim = lims[dim[0],:]
             ylim = lims[dim[1],:]
-        except TypeError,ValueError:
+        except (TypeError,ValueError):
             xlim = lims
             ylim = lims
         ax.set_xlim(xlim)
@@ -512,7 +513,7 @@ class TracePlot(object):
         self.traces.plot = self
         self.order = order
         
-    def all(self,fig = None):
+    def all(self, fig=None, yscale=True):
         '''
             Plot trace plots of latent means and nus.
         '''
@@ -520,21 +521,22 @@ class TracePlot(object):
             fig = plt.figure()
         for k in range(self.traces.K):
             ax = plt.subplot2grid((1, self.traces.K+1), (0, k))
-            self.mulat(k,ax)
+            self.mulat(k,ax,yscale)
             ax.set_title('theta_'+'{}'.format(k+1))
         ax = plt.subplot2grid((1, self.traces.K+1), (0, k+1))
         self.nu(ax)
         ax.set_title('nu',fontsize=16)
         return fig,ax
         
-    def mulat(self,k,ax=None):
+    def mulat(self,k,ax=None,yscale=True):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
         ax.plot(self.traces.ind, self.traces.get_mulat_k(self.order[k]))
         ax.set_xlim(0,self.traces.ind[-1])
-        ax.set_ylim(-.2,1.2)
-        ax.axes.yaxis.set_ticks([0.1,0.9])
+        if yscale:
+            ax.set_ylim(-.2,1.2)
+            ax.axes.yaxis.set_ticks([0.1,0.9])
         plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
         
     def nu(self,ax=None):

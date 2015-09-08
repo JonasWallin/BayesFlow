@@ -2,12 +2,14 @@ import os
 import time
 import tempfile
 import imp
+import shutil
 from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 
 import BayesFlow as bf
 from BayesFlow.PurePython.GMM import mixture
+from BayesFlow.exceptions import NoOtherClusterError
 
 
 class SynSample(object):
@@ -72,12 +74,16 @@ class Pipeline(object):
         '''
         Nevent = np.mean([synsamp.n_obs for synsamp in self.synsamples])
         self.prior, self.simpar, self.postpar = self.bf_setup(self.J, Nevent,
-                                                              self.d, K=4)
+                                                              self.d, K=8)
         self.hGMM = bf.hierarical_mixture_mpi(K=self.prior.K, comm=self.comm)
         sampnames = bf.utils.dat_util.sampnames_mpi(self.comm, self.datadir,
                                                     self.data_kws['ext'])
         self.hGMM.load_data(sampnames, **self.data_kws)
-        self.hGMM.set_prior(prior=self.prior, init=True)
+        self.hGMM.set_prior(prior=self.prior,init=True)
+        #self.hGMM.set_init(self.prior, method='EMWIS',
+        #                   N=int(Nevent*self.J/100), rho=2, iterations=4,
+        #                   plotting=True)
+        self.hGMM.toggle_timing()
 
     def MCMC(self):
         '''
@@ -127,32 +133,41 @@ class Pipeline(object):
         self.res.merge(self.postpar.mergemeth, **self.postpar.mergekws)
 
     def quality_check(self):
-        pass
+        print "self.res.active_komp = {}".format(self.res.active_komp)
 
     def plot(self):
 
         plotdim = [[i, j] for i in range(self.d) for j in range(i+1, self.d)]
 
         fig = plt.figure(figsize=(18, 9))
-        self.res.components.plot.center_distance_quotient(fig=fig, totplots=2, plotnbr=1)
-        self.res.components.plot.bhattacharyya_overlap_quotient(fig=fig, totplots=2, plotnbr=2)
+        try:
+            self.res.components.plot.center_distance_quotient(fig=fig, totplots=2, plotnbr=1)
+            self.res.components.plot.bhattacharyya_overlap_quotient(fig=fig, totplots=2, plotnbr=2)
+        except NoOtherClusterError:
+            pass
 
         fig = plt.figure(figsize=(9, 9))
         self.res.components.plot.cov_dist(fig=fig)
 
-        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)))
+        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)),yscale=False)
         self.res.traces.plot.nu()
 
         fig_m = plt.figure(figsize=(18, 12))
-        self.res.components.plot.center(yscale=True, fig=fig_m, totplots=4, plotnbr=1, alpha=0.3)
+        self.res.components.plot.center(yscale=False, fig=fig_m, totplots=4, 
+                                        plotnbr=1, alpha=0.3)
         self.res.plot.prob(fig=fig_m, totplots=4, plotnbr=2)
-        self.res.components.plot.center(suco=False, yscale=True, fig=fig_m, totplots=4, plotnbr=3, alpha=0.3)
+        self.res.components.plot.center(suco=False, yscale=False, fig=fig_m,
+                                        totplots=4, plotnbr=3, alpha=0.3)
         self.res.plot.prob(suco=False, fig=fig_m, totplots=4, plotnbr=4)
+        
+        mimicnames = self.res.mimics.keys()
+        self.res.plot.component_fit(plotdim,name=mimicnames[-1],fig=plt.figure(figsize=(18,25)))
+        self.res.plot.component_fit(plotdim,name='pooled',fig=plt.figure(figsize=(18,25)))
 
 
 
     def clean_up(self):
-        print "remove savedir {}".format(self.savedir)
+        print "removing savedir {}".format(self.savedir)
         #shutil.rmtree(self.savedir)
     
     def run(self):
@@ -163,6 +178,10 @@ class Pipeline(object):
             print "prior vals: {}".format(self.hGMM.prior.__dict__)
             self.MCMC()
             self.postproc()
+            self.quality_check()
+            self.plot()
+            if 1:
+                plt.show()
         except:
             self.clean_up()
             raise

@@ -8,6 +8,7 @@ from sklearn.covariance import MinCovDet
 
 from BayesFlow.PurePython.distribution.wishart import invwishartrand
 from BayesFlow import HMlog
+from BayesFlow.exceptions import NoOtherClusterError, EmptyClusterError
 import Bhattacharyya as bhat
 import diptest
 from plot_util import get_colors
@@ -717,9 +718,6 @@ class SampleClustering(object):
     #     return data[clf > min_clf]
 
 
-class EmptyClusterError(Exception):
-    pass
-
 
 class Components(object):
     '''
@@ -901,6 +899,8 @@ class Components(object):
         for suco in self.mergeind:
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
+                if sum(otherind) == 0:
+                    raise NoOtherClusterError
                 corrdist = self.get_center_dist()
                 for j in range(self.J):                
                     wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] 
@@ -912,7 +912,9 @@ class Components(object):
         distquo = np.zeros((self.J, self.K))
         for suco in self.mergeind:
             for k in suco:
-                otherind = np.array([not (kk in suco) for kk in range(self.K)])
+                otherind = [kk for kk in range(self.K) if not kk in suco]# np.array([not (kk in suco) for kk in range(self.K)])
+                if len(otherind) == 0:
+                    raise NoOtherClusterError
                 for j in range(self.J):
                     corrdist = bhat.bhattacharyya_overlap(self.mupers[j, k, :],
                         self.Sigmapers[j, k, :, :], self.mulat[k, :],

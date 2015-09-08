@@ -2,6 +2,7 @@ from __future__ import division
 #from sklearn import mixture as skmixture
 from BayesFlow.utils import dat_util
 from BayesFlow.utils import mpiutil
+from BayesFlow.exceptions import EmptyClusterError
 import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
@@ -159,10 +160,6 @@ class DataMPI(object):
         print "tot weight for subsampling {}".format(weightsMPI.W)
         indices = weightsMPI.sample_from_all(N)
         return [self.data[j][ind, :] for j, ind in enumerate(indices)]
-
-
-class EmptyClusterError(Exception):
-    pass
 
 
 #@profile

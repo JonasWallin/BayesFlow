@@ -1068,42 +1068,42 @@ class hierarical_mixture_mpi(object):
                         print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
                         print("save  %.4f sec/sim" % (t_save/(i+1)))
 
-                    if not self.timing:
-                        self.sample()
-                        hmlog.savesim(self)
-                    else:
-                        if self.comm.Get_rank() == 0:
-                            t0 = time.time()
+                if not self.timing:
+                    self.sample()
+                    hmlog.savesim(self)
+                else:
+                    if self.comm.Get_rank() == 0:
+                        t0 = time.time()
 
-                        for GMM in self.GMMs:
-                            GMM.sample()
+                    for GMM in self.GMMs:
+                        GMM.sample()
 
-                        if self.comm.Get_rank() == 0:
-                            t1 = time.time()
-                            t_GMM += np.double(t1-t0)
+                    if self.comm.Get_rank() == 0:
+                        t1 = time.time()
+                        t_GMM += np.double(t1-t0)
 
-                        self.update_prior()
+                    self.update_prior()
 
-                        if self.comm.Get_rank() == 0:
-                            t2 = time.time()
-                            t_load += np.double(t2-t1)
+                    if self.comm.Get_rank() == 0:
+                        t2 = time.time()
+                        t_load += np.double(t2-t1)
 
-                        if self.comm.Get_rank() == 0:
-                            for k in range(self.K):
-                                self.normal_p_wisharts[k].sample()
-                                self.wishart_p_nus[k].sample()
-                        self.comm.Barrier()
-                        self.update_GMM()
+                    if self.comm.Get_rank() == 0:
+                        for k in range(self.K):
+                            self.normal_p_wisharts[k].sample()
+                            self.wishart_p_nus[k].sample()
+                    self.comm.Barrier()
+                    self.update_GMM()
 
-                        if self.comm.Get_rank() == 0:
-                            t3 = time.time()
-                            t_rest += np.double(t3-t2)
+                    if self.comm.Get_rank() == 0:
+                        t3 = time.time()
+                        t_rest += np.double(t3-t2)
 
-                        hmlog.savesim(self)
+                    hmlog.savesim(self)
 
-                        if self.comm.Get_rank() == 0:
-                            t4 = time.time()
-                            t_save += np.double(t4-t3)
+                    if self.comm.Get_rank() == 0:
+                        t4 = time.time()
+                        t_save += np.double(t4-t3)
 
         except UserWarning as w:
             raise SimulationError(str(w), name=name, it=i)
