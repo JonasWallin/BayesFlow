@@ -8,15 +8,17 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-from BayesFlow.PurePython.distribution import wishart
-import scipy.special as sps
-#import matplotlib.pyplot as plt
-import scipy.linalg as sla
-from BayesFlow.utils.gammad import ln_gamma_d
-from BayesFlow.utils.Bhattacharyya import bhattacharyya_distance
-import cPickle as pickle
-from ..utils import rmvn
 import time
+import scipy.special as sps
+import cPickle as pickle
+import scipy.linalg as sla
+#import matplotlib.pyplot as plt
+
+from .distribution import wishart
+from ..utils.gammad import ln_gamma_d
+from ..utils.Bhattacharyya import bhattacharyya_distance
+from ..utils import rmvn
+
 
 def log_betapdf(p, a, b):
 	
@@ -918,6 +920,13 @@ class mixture(object):
 			X[x == self.K,:] = x_
 		return X
 	
+	@classmethod
+	def simulate_mixture(cls, mu, Sigma, p, n):
+		mix = cls(K=len(mu))
+		mix.mu, mix.sigma, mix.p = mu, Sigma, p
+		mix.d = len(mu[0])
+		return mix.simulate_data(n)
+
 	def simulate_one_obs(self):
 		"""
 			if there exists noise class it __will__ be used

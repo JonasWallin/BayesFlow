@@ -3,12 +3,13 @@ from mpi4py import MPI
 import numpy as np
 import collections
 import warnings
-from utils import mpiutil
-from utils.jsonutil import ObjJsonEncoder, class_decoder
 from scipy import io, sparse
 import os
 import cPickle as pickle
 import json
+
+from .utils import mpiutil
+from .utils.jsonutil import ObjJsonEncoder, class_decoder
 
 warnings.filterwarnings('ignore',message='using a non-integer number.*',category= DeprecationWarning)
 

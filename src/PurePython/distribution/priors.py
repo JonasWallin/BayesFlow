@@ -6,7 +6,8 @@ updated: May 28, 2015: added AMCMC
 '''
 import numpy as np
 import numpy.random as npr
-from BayesFlow.utils.gammad import ln_gamma_d
+#from BayesFlow.utils.gammad import ln_gamma_d
+from ...utils.gammad import ln_gamma_d
 
 def f_prior_nu(x, nu  =0.01): 
 	"""

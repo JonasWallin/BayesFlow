@@ -10,10 +10,11 @@ import numpy.random as npr
 import copy
 import glob
 from mpi4py import MPI
-import load_and_save as ls
 import cPickle as pickle
-import mpiutil
 import os
+
+from . import mpiutil
+from . import load_and_save as ls
 
 def add_noise(data,sd=0.01):
     return data + npr.normal(0,sd,data.shape)

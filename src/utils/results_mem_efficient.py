@@ -6,13 +6,13 @@ from mpi4py import MPI
 from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
 
-from BayesFlow.PurePython.distribution.wishart import invwishartrand
-from BayesFlow import HMlog
-from BayesFlow.exceptions import NoOtherClusterError, EmptyClusterError
-import Bhattacharyya as bhat
-import diptest
-from plot_util import get_colors
-from .random import rmvn
+from ..PurePython.distribution.wishart import invwishartrand
+from .. import HMlog
+from ..exceptions import NoOtherClusterError, EmptyClusterError
+from . import Bhattacharyya as bhat
+from . import diptest
+from .plot_util import get_colors
+from .random_ import rmvn
 
 
 class LazyProperty(object):

@@ -7,9 +7,36 @@ from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 
-import BayesFlow as bf
+from BayesFlow import setup_sim, hierarical_mixture_mpi, HMlogB, HMElog, HMres
+from BayesFlow.utils import load_fcdata
+from BayesFlow.utils.dat_util import sampnames_mpi
 from BayesFlow.PurePython.GMM import mixture
 from BayesFlow.exceptions import NoOtherClusterError
+
+
+import __builtin__
+openfiles = set()
+oldfile = __builtin__.file
+class newfile(oldfile):
+    def __init__(self, *args):
+        self.x = args[0]
+        print "### OPENING %s ###" % str(self.x)            
+        oldfile.__init__(self, *args)
+        openfiles.add(self)
+        print "{} FILES OPEN".format(len(openfiles))
+
+    def close(self):
+        print "### CLOSING %s ###" % str(self.x)
+        oldfile.close(self)
+        openfiles.remove(self)
+oldopen = __builtin__.open
+def newopen(*args):
+    return newfile(*args)
+__builtin__.file = newfile
+__builtin__.open = newopen
+
+def printOpenFiles():
+    print "### %d OPEN FILES: [%s]" % (len(openfiles), ", ".join(f.x for f in openfiles))
 
 
 class SynSample(object):
@@ -26,12 +53,7 @@ class SynSample(object):
         '''
             Generate data and save
         '''
-        mix = mixture(K=self.K)
-        mix.mu = self.mu
-        mix.sigma = self.sigma
-        mix.p = self.p
-        mix.d = self.d
-        Y = mix.simulate_data(self.n_obs)
+        Y = mixture.simulate_mixture(self.mu, self.sigma, self.p, self.n_obs)
         np.savetxt(os.path.join(savedir, self.name+'.txt'), Y)
 
 
@@ -40,14 +62,14 @@ class Pipeline(object):
     def __init__(self, comm=MPI.COMM_WORLD):
         self.comm = comm
 
-        self.J = 20
-        self.savedir = tempfile.mkdtemp()
+        self.J = 2
+        self.savedir = 'blah'#tempfile.mkdtemp()
         print "savedir = {}".format(self.savedir)
         self.datadir = os.path.join(self.savedir, 'data')
         self.synsamples = [SynSample(j) for j in range(self.J)]
         self.d = self.synsamples[0].d
 
-        self.parfile = "param/0.py"
+        self.parfile = "tests/param/0.py"
         self.data_kws = {'scale': 'percentilescale',
                          'loadfilef': lambda filename: np.loadtxt(filename),
                          'ext': '.txt', 'datadir': self.datadir}
@@ -60,7 +82,7 @@ class Pipeline(object):
             synsamp.generate_data(self.datadir)
 
     def setup_run(self):
-        self.rundir, self.run = bf.setup_sim(self.savedir)
+        self.rundir, self.run = setup_sim(self.savedir)
         try:
             self.bf_setup = imp.load_source('', self.parfile).setup
         except IOError as e:
@@ -75,14 +97,15 @@ class Pipeline(object):
         Nevent = np.mean([synsamp.n_obs for synsamp in self.synsamples])
         self.prior, self.simpar, self.postpar = self.bf_setup(self.J, Nevent,
                                                               self.d, K=8)
-        self.hGMM = bf.hierarical_mixture_mpi(K=self.prior.K, comm=self.comm)
-        sampnames = bf.utils.dat_util.sampnames_mpi(self.comm, self.datadir,
-                                                    self.data_kws['ext'])
+        self.hGMM = hierarical_mixture_mpi(K=self.prior.K, comm=self.comm)
+        sampnames = sampnames_mpi(self.comm, self.datadir, self.data_kws['ext'])
+        print "sampnames before load: {}".format(sampnames)
         self.hGMM.load_data(sampnames, **self.data_kws)
-        self.hGMM.set_prior(prior=self.prior,init=True)
-        #self.hGMM.set_init(self.prior, method='EMWIS',
-        #                   N=int(Nevent*self.J/100), rho=2, iterations=4,
-        #                   plotting=True)
+        print "after load data"
+        self.hGMM.set_prior(prior=self.prior, init=False)
+        self.hGMM.set_init(self.prior, method='EMWIS',
+                           N=int(Nevent*self.J/100), rho=2, n_iter=4, n_init=20,
+                           plotting=False, selection='EMD')
         self.hGMM.toggle_timing()
 
     def MCMC(self):
@@ -124,12 +147,12 @@ class Pipeline(object):
         del self.hGMM
 
     def postproc(self):
-        blog = bf.HMlogB.load(self.savedir)
-        log = bf.HMElog.load(self.savedir)
-        data = bf.utils.dat_util.load_fcdata(log.names, **self.data_kws)
+        blog = HMlogB.load(self.savedir)
+        log = HMElog.load(self.savedir)
+        data = load_fcdata(log.names, **self.data_kws)
         self.metadata['samp'] = {'names': log.names}
-                    
-        self.res = bf.HMres(log, blog, data, self.metadata)
+
+        self.res = HMres(log, blog, data, self.metadata)
         self.res.merge(self.postpar.mergemeth, **self.postpar.mergekws)
 
     def quality_check(self):
@@ -149,45 +172,52 @@ class Pipeline(object):
         fig = plt.figure(figsize=(9, 9))
         self.res.components.plot.cov_dist(fig=fig)
 
-        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)),yscale=False)
+        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)), yscale=False)
         self.res.traces.plot.nu()
 
         fig_m = plt.figure(figsize=(18, 12))
-        self.res.components.plot.center(yscale=False, fig=fig_m, totplots=4, 
+        self.res.components.plot.center(yscale=False, fig=fig_m, totplots=4,
                                         plotnbr=1, alpha=0.3)
         self.res.plot.prob(fig=fig_m, totplots=4, plotnbr=2)
         self.res.components.plot.center(suco=False, yscale=False, fig=fig_m,
                                         totplots=4, plotnbr=3, alpha=0.3)
         self.res.plot.prob(suco=False, fig=fig_m, totplots=4, plotnbr=4)
-        
+
         mimicnames = self.res.mimics.keys()
-        self.res.plot.component_fit(plotdim,name=mimicnames[-1],fig=plt.figure(figsize=(18,25)))
-        self.res.plot.component_fit(plotdim,name='pooled',fig=plt.figure(figsize=(18,25)))
-
-
+        self.res.plot.component_fit(plotdim, name=mimicnames[-1], fig=plt.figure(figsize=(18, 25)))
+        self.res.plot.component_fit(plotdim, name='pooled', fig=plt.figure(figsize=(18, 25)))
 
     def clean_up(self):
-        print "removing savedir {}".format(self.savedir)
-        #shutil.rmtree(self.savedir)
-    
-    def run(self):
+        print "removing savedir {} ...".format(self.savedir)
         try:
+            pass
+            #shutil.rmtree(self.savedir)
+        except Exception as e:
+            print "Could not remove savedir {}: {}".format(self.savedir, e)
+        else:
+            print "removing savedir {} done".format(self.savedir)
+
+    def run(self):
+        if 1:
             self.generate_data()
             self.setup_run()
+            printOpenFiles()
             self.init_hGMM()
             print "prior vals: {}".format(self.hGMM.prior.__dict__)
             self.MCMC()
             self.postproc()
             self.quality_check()
-            self.plot()
-            if 1:
-                plt.show()
-        except:
+            print "before plot"
+            #self.plot()
+            print "after plot"
+            #if 1:
+            #    plt.show()
+        #except Exception as e:
+        #    self.clean_up()
+        #    raise e
+        #else:
             self.clean_up()
-            raise
-        else:
-            self.clean_up()
-    
+
 if __name__ == '__main__':
     pipeline = Pipeline()
     pipeline.run()

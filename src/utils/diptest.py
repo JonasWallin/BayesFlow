@@ -1,8 +1,11 @@
 from __future__ import division
 import numpy as np
-from rpy2.robjects.packages import importr, data
-from rpy2.rinterface import RRuntimeError
 import matplotlib.pyplot as plt
+try:
+    from rpy2.robjects.packages import importr, data
+    from rpy2.rinterface import RRuntimeError
+except ImportError as e:
+    print "{} --- will not be able to transform dip values to p-value".format(e)
 
 
 def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):

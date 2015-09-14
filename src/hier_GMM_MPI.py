@@ -5,16 +5,7 @@ Created on Jul 10, 2014
 @author: jonaswallin
 '''
 from mpi4py import MPI
-import GMM
 import numpy as np
-from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
-from BayesFlow.GMM import mixture
-from BayesFlow.utils import dat_util
-from BayesFlow.utils.mpiutil import bcast_int
-from BayesFlow.utils.EM_weighted_iterated_subsampling import EM_weighted_iterated_subsampling
-import HMlog
-import matplotlib.pyplot as plt
-#from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr
 import os
 import glob
@@ -22,6 +13,18 @@ import time
 import warnings
 import traceback
 import sys
+import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
+
+from . import GMM
+from .distribution import normal_p_wishart, Wishart_p_nu
+from .GMM import mixture
+from .utils.timer import Timer
+from .utils.initialization.EM import EM_pooled
+from .utils import load_fcdata
+from .exceptions import SimulationError
+from . import HMlog
+
 
 #TODO: change to geomtrical median instead of mean!!
 #TODO: if a cluster is turned off use the latent mean insead of mu
@@ -83,12 +86,6 @@ def load_hGMM(dirname):
     hGMM = hierarical_mixture_mpi(K)
     hGMM.load_from_file(dirname)
     return hGMM
-
-class SimulationError(Exception):
-    def __init__(self,msg,name='',it=0):
-        self.msg = msg
-        self.name = name
-        self.iteration = it
 
 
 class hierarical_mixture_mpi(object):
@@ -466,7 +463,7 @@ class hierarical_mixture_mpi(object):
         """
             Load data corresponding to sampnames directly onto worker
         """      
-        data = dat_util.load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
+        data = load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
         rank = self.comm.Get_rank()
 
         self.n = len(data)
@@ -479,11 +476,10 @@ class hierarical_mixture_mpi(object):
         print "self.counts at rank {} = {}".format(rank,self.counts)
         
         if rank == 0:
-            d = data[0].shape[1]
+            self.d = data[0].shape[1]
         else:
-            d = 0
-        d = bcast_int(d,self.comm)
-        self.d = d
+            self.d = 0
+        self.d = self.comm.bcast(self.d)
 
         for Y,name in zip(data,sampnames):
             if self.d != Y.shape[1]:
@@ -595,7 +591,6 @@ class hierarical_mixture_mpi(object):
                 Psiprior['Qs'] = H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
-                print "psiprior = {}".format(Psiprior)
 
     def resize_var_priors(self, c):
         self.prior.resize_var_priors(c)
@@ -611,10 +606,9 @@ class hierarical_mixture_mpi(object):
 
         rank = self.comm.Get_rank()
 
-        if method == 'EMWIS':
+        if method == 'EM_pooled':
             data = [GMM.data for GMM in self.GMMs]
-            thetas, expSigmas, _ = EM_weighted_iterated_subsampling(
-                self.comm, data, self.K, **kw)
+            thetas, expSigmas, _ = EM_pooled(self.comm, data, self.K, **kw)
 
         if rank == 0:
             for k in range(self.K):
@@ -1047,46 +1041,51 @@ class hierarical_mixture_mpi(object):
         else:
             warnings.filterwarnings("default", 'One cluster turned off in all samples')
 
-        if self.timing:
-            t_GMM = 0
-            t_load = 0
-            t_rest = 0
-            t_save = 0
         iterations = np.int(simpar['iterations'])
         self.set_simulation_param(simpar)
         hmlog = getattr(HMlog, simpar['logtype'])(self, iterations,
                                                   **simpar['logpar'])
 
+        if self.timing:
+            # t_GMM = 0
+            # t_load = 0
+            # t_rest = 0
+            # t_save = 0
+            timer = Timer(self.comm)
+            
         try:
             for i in range(iterations):
                 if i % printfrq == 0 and self.comm.Get_rank() == 0:
                     print "{} iteration = {}".format(name, i)
                     if self.timing:
-                        print "{} iteration = {}".format(name, i)
-                        print("hgmm GMM  %.4f sec/sim" % (t_GMM/(i+1)))
-                        print("hgmm load  %.4f sec/sim" % (t_load/(i+1)))
-                        print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
-                        print("save  %.4f sec/sim" % (t_save/(i+1)))
+                    #     print "{} iteration = {}".format(name, i)
+                    #     print("hgmm GMM  %.4f sec/sim" % (t_GMM/(i+1)))
+                    #     print("hgmm load  %.4f sec/sim" % (t_load/(i+1)))
+                    #     print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
+                    #     print("save  %.4f sec/sim" % (t_save/(i+1)))
+                        timer.print_timepoints(iter=i)
 
                 if not self.timing:
                     self.sample()
                     hmlog.savesim(self)
                 else:
-                    if self.comm.Get_rank() == 0:
-                        t0 = time.time()
+                    # if self.comm.Get_rank() == 0:
+                    #     t0 = time.time()
 
                     for GMM in self.GMMs:
                         GMM.sample()
 
-                    if self.comm.Get_rank() == 0:
-                        t1 = time.time()
-                        t_GMM += np.double(t1-t0)
+                    timer.timepoint('GMM')
+                    # if self.comm.Get_rank() == 0:
+                    #     t1 = time.time()
+                    #     t_GMM += np.double(t1-t0)
 
                     self.update_prior()
 
-                    if self.comm.Get_rank() == 0:
-                        t2 = time.time()
-                        t_load += np.double(t2-t1)
+                    # if self.comm.Get_rank() == 0:
+                    #     t2 = time.time()
+                    #     t_load += np.double(t2-t1)
+                    timer.timepoint('load')
 
                     if self.comm.Get_rank() == 0:
                         for k in range(self.K):
@@ -1095,15 +1094,17 @@ class hierarical_mixture_mpi(object):
                     self.comm.Barrier()
                     self.update_GMM()
 
-                    if self.comm.Get_rank() == 0:
-                        t3 = time.time()
-                        t_rest += np.double(t3-t2)
+                    # if self.comm.Get_rank() == 0:
+                    #     t3 = time.time()
+                    #     t_rest += np.double(t3-t2)
+                    timer.timepoint('hGMM rank=0')
 
                     hmlog.savesim(self)
 
-                    if self.comm.Get_rank() == 0:
-                        t4 = time.time()
-                        t_save += np.double(t4-t3)
+                    # if self.comm.Get_rank() == 0:
+                    #     t4 = time.time()
+                    #     t_save += np.double(t4-t3)
+                    timer.timepoint('save')
 
         except UserWarning as w:
             raise SimulationError(str(w), name=name, it=i)
@@ -1115,6 +1116,9 @@ class hierarical_mixture_mpi(object):
                 self.blog = hmlog
         else:
             self.log = hmlog
+
+        if self.timing:
+            timer.print_timepoints(iterations)
 
         return hmlog
 

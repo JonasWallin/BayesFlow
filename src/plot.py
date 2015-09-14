@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as colors
-from utils.plot_util import black_ip
+from .utils.plot_util import black_ip
 
 def autocorr(x_in, lag=100):
     """

@@ -7,7 +7,7 @@ Created on Mon Aug 18 18:35:14 2014
 from __future__ import division
 from mpi4py import MPI
 import numpy as np
-from HMplot import HMplot
+from .HMplot import HMplot
 from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components, MetaData
 
 comm = MPI.COMM_WORLD
