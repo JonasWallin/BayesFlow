@@ -13,20 +13,7 @@ from . import Bhattacharyya as bhat
 from . import diptest
 from .plot_util import get_colors
 from .random_ import rmvn
-
-
-class LazyProperty(object):
-
-    def __init__(self, func):
-        self._func = func
-        self.__name__ = func.__name__
-        self.__doc__ = func.__doc__
-
-    def __get__(self, obj, cls=None):
-        if obj is None:
-            return None
-        result = obj.__dict__[self.__name__] = self._func(obj)
-        return result
+from lazy_property import LazyProperty
 
 
 def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):

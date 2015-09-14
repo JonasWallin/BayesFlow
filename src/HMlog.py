@@ -367,7 +367,7 @@ class HMlog(HMlogB):
             pass
         return jsondict
 
-    def save(self,savedir):
+    def save(self, savedir):
         if not savedir[-1] == '/':
             savedir += '/'
         self.syndata_dir = savedir + 'syndata/'
@@ -375,21 +375,17 @@ class HMlog(HMlogB):
             if not os.path.exists(self.syndata_dir):
                 os.mkdir(self.syndata_dir)
         self.comm.Barrier()
-        try:
-            for j,name in enumerate(self.savesampnames_loc):
-                with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
-                    pickle.dump(self.Y_sim_loc[j],f,-1)
-        except:
-            if self.rank == 0:
-                for j,name in enumerate(self.savesampnames):
-                    with open(self.syndata_dir+name+'_MODEL.pkl','w') as f:
-                        pickle.dump(self.Y_sim[j],f,-1)
+
+        for j, name in enumerate(self.savesampnames_loc):
+            with open(self.syndata_dir+name+'_MODEL.pkl', 'w') as f:
+                pickle.dump(self.Y_sim_loc[j], f, -1)
+
         if self.rank == 0:
-            with open(self.syndata_dir+'pooled_MODEL.pkl','w') as f:
-                pickle.dump(self.Y_pooled_sim,f,-1)
-            if not hasattr(self,'savesampnames'):
+            with open(self.syndata_dir+'pooled_MODEL.pkl', 'w') as f:
+                pickle.dump(self.Y_pooled_sim, f, -1)
+            if not hasattr(self, 'savesampnames'):
                 self.set_savesampnames()
-        super(HMlog,self).save(savedir,logname='log')
+        super(HMlog, self).save(savedir, logname='log')
 
     @classmethod
     def load(cls,savedir,comm=MPI.COMM_WORLD):
@@ -539,7 +535,7 @@ class HMElog(HMlog):
             pass
         return jsondict
 
-    def save(self,savedir):
+    def save(self, savedir):
         if not savedir[-1] == '/':
             savedir += '/'
         self.classif_freq_dir = savedir+'classif_freq/'
@@ -547,17 +543,17 @@ class HMElog(HMlog):
             if not os.path.exists(self.classif_freq_dir):
                 os.mkdir(self.classif_freq_dir)
         self.comm.Barrier()
-        try:
-            print "names_loc at rank {}: {}".format(self.rank,self.names_loc)            
-        except AttributeError as e:
-            print e
-            if self.rank == 0:
-                for j,name in enumerate(self.names):
-                    io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
-        else:
-            for j,name in enumerate(self.names_loc):
-                io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq_loc[j]))            
-        super(HMElog,self).save(savedir)
+        # try:
+        #     print "names_loc at rank {}: {}".format(self.rank,self.names_loc)
+        # except AttributeError as e:
+        #     print e
+        #     if self.rank == 0:
+        #         for j,name in enumerate(self.names):
+        #             io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
+        # else:
+        for j, name in enumerate(self.names_loc):
+            io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx', sparse.coo_matrix(self.classif_freq_loc[j]))
+        super(HMElog, self).save(savedir)
 
     @classmethod
     def load(cls,savedir,comm=MPI.COMM_WORLD):

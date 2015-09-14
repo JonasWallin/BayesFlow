@@ -235,7 +235,7 @@ class BalancedPrior(Prior):
     """
 
     def latent_cluster_means(self, t_inf=None, t_ex=np.nan, alpha_Sk=None,
-                             Sk_ex=np.nan,alpha_sk=None):
+                             Sk_ex=np.nan, alpha_sk=None):
         """
             Priors on latent cluster means
 

@@ -636,6 +636,7 @@ class hierarical_mixture_mpi(object):
                     wpnparam['Q'] = expSigmas[k] * (wpnparam['nu']-self.d-1)
                 wpn.set_parameter(wpnparam)
                 wpn.nu_class.set_val(wpn.Q_class.nu_s)
+        self.update_GMM()
 
     def set_GMM_init(self):
         self.set_GMMs_mu_Sigma_from_prior()
@@ -1032,7 +1033,8 @@ class hierarical_mixture_mpi(object):
         else:
             self.timing = False
 
-    def simulate(self, simpar, name='simulation', printfrq=100, stop_if_cl_off=True):
+    def simulate(self, simpar, name='simulation', printfrq=100,
+                 stop_if_cl_off=True, plotting=False, plotdim=None):
 
         if self.comm.Get_size() > 1:        
             sys.excepthook = self.mpiexceptabort
@@ -1047,44 +1049,32 @@ class hierarical_mixture_mpi(object):
                                                   **simpar['logpar'])
 
         if self.timing:
-            # t_GMM = 0
-            # t_load = 0
-            # t_rest = 0
-            # t_save = 0
             timer = Timer(self.comm)
-            
+
         try:
             for i in range(iterations):
                 if i % printfrq == 0 and self.comm.Get_rank() == 0:
                     print "{} iteration = {}".format(name, i)
                     if self.timing:
-                    #     print "{} iteration = {}".format(name, i)
-                    #     print("hgmm GMM  %.4f sec/sim" % (t_GMM/(i+1)))
-                    #     print("hgmm load  %.4f sec/sim" % (t_load/(i+1)))
-                    #     print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
-                    #     print("save  %.4f sec/sim" % (t_save/(i+1)))
                         timer.print_timepoints(iter=i)
+                    if plotting:
+                        fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
+                                                sharex=True, sharey=True,
+                                                squeeze=False)
+                        for j, gmm in enumerate(self.GMMs):
+                            for k, dim in enumerate(plotdim):
+                                gmm.plot_components(dim, axs[k, j])
 
                 if not self.timing:
                     self.sample()
                     hmlog.savesim(self)
                 else:
-                    # if self.comm.Get_rank() == 0:
-                    #     t0 = time.time()
 
-                    for GMM in self.GMMs:
-                        GMM.sample()
-
+                    for gmm in self.GMMs:
+                        gmm.sample()
                     timer.timepoint('GMM')
-                    # if self.comm.Get_rank() == 0:
-                    #     t1 = time.time()
-                    #     t_GMM += np.double(t1-t0)
 
                     self.update_prior()
-
-                    # if self.comm.Get_rank() == 0:
-                    #     t2 = time.time()
-                    #     t_load += np.double(t2-t1)
                     timer.timepoint('load')
 
                     if self.comm.Get_rank() == 0:
@@ -1093,17 +1083,9 @@ class hierarical_mixture_mpi(object):
                             self.wishart_p_nus[k].sample()
                     self.comm.Barrier()
                     self.update_GMM()
-
-                    # if self.comm.Get_rank() == 0:
-                    #     t3 = time.time()
-                    #     t_rest += np.double(t3-t2)
                     timer.timepoint('hGMM rank=0')
 
                     hmlog.savesim(self)
-
-                    # if self.comm.Get_rank() == 0:
-                    #     t4 = time.time()
-                    #     t_save += np.double(t4-t3)
                     timer.timepoint('save')
 
         except UserWarning as w:

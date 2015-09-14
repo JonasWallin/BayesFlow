@@ -36,4 +36,4 @@ class Timer:
                     print "{}: {} s\n".format(tp, self.t[tp])
             else:
                 for tp in self.t:
-                    print "{}: {} s per iteration\n".format(tp, self.t[tp]/iter)
+                    print "{}: {} s per iteration".format(tp, self.t[tp]/iter)

@@ -8,7 +8,8 @@ Created on Thu Aug 14 20:02:37 2014
 from __future__ import division
 import numpy as np
 
-from ... import SimPar, PostProcPar, Prior
+from ... import SimPar, PostProcPar
+from ... import BalancedPrior as Prior
 
 
 def setup(comm, J, n_J, d, K):
@@ -20,9 +21,9 @@ def setup(comm, J, n_J, d, K):
     #print "Informative prior locations: {}".format(t_inf)
 
     prior = Prior(J, n_J, d=d, K=K)
-    prior.latent_cluster_means(t_inf=None, t_ex=0.5, Sk_inf=1, Sk_ex=1e6)
-    prior.component_location_variance(nt=0.03, q=1e-3)
-    prior.component_shape(nps=0.01, h=1e3)
+    prior.latent_cluster_means(t_inf=None, t_ex=0.5, Sk_ex=1e6)
+    prior.component_location_variance(nt=0.3, q=1e-3)
+    prior.component_shape(nps=0.1, h=1e3)
     prior.set_noise_class(noise_mu=0.5, noise_Sigma=0.5**2, on=False)  # We do not introduce noise class from start
     prior.pop_size()
 
@@ -34,7 +35,7 @@ def setup(comm, J, n_J, d, K):
 
     nbriter = 1000
 
-    simpar = SimPar(nbriter=nbriter, qburn=0.8, tightinit=100, simsamp=['1', '2', '3'])
+    simpar = SimPar(nbriter=nbriter, qburn=0.8, tightinit=1, simsamp=['1', '2', '3'])
     simpar.new_burnphase(qB1a, 'B1a')
     simpar.set('B1a', p_sw=0, p_on_off=[0, 0])
     if rank == 0:

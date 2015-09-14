@@ -19,7 +19,7 @@ class SynSample(object):
         self.d = 3
         self.K = 4
         self.n_obs = 1000
-        self.mu = [np.repeat(k+0.01*j, self.d) for k in range(self.K)]
+        self.mu = [np.repeat(k+0.1*j, self.d) for k in range(self.K)]
         self.sigma = [np.eye(self.d)*0.01 for k in range(self.K)]
         self.p = np.ones(self.K)/self.K
         self.name = str(j)
@@ -37,7 +37,7 @@ class SynSample2(object):
         self.d = 2
         self.n_obs = 1000
         self.mu = [(0, 0), (0, 1), (1, 0), (1, 1)]
-        self.mu = [np.array(mu)+0.01*j for mu in self.mu]
+        self.mu = [np.array(mu)+0.1*j for mu in self.mu]
         self.K = len(self.mu)
         #[np.repeat(k+0.01*j, self.d) for k in range(self.K)]
         self.sigma = [np.eye(self.d)*0.01 for k in range(self.K)]
@@ -61,10 +61,10 @@ class Pipeline(object):
         self.savedir = 'blah'#tempfile.mkdtemp()
         print "savedir = {}".format(self.savedir)
         self.datadir = os.path.join(self.savedir, 'data')
-        self.synsamples = [SynSample2(j) for j in range(self.J)]
+        self.synsamples = [SynSample(j) for j in range(self.J)]
         self.d = self.synsamples[0].d
 
-        self.parfile = "src/tests/param/0_no_onoff.py"
+        self.parfile = "src/tests/param/0.py"
         self.data_kws = {'scale': 'percentilescale',
                          'loadfilef': lambda filename: np.loadtxt(filename),
                          'ext': '.txt', 'datadir': self.datadir}
@@ -77,7 +77,7 @@ class Pipeline(object):
             synsamp.generate_data(self.datadir)
 
     def setup_run(self):
-        self.rundir, self.run = setup_sim(self.savedir, setupfile=self.parfile)
+        self.rundir, self.run = setup_sim(self.savedir, setupfile=self.parfile, comm=self.comm)
         try:
             self.bf_setup = imp.load_source('src.tests.param.setup', self.parfile).setup
         except IOError as e:
@@ -98,32 +98,42 @@ class Pipeline(object):
         self.hGMM.load_data(sampnames, **self.data_kws)
         print "after load data"
         self.hGMM.set_prior(prior=self.prior, init=False)
-        self.hGMM.set_init(self.prior, method='EM_pooled', WIS=False,
-                           N=int(Nevent*self.J/100), rho=2, n_iter=20, n_init=100,
-                           plotting=True, selection='likelihood', gamma=5)
+        self.hGMM.set_init(self.prior, method='EM_pooled', WIS=True,
+                           N=int(Nevent*self.J/100), rho=2, n_iter=20, n_init=10,
+                           plotting=True, selection='EMD', gamma=2)
         self.hGMM.toggle_timing()
 
     def MCMC(self):
         '''
             Burn-in iterations
         '''
-        printfrq = 10
+        printfrq = 100
 
         t0 = time.time()
 
         self.hGMM.resize_var_priors(self.simpar.tightinitfac)
-        self.hGMM.simulate(self.simpar.phases['B1a'], 'Burnin phase 1a', printfrq=printfrq, stop_if_cl_off=False)
+        self.hGMM.simulate(self.simpar.phases['B1a'], 'Burnin phase 1a',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
         print "prior vals: {}".format(self.hGMM.prior.__dict__)
         self.hGMM.resize_var_priors(1./self.simpar.tightinitfac)
         print "prior vals: {}".format(self.hGMM.prior.__dict__)
-        self.hGMM.simulate(self.simpar.phases['B1b'], 'Burnin phase 1b', printfrq=printfrq, stop_if_cl_off=False)
+        self.hGMM.simulate(self.simpar.phases['B1b'], 'Burnin phase 1b',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
         self.hGMM.set_theta_to_median()
         #hGMM.deactivate_outlying_components()
         self.hGMM.set_GMMs_mu_Sigma_from_prior()
         self.comm.Barrier()
-        self.hGMM.simulate(self.simpar.phases['B2a'], 'Burnin phase 2a', stop_if_cl_off=False, printfrq=printfrq)
-        self.hGMM.simulate(self.simpar.phases['B2b'], 'Burnin phase 2a', stop_if_cl_off=False, printfrq=printfrq)
-        self.hGMM.simulate(self.simpar.phases['B3'], 'Burnin phase 3', stop_if_cl_off=False)
+        self.hGMM.simulate(self.simpar.phases['B2a'], 'Burnin phase 2a',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
+        self.hGMM.simulate(self.simpar.phases['B2b'], 'Burnin phase 2a',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
+        self.hGMM.simulate(self.simpar.phases['B3'], 'Burnin phase 3',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
         self.hGMM.save_burnlog(self.rundir)
 
         t1 = time.time()
@@ -131,7 +141,9 @@ class Pipeline(object):
         '''
                 Production iterations
         '''
-        self.hGMM.simulate(self.simpar.phases['P'], 'Production phase', stop_if_cl_off=False, printfrq=printfrq)
+        self.hGMM.simulate(self.simpar.phases['P'], 'Production phase',
+                           printfrq=printfrq, stop_if_cl_off=False,
+                           plotting=True, plotdim=[[0, 1]])
         self.hGMM.save_log(self.rundir)
 
         t2 = time.time()
@@ -141,13 +153,13 @@ class Pipeline(object):
 
         del self.hGMM
 
-    def postproc(self):
-        blog = HMlogB.load(self.rundir)
-        log = HMElog.load(self.rundir)
-        data = load_fcdata(log.names, **self.data_kws)
+    def postproc(self, comm=MPI.COMM_SELF):
+        blog = HMlogB.load(self.rundir, comm=comm)
+        log = HMElog.load(self.rundir, comm=comm)
+        data = load_fcdata(log.names, comm=comm, **self.data_kws)
         self.metadata['samp'] = {'names': log.names}
 
-        self.res = HMres(log, blog, data, self.metadata)
+        self.res = HMres(log, blog, data, self.metadata, comm=comm)
         self.res.merge(self.postpar.mergemeth, **self.postpar.mergekws)
 
     def quality_check(self):
@@ -194,16 +206,18 @@ class Pipeline(object):
 
     def run(self):
         if 1:
-            self.generate_data()
+            if self.comm.Get_rank() == 0:
+                self.generate_data()
             self.setup_run()
             self.init_hGMM()
             print "prior vals: {}".format(self.hGMM.prior.__dict__)
             self.MCMC()
-            self.postproc()
-            self.quality_check()
-            self.plot()
-            if 1:
-                plt.show()
+            if self.comm.Get_rank() == 0:
+                self.postproc(MPI.COMM_SELF)
+                self.quality_check()
+                self.plot()
+                if 1:
+                    plt.show()
         # except Exception as e:
         #     self.clean_up()
         #     raise e

@@ -11,6 +11,7 @@ import numpy as np
 from .PurePython import GMM as PPGMM
 #import BayesFlow.mixture_util.GMM_util as GMM_util
 from .mixture_util import GMM_util
+from .plot import component_plot
 #import bayesianmixture.distributions.rng_cython as rng_cython
 
 class mixture(PPGMM.mixture):
@@ -218,3 +219,5 @@ class mixture(PPGMM.mixture):
 		if norm==True:
 			GMM_util.calc_exp_normalize(self.prob_X, p, np.array(range(self.K + self.noise_class), dtype = np.int )[active_komp])
 
+	def plot_components(self, dim, ax, colors=None, lw=2):
+		return component_plot(self.mu, self.sigma, dim, ax, colors, lw)
