@@ -11,17 +11,16 @@ import os
 import inspect
 import shutil
 
-from utils.seed import get_seed
-
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
+from .utils.seed import get_seed
 
 
-def setup_sim(expdir, seed=None, setupfile=None, **kws):
+def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
     '''
         Define save and load directories, create save directories
         and copy experiment setup.
     '''
+
+    rank = comm.Get_rank()
 
     if seed is None:
         seed = get_seed(expdir)
@@ -45,7 +44,7 @@ def setup_sim(expdir, seed=None, setupfile=None, **kws):
     #    loaddir = expdir + 'run'+str(simpar.loadrond)+'/hGMM/burn/'
 
     if rank == 0:
-        for dr in [savedir, savedir+'hGMM/burn/', savedir+'hGMM/prod/']:
+        for dr in [savedir]:
             if not os.path.exists(dr):
                 os.makedirs(dr)
         simfile = inspect.getouterframes(inspect.currentframe())[1][1]
@@ -99,23 +98,23 @@ class Prior(object):
                         variance for components
                         with non-informative priors.
         """
-        if rank == 0:
-            if t_inf is None:
-                ts = np.zeros((0,self.d))
-                Sks = np.zeros((0,self.d))
-            else:
-                ts = t_inf
-                Sks = Sk_inf
-            
-            if ts.shape[0] < self.K:
-                self.K_inf = ts.shape[0]
-                ts = np.vstack([ts,t_ex*np.ones((self.K-self.K_inf,self.d))])
-                Sks  = np.vstack([Sks,Sk_ex*np.ones((self.K-self.K_inf,self.d))])
-            else:
-                self.K_inf = 0
 
-            self.t = ts
-            self.S = Sks       
+        if t_inf is None:
+            ts = np.zeros((0, self.d))
+            Sks = np.zeros((0, self.d))
+        else:
+            ts = t_inf
+            Sks = Sk_inf
+
+        if ts.shape[0] < self.K:
+            self.K_inf = ts.shape[0]
+            ts = np.vstack([ts, t_ex*np.ones((self.K-self.K_inf, self.d))])
+            Sks = np.vstack([Sks, Sk_ex*np.ones((self.K-self.K_inf, self.d))])
+        else:
+            self.K_inf = 0
+
+        self.t = ts
+        self.S = Sks
 
     def component_location_variance(self,nt=None,q=None,n_theta=None,Q=None):
         """
@@ -133,14 +132,13 @@ class Prior(object):
                         Q as its diagonal elements.
 
         """
-        if rank == 0:
-            if n_theta is None:
-                n_theta = int(nt*self.n_J/self.K)
-            self.n_theta = n_theta*np.ones(self.K,dtype='i')
+        if n_theta is None:
+            n_theta = int(nt*self.n_J/self.K)
+        self.n_theta = n_theta*np.ones(self.K,dtype='i')
 
-            if Q is None:
-                Q = q*(self.n_theta-self.d-1)*self.J
-            self.Q = Q*np.ones(self.K)
+        if Q is None:
+            Q = q*(self.n_theta-self.d-1)*self.J
+        self.Q = Q*np.ones(self.K)
      
     def component_shape(self,nps=None,min_n_Psi=12,h=None,n_Psi=None,H=None):   
         """
@@ -159,14 +157,14 @@ class Prior(object):
             H           -   scalar. The scale matrix will be diagonal
                             with H as its diagonal elements.
         """
-        if rank == 0:
-            if n_Psi is None:
-                n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
-            self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
-       
-            if H is None:
-                H = h*(self.n_Psi-self.d-1)/self.n_Psi/self.J
-            self.H = H
+
+        if n_Psi is None:
+            n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
+        self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
+   
+        if H is None:
+            H = h*(self.n_Psi-self.d-1)/self.n_Psi/self.J
+        self.H = H
 
     def set_noise_class(self,noise_mu,noise_Sigma,on=True):
         """
@@ -207,10 +205,10 @@ class Prior(object):
             With c >> 1 this can be used to force sample
             component locations together.
         """
-        if rank == 0:
-            n_theta_old = self.n_theta
-            self.n_theta = c*self.n_theta
-            self.Q = (self.n_theta-self.d-1)/(n_theta_old-self.d-1)*self.Q
+
+        n_theta_old = self.n_theta
+        self.n_theta = c*self.n_theta
+        self.Q = (self.n_theta-self.d-1)/(n_theta_old-self.d-1)*self.Q
 
     def resize_Psi_prior(self,c):
         """
@@ -218,10 +216,9 @@ class Prior(object):
             With c >> 1 this can be used to force sample
             components to same shape.
         """
-        if rank == 0:
-            n_Psi_old = self.n_Psi
-            self.n_Psi = c*self.n_Psi
-            self.H = (self.n_Psi-self.d-1)/self.n_Psi * (n_Psi_old-self.d-1)/n_Psi_old
+        n_Psi_old = self.n_Psi
+        self.n_Psi = c*self.n_Psi
+        self.H = (self.n_Psi-self.d-1)/self.n_Psi * (n_Psi_old-self.d-1)/n_Psi_old
 
     def relaxed_switch(self, nu_sw = None, Sigma_mu_sw = None):
         if not nu_sw is None:
@@ -251,23 +248,22 @@ class BalancedPrior(Prior):
                         variance for components
                         with non-informative priors.
         """
-        if rank == 0:
-            if t_inf is None:
-                ts = np.zeros((0, self.d))
-                Sks = np.zeros((0, self.d))
-            else:
-                ts = t_inf
-                Sks = alpha_Sk/(self.n_J*self.J)*np.ones((t_inf.shape[0], self.d))
-            
-            if ts.shape[0] < self.K:
-                self.K_inf = ts.shape[0]
-                ts = np.vstack([ts,t_ex*np.ones((self.K-self.K_inf,self.d))])
-                Sks  = np.vstack([Sks,Sk_ex*np.ones((self.K-self.K_inf,self.d))])
-            else:
-                self.K_inf = 0
+        if t_inf is None:
+            ts = np.zeros((0, self.d))
+            Sks = np.zeros((0, self.d))
+        else:
+            ts = t_inf
+            Sks = alpha_Sk/(self.n_J*self.J)*np.ones((t_inf.shape[0], self.d))
+        
+        if ts.shape[0] < self.K:
+            self.K_inf = ts.shape[0]
+            ts = np.vstack([ts,t_ex*np.ones((self.K-self.K_inf,self.d))])
+            Sks  = np.vstack([Sks,Sk_ex*np.ones((self.K-self.K_inf,self.d))])
+        else:
+            self.K_inf = 0
 
-            self.t = ts
-            self.S = Sks       
+        self.t = ts
+        self.S = Sks       
 
     def component_location_variance(self,nt,q):
         """
@@ -280,12 +276,11 @@ class BalancedPrior(Prior):
                         d, and J, with q as a scaling factor.
 
         """
-        if rank == 0:
-            n_theta = int(nt*self.n_J/self.K)
-            self.n_theta = n_theta*np.ones(self.K,dtype='i')
+        n_theta = int(nt*self.n_J/self.K)
+        self.n_theta = n_theta*np.ones(self.K,dtype='i')
 
-            Q = q*self.J
-            self.Q = Q*np.ones(self.K)
+        Q = q*self.J
+        self.Q = Q*np.ones(self.K)
      
     def component_shape(self,nps,h,min_n_Psi=12):   
         """
@@ -299,11 +294,10 @@ class BalancedPrior(Prior):
             h           -   scalar. H will be determined based on n_Psi,
                             d and J, with h as a scaling constant.
         """
-        if rank == 0:
-            n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
-            self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
-            
-            self.H = h*np.ones(self.K)/self.J
+        n_Psi = max([int(nps*self.n_J/self.K),min_n_Psi])
+        self.n_Psi = n_Psi*np.ones(self.K,dtype='i')
+        
+        self.H = h*np.ones(self.K)/self.J
 
     def resize_Sigma_theta_prior(self,c):
         """
@@ -311,8 +305,7 @@ class BalancedPrior(Prior):
             With c >> 1 this can be used to force sample
             component locations together.
         """
-        if rank == 0:
-            self.n_theta = c*self.n_theta
+        self.n_theta = c*self.n_theta
 
     def resize_Psi_prior(self,c):
         """
@@ -320,8 +313,7 @@ class BalancedPrior(Prior):
             With c >> 1 this can be used to force sample
             components to same shape.
         """
-        if rank == 0:
-            self.n_Psi = c*self.n_Psi
+        self.n_Psi = c*self.n_Psi
     
 
 class PostProcPar(object):
