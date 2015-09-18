@@ -241,7 +241,7 @@ def component_plot(mus,Sigmas,dim,ax,colors=None,lw=2):
         mu,Sigma    -   mixture component parameters
         dim         -   dimensions for projection
     '''
-    
+
     q_y = [np.inf,-np.inf]
     q_x = [np.inf,-np.inf]
     K = len(mus)

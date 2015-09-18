@@ -19,6 +19,8 @@ def EM_pooled(comm, data, K, noise_class=False,
               noise_mu=0.5, noise_sigma=0.5**2, noise_pi=0.001,
               n_iter=10, n_init=5, WIS=False,
               selection='likelihood', gamma=None, plotting=False, **kw):
+    if comm.Get_rank() > 0:
+        plotting = False
 
     if WIS:
         return EM_weighted_iterated_subsampling(
@@ -73,11 +75,9 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
     if pis_fixed is None:
         pis_fixed = []
 
-    mu0, Sigma0, _ = \
-        E_step_pooled(comm, data,
-                      [np.array([1./K
-                                 for i in range(dat.shape[0])]).reshape(-1, 1)
-                       for dat in data])
+    mu0, Sigma0, _ = E_step_pooled(
+        comm, data, [np.array([1./K for i in range(dat.shape[0])]).reshape(-1, 1)
+                     for dat in data])
     d = data[0].shape[1]
     if selection == 'likelihood':
         max_log_lik = -np.inf
@@ -85,6 +85,8 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
         min_emd = np.inf
         data_mpi = DataMPI(comm, data)
         N_synsamp = int(sum(data_mpi.n_j)*.1)
+    elif selection == 'sum_min_dist':
+        max_sum_min_dist = -np.inf
     else:
         raise ValueError("Selection {} not possible".format(selection))
 
@@ -102,8 +104,13 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
         for it in range(n_iter):
             weights = M_step_pooled(comm, data, mus, Sigmas, pis)
             for k in range(K):
-                (mus[k], Sigmas[k],
-                 pis[k]) = E_step_pooled(comm, data, [weight[:, k] for weight in weights])
+                try:
+                    mus[k], Sigmas[k], pis[k] = E_step_pooled(
+                        comm, data, [weight[:, k] for weight in weights])
+                except EmptyClusterError:
+                    mus[k] = stats.multivariate_normal.rvs(mu0, Sigma0)
+                    Sigmas[k] = Sigma0
+                    pis[k] = 0.01
             for k_fix in range(K, K+K_fix):
                 if not k_fix in k_pi_fixed:
                     pis[k] = WeightsMPI(comm, [weight[:, k] for weight in weights]).W
@@ -114,15 +121,55 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
             log_lik = sum(comm.bcast(comm.gather(log_lik_loc)))
             if log_lik > max_log_lik:
                 best_mus, best_Sigmas, best_pis = mus, Sigmas, pis
+                max_log_lik = log_lik
+
         elif selection == 'EMD':
-            real_data = data_mpi.subsample_to_root(N_synsamp)
-            syn_data = mixture.simulate_mixture(mus, Sigmas, pis, N_synsamp)
-            emd = max([earth_movers_distance(syn_data, real_data, nbins=50, dim=[i, j],
-                                             gamma=gamma)
-                       for i in range(d) for j in range(i+1, d)])
+            emd = EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis,
+                                              N_synsamp, gamma)
             if emd < min_emd:
                 best_mus, best_Sigmas, best_pis = mus, Sigmas, pis
+                min_emd = emd
+
+        elif selection == 'sum_min_dist':
+            mus_all = comm.gather(mus)
+            if comm.Get_rank() == 0:
+                mus_all = np.vstack(mus_all)
+                L = mus_all.shape[0]
+                D = np.empty((L, L))
+                for i in range(L):
+                    for j in range(L):
+                        D[i, j] = np.linalg.norm(mus_all[i] - mus_all[j])
+                sum_min_dist = np.sum(np.min(D, axis=1))
+            else:
+                sum_min_dist = None
+            sum_min_dist = comm.bcast(sum_min_dist)
+            if sum_min_dist > max_sum_min_dist:
+                best_mus, best_Sigmas, best_pis = mus, Sigmas, pis
+                max_sum_min_dist = sum_min_dist
+
     return best_mus, best_Sigmas, best_pis
+
+
+def EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis, N_synsamp, gamma=1, nbins=50):
+    comm = data_mpi.comm
+    d = data_mpi.d
+    real_data = data_mpi.subsample_to_root(N_synsamp)
+    if comm.Get_rank() == 0:
+        syn_data = mixture.simulate_mixture(mus, Sigmas, pis, N_synsamp)
+        emd = max([earth_movers_distance(syn_data, real_data, nbins=nbins, dim=[i, j],
+                                         gamma=gamma)
+                   for i in range(d) for j in range(i+1, d)])
+    else:
+        emd = None
+    return comm.bcast(emd)
+
+
+def data_log_likelihood(data_mpi, mus, Sigmas, pis):
+    comm = data_mpi.comm
+    weights = M_step_pooled(data_mpi.comm, data_mpi.data, mus, Sigmas, pis)
+    log_lik_loc = np.sum([np.sum(np.log(np.sum(weight, axis=1))) for weight in weights])
+    log_lik = sum(comm.bcast(comm.gather(log_lik_loc)))
+    return log_lik
 
 
 #@profile
@@ -164,7 +211,6 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
         mus_fixed += [mus[k] for k in k_fixed]
         Sigmas_fixed += [Sigmas[k] for k in k_fixed]
         pis_fixed += [np.nan for k in k_fixed]
-
         if not likelihood_weights:
             weights = M_step_pooled(comm, data, mus, Sigmas, pis)
             weights_subsamp = [1-(np.sum(weight[:, weight.shape[1]-K_fix:], axis=1)
@@ -174,7 +220,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
             weights = component_likelihoods(data, mus_fixed, Sigmas_fixed)
             #fig = plt.figure()
             #plt.hist(weights)
-            weights_subsamp = [(-np.log((np.sum(weight, axis=1))))**rho for weight in weights]
+            weights_subsamp = [np.abs((-np.log((np.sum(weight, axis=1)))))**rho for weight in weights]
         data_subsamp = data_mpi.subsample_weighted(weights_subsamp, N)
 
         K_fix = len(mus_fixed)

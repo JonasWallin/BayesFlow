@@ -1,3 +1,11 @@
+class NoDataError(Exception):
+    pass
+
+
+class OldFileError(Exception):
+    pass
+
+
 class NoOtherClusterError(Exception):
     pass
 

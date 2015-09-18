@@ -1,5 +1,6 @@
 import numpy as np
 from mpi4py import MPI
+import matplotlib.pyplot as plt
 
 from .. import LazyProperty
 from .. import load_fcdata
@@ -153,3 +154,17 @@ class DataMPI(object):
         print "tot weight for subsampling {}".format(weightsMPI.W)
         indices = weightsMPI.sample_from_all(N)
         return [self.data[j][ind, :] for j, ind in enumerate(indices)]
+
+    def scatter(self, dim, ax=None, **kw):
+        if ax is None:
+            if self.rank == 0:
+                _, ax = plt.subplots()
+            else:
+                ax = None
+            ax = self.comm.bcast(ax)
+        for rank in range(self.comm.Get_size()):
+            if rank == self.rank:
+                for dat in self.data:
+                    ax.scatter(dat[:, dim[0]], dat[:, dim[1]], **kw)
+            self.comm.Barrier()
+

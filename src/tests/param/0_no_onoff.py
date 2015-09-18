@@ -27,15 +27,18 @@ def setup(comm, J, n_J, d, K):
     prior.set_noise_class(noise_mu=0.5, noise_Sigma=0.5**2, on=False)  # We do not introduce noise class from start
     prior.pop_size()
 
+    AMCMC = True
+
     qB1a = 0.20
     qB1b = 0.20
     qB2a = 0.05
     qB2b = 0.25
     qB3 = 0.30
 
-    nbriter = 1000
+    nbriter = 16000
 
-    simpar = SimPar(nbriter=nbriter, qburn=0.8, tightinit=1, simsamp=['1', '2', '3'])
+    simpar = SimPar(nbriter=nbriter, qburn=0.8, tightinit=100,
+                    AMCMC=AMCMC, simsamp=['1', '2', '3'])
     simpar.new_burnphase(qB1a, 'B1a')
     simpar.set('B1a', p_sw=0, p_on_off=[0, 0])
     if rank == 0:
@@ -47,11 +50,13 @@ def setup(comm, J, n_J, d, K):
     simpar.set('B2a', p_sw=0.1, p_on_off=[0, 0])
     simpar.new_burnphase(qB2b, 'B2b')
     simpar.set('B2b', p_sw=0.1, p_on_off=[0, 0])
-    simpar.new_trialphase(100)
     simpar.new_burnphase(qB3, 'B3')
     simpar.set('B3', p_sw=0, p_on_off=[0, 0])
-    simpar.set_nu_MH('B3', sigma_nuprop=0.1)
     simpar.new_prodphase(last_burnphase='B3')
+
+    for ph in ['B1b', 'B2a', 'B2b', 'B3']:
+        if not AMCMC:
+            simpar.set_nu_MH(ph, sigma_nuprop=0.1)
 
     postproc = PostProcPar(True, 'bhat_hier_dip', thr=0.47, lowthr=0.08, dipthr=0.28)
 

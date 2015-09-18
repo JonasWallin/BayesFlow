@@ -66,3 +66,20 @@ class HMres(Mres):
                 self.comm.send(self.mergeind, dest=i, tag=2)
         else:
             self.mergeind = self.comm.recv(source=0, tag=2)
+
+    def get_bh_distance_to_own_latent(self):
+        return self.components.get_bh_distance_to_own_latent()
+
+    def get_center_dist(self):
+        return self.components.get_center_dist()
+
+    def get_mix(self, j):
+        active = self.active_komp[j, :] > 0.05
+        mus = [self.components.mupers[j, k, :] for k in range(self.K) if active[k]]
+        Sigmas = [self.components.Sigmapers[j, k, :, :] for k in range(self.K) if active[k]]
+        ps = self.components.p[j, active]
+        return mus, Sigmas, ps
+
+    @property
+    def K_active(self):
+        return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
