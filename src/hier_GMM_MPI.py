@@ -595,7 +595,6 @@ class hierarical_mixture_mpi(object):
                 Psiprior['Qs'] = H[k]*np.eye(self.d)
                 Psiprior['nus'] = n_Psi[k]
                 self.wishart_p_nus[k].Q_class.set_prior(Psiprior)
-                print "psiprior = {}".format(Psiprior)
 
     def resize_var_priors(self, c):
         self.prior.resize_var_priors(c)
