@@ -1,8 +1,8 @@
 import numpy as np
-import Bhattacharyya as bhat
-from flow_match import flow_match
-
 import matplotlib.pyplot as plt
+
+from .. import Bhattacharyya as bhat
+from .flow_match import flow_match
 
 
 class SampleComponents(object):

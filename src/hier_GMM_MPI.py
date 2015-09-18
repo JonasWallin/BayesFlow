@@ -5,16 +5,7 @@ Created on Jul 10, 2014
 @author: jonaswallin
 '''
 from mpi4py import MPI
-import GMM
 import numpy as np
-from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
-from BayesFlow.GMM import mixture
-from BayesFlow.utils import dat_util
-from BayesFlow.utils.mpiutil import bcast_int
-from BayesFlow.utils.EM_weighted_iterated_subsampling import EM_weighted_iterated_subsampling
-import HMlog
-import matplotlib.pyplot as plt
-#from mpl_toolkits.mplot3d import Axes3D
 import numpy.random as npr
 import os
 import glob
@@ -22,6 +13,18 @@ import time
 import warnings
 import traceback
 import sys
+import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
+
+from . import GMM
+from .distribution import normal_p_wishart, Wishart_p_nu
+from .GMM import mixture
+from .utils.timer import Timer
+from .utils.initialization.EM import EM_pooled
+from .utils import load_fcdata
+from .exceptions import SimulationError
+from . import HMlog
+
 
 #TODO: change to geomtrical median instead of mean!!
 #TODO: if a cluster is turned off use the latent mean insead of mu
@@ -84,12 +87,6 @@ def load_hGMM(dirname):
     hGMM.load_from_file(dirname)
     return hGMM
 
-class SimulationError(Exception):
-    def __init__(self,msg,name='',it=0):
-        self.msg = msg
-        self.name = name
-        self.iteration = it
-
 
 class hierarical_mixture_mpi(object):
     """    
@@ -98,7 +95,7 @@ class hierarical_mixture_mpi(object):
     """
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
                  thetas=None, expSigmas=None, high_memory=True, timing=False,
-                 comm=MPI.COMM_WORLD):
+                 AMCMC=False, comm=MPI.COMM_WORLD):
         """
             starting up the class and defning number of classes
             
@@ -116,7 +113,7 @@ class hierarical_mixture_mpi(object):
         #master
         if rank == 0:
             self.normal_p_wisharts = [ normal_p_wishart() for k in range(self.K)]  # @UnusedVariable
-            self.wishart_p_nus     = [Wishart_p_nu() for k in range(self.K) ]  # @UnusedVariable
+            self.wishart_p_nus     = [Wishart_p_nu(AMCMC=AMCMC) for k in range(self.K) ]  # @UnusedVariable
 
         else:
             self.normal_p_wisharts = None 
@@ -261,27 +258,6 @@ class hierarical_mixture_mpi(object):
         else:
             data = {'GMM':self.GMMs}
             self.comm.send(data, dest=0, tag=11)
-
-        
-    
-    def set_nu_MH_param(self, sigma = 5, iteration = 5, sigma_nuprop = None):
-        """
-            setting the parametet for the MH algorithm
-            
-            sigma     -  the sigma in the MH algorihm on the Natural line
-            iteration -  number of time to sample using the MH algortihm
-            sigma_nuprop - if provided, the proportion of nu that will be set as sigma
-            
-        """
-        if self.comm.Get_rank() == 0:  # @UndefinedVariable
-            for k,wpn in enumerate(self.wishart_p_nus):
-                if sigma_nuprop is None:
-                    if not isinstance(sigma, list):
-                        wpn.set_MH_param( sigma , iteration)
-                    else:
-                        wpn.set_MH_param( sigma[k] , iteration)
-                else:
-                    wpn.set_MH_param( max(np.ceil(sigma_nuprop*wpn.param['nu']),self.d) , iteration)
         
     def add_noise_class(self,Sigma_scale = 5.,mu=None,Sigma=None):
         
@@ -407,17 +383,37 @@ class hierarical_mixture_mpi(object):
                 self.wishart_p_nus[k].set_data(Sigma_k[index,:,:])
 
         self.comm.Bcast([cl_off, MPI.INT])  # @UndefinedVariable
-        
+
         if cl_off[0]:
             warnings.warn('One cluster turned off in all samples')
-            
 
-    def set_simulation_param(self,sim_par):
+    def set_simulation_param(self, sim_par):
         self.set_p_labelswitch(sim_par['p_sw'])
         if not sim_par['nu_MH_par'] is None:
             self.set_nu_MH_param(**sim_par['nu_MH_par'])
         self.set_p_activation(sim_par['p_on_off'])
 
+    def set_nu_MH_param(self, sigma=5, iteration=5, sigma_nuprop=None):
+        """
+            setting the parameters for the MH algorithm
+
+            sigma           - the sigma in the MH algorihm on the
+                              natural line
+            iteration       - number of time to sample using the MH algortihm
+            sigma_nuprop    - if provided, the proportion of nu that will
+                              be set as sigma
+
+        """
+        if self.comm.Get_rank() == 0:  # @UndefinedVariable
+            for k, wpn in enumerate(self.wishart_p_nus):
+                if sigma_nuprop is None:
+                    if not isinstance(sigma, list):
+                        wpn.set_MH_param(sigma, iteration)
+                    else:
+                        wpn.set_MH_param(sigma[k], iteration)
+                else:
+                    wpn.set_MH_param(max(np.ceil(sigma_nuprop*wpn.param['nu']),
+                                         self.d), iteration)
 
     def set_p_activation(self, p):
         '''
@@ -426,8 +422,7 @@ class hierarical_mixture_mpi(object):
         for GMM in self.GMMs:
             GMM.p_act   = p[0]
             GMM.p_inact = p[1]
-    
-    
+
     def set_prior_actiavation(self, komp_prior):
         '''
             setting the expontial covariates on likelihood on that a component is active
@@ -436,15 +431,15 @@ class hierarical_mixture_mpi(object):
         '''
         for GMM in self.GMMs:
             GMM.komp_prior = komp_prior
-    
+
     def set_p_labelswitch(self,p):
         """
             setting the label switch parameter
         """
-        
+
         for GMM in self.GMMs:
             GMM.p_switch   = p
-    
+
     def set_nuss(self, nu):
         """
             increase to force the mean to move together
@@ -466,7 +461,7 @@ class hierarical_mixture_mpi(object):
         """
             Load data corresponding to sampnames directly onto worker
         """      
-        data = dat_util.load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
+        data = load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
         rank = self.comm.Get_rank()
 
         self.n = len(data)
@@ -479,11 +474,10 @@ class hierarical_mixture_mpi(object):
         print "self.counts at rank {} = {}".format(rank,self.counts)
         
         if rank == 0:
-            d = data[0].shape[1]
+            self.d = data[0].shape[1]
         else:
-            d = 0
-        d = bcast_int(d,self.comm)
-        self.d = d
+            self.d = 0
+        self.d = self.comm.bcast(self.d)
 
         for Y,name in zip(data,sampnames):
             if self.d != Y.shape[1]:
@@ -549,15 +543,15 @@ class hierarical_mixture_mpi(object):
         self.set_var_prior(prior)
 
         if hasattr(prior, 'nu_sw'):
-            for GMM in self.GMMs:
-                GMM.nu_sw = prior.nu_sw
+            for gmm in self.GMMs:
+                gmm.nu_sw = prior.nu_sw
 
         if hasattr(prior, 'Sigma_mu_sw'):
-            for GMM in self.GMMs:
-                GMM.Sigma_mu_sw = prior.Sigma_mu_sw
+            for gmm in self.GMMs:
+                gmm.Sigma_mu_sw = prior.Sigma_mu_sw
 
-        for GMM in self.GMMs:
-            GMM.alpha_vec = prior.a
+        for gmm in self.GMMs:
+            gmm.alpha_vec = prior.a
 
         if init:
             self.set_latent_init(prior, thetas, expSigmas)
@@ -565,12 +559,12 @@ class hierarical_mixture_mpi(object):
 
         self.prior = prior
 
-    def set_location_prior(self,prior):
+    def set_location_prior(self, prior):
         if self.comm.Get_rank() == 0:
             for k in range(self.K):
                 thetaprior = {}
-                thetaprior['mu'] = prior.t[k,:]
-                thetaprior['Sigma'] = np.diag(prior.S[k,:])
+                thetaprior['mu'] = prior.t[k, :]
+                thetaprior['Sigma'] = np.diag(prior.S[k, :])
                 self.normal_p_wisharts[k].theta_class.set_prior(thetaprior)
 
     def set_var_prior(self, prior=None):
@@ -610,10 +604,9 @@ class hierarical_mixture_mpi(object):
 
         rank = self.comm.Get_rank()
 
-        if method == 'EMWIS':
-            data = [GMM.data for GMM in self.GMMs]
-            thetas, expSigmas, _ = EM_weighted_iterated_subsampling(
-                self.comm, data, self.K, **kw)
+        if method == 'EM_pooled':
+            data = [gmm.data for gmm in self.GMMs]
+            thetas, expSigmas, _ = EM_pooled(self.comm, data, self.K, **kw)
 
         if rank == 0:
             for k in range(self.K):
@@ -641,12 +634,13 @@ class hierarical_mixture_mpi(object):
                     wpnparam['Q'] = expSigmas[k] * (wpnparam['nu']-self.d-1)
                 wpn.set_parameter(wpnparam)
                 wpn.nu_class.set_val(wpn.Q_class.nu_s)
+        self.update_GMM()
 
     def set_GMM_init(self):
         self.set_GMMs_mu_Sigma_from_prior()
-        for GMM in self.GMMs:
-            GMM.p = GMM.alpha_vec/sum(GMM.alpha_vec)
-            GMM.active_komp = np.ones(self.K+self.noise_class,dtype='bool')
+        for gmm in self.GMMs:
+            gmm.p = gmm.alpha_vec/sum(gmm.alpha_vec)
+            gmm.active_komp = np.ones(self.K+self.noise_class, dtype='bool')
 
     def set_GMMs_mu_Sigma_from_prior(self):
         param = [None]*self.K
@@ -654,37 +648,44 @@ class hierarical_mixture_mpi(object):
             param[k] = {}
             param[k]['mu'] = self.GMMs[0].prior[k]['mu']['theta'].reshape(self.d)
             param[k]['sigma'] = self.GMMs[0].prior[k]['sigma']['Q']/(self.GMMs[0].prior[k]['sigma']['nu']-self.d-1)
-        for GMM in self.GMMs:
-            GMM.set_param(param,active_only=True)
+        for gmm in self.GMMs:
+            gmm.set_param(param, active_only=True)
 
-    def deactivate_outlying_components(self,aquitted=None,bhat_distance=False):
-        any_deactivated = 0
-        for GMM in self.GMMs:
-            any_deactivated = max(any_deactivated,GMM.deactivate_outlying_components(aquitted,bhat_distance))
-            
+    def deactivate_outlying_components(self, aquitted=None, bhat_distance=False):
+        any_deactivated_loc = 0
+        for gmm in self.GMMs:
+            any_deactivated_loc = max(
+                any_deactivated_loc, gmm.deactivate_outlying_components(aquitted, bhat_distance))
+
+        any_deactivated_all = self.comm.gather(any_deactivated_loc)
         if self.comm.Get_rank() == 0:
-            any_deactivated_all = np.empty(self.comm.Get_size(),dtype = 'i')
+            any_deactivated = max(any_deactivated_all)
         else:
-            any_deactivated_all = 0
-        self.comm.Gather(sendbuf=[np.array(any_deactivated,dtype='i'), MPI.INT], recvbuf=[any_deactivated_all, MPI.INT], root=0)
-        if self.comm.Get_rank() == 0:
-            any_deactivated = np.array([max(any_deactivated_all)])
-        else:
-            any_deactivated = np.array([any_deactivated])
-        self.comm.Bcast([any_deactivated, MPI.INT],root=0)
-        
-        return any_deactivated
+            any_deactivated = None
+        return self.comm.bcast(any_deactivated)
+
+        # if self.comm.Get_rank() == 0:
+        #     any_deactivated_all = np.empty(self.comm.Get_size(),dtype = 'i')
+        # else:
+        #     any_deactivated_all = 0
+        # self.comm.Gather(sendbuf=[np.array(any_deactivated,dtype='i'), MPI.INT], recvbuf=[any_deactivated_all, MPI.INT], root=0)
+        # if self.comm.Get_rank() == 0:
+        #     any_deactivated = np.array([max(any_deactivated_all)])
+        # else:
+        #     any_deactivated = np.array([any_deactivated])
+        # self.comm.Bcast([any_deactivated, MPI.INT],root=0)
+        # return any_deactivated
 
     def set_theta_to_median(self):
         mus = self.get_mus()
         if self.comm.Get_rank() == 0:
-            medians = np.median(mus,axis=0)
+            medians = np.median(mus, axis=0)
             for k in range(self.K):
                 npw = self.normal_p_wisharts[k]
                 npwparam = {}
-                npwparam['theta'] = medians[k,:]
+                npwparam['theta'] = medians[k, :]
                 npwparam['Sigma'] = npw.param['Sigma']
-                npw.set_parameter(npwparam)            
+                npw.set_parameter(npwparam)
         self.comm.Barrier()
         self.update_GMM()
 
@@ -736,7 +737,15 @@ class hierarical_mixture_mpi(object):
             nus = np.array([wpn.param['nu'] for wpn in self.wishart_p_nus])
             
         return nus
-                
+
+    def get_sigma_nus(self):
+        sigma_nus = None
+
+        if self.comm.Get_rank() == 0:
+            sigma_nus = np.array([wpn.nu_class.sigma for wpn in self.wishart_p_nus])
+
+        return sigma_nus
+
     def get_mus(self):
         """
             Collects all mu and sends them to rank ==0
@@ -1037,7 +1046,8 @@ class hierarical_mixture_mpi(object):
         else:
             self.timing = False
 
-    def simulate(self, simpar, name='simulation', printfrq=100, stop_if_cl_off=True):
+    def simulate(self, simpar, name='simulation', printfrq=100,
+                 stop_if_cl_off=True, plotting=False, plotdim=None):
 
         if self.comm.Get_size() > 1:        
             sys.excepthook = self.mpiexceptabort
@@ -1046,46 +1056,39 @@ class hierarical_mixture_mpi(object):
         else:
             warnings.filterwarnings("default", 'One cluster turned off in all samples')
 
-        if self.timing:
-            t_GMM = 0
-            t_load = 0
-            t_rest = 0
-            t_save = 0
         iterations = np.int(simpar['iterations'])
         self.set_simulation_param(simpar)
         hmlog = getattr(HMlog, simpar['logtype'])(self, iterations,
                                                   **simpar['logpar'])
+
+        if self.timing:
+            timer = Timer(self.comm)
 
         try:
             for i in range(iterations):
                 if i % printfrq == 0 and self.comm.Get_rank() == 0:
                     print "{} iteration = {}".format(name, i)
                     if self.timing:
-                        print "{} iteration = {}".format(name, i)
-                        print("hgmm GMM  %.4f sec/sim" % (t_GMM/(i+1)))
-                        print("hgmm load  %.4f sec/sim" % (t_load/(i+1)))
-                        print("hgmm rank=0  %.4f sec/sim" % (t_rest/(i+1)))
-                        print("save  %.4f sec/sim" % (t_save/(i+1)))
+                        timer.print_timepoints(iter=i)
+                    if plotting:
+                        fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
+                                                sharex=True, sharey=True,
+                                                squeeze=False)
+                        for j, gmm in enumerate(self.GMMs):
+                            for k, dim in enumerate(plotdim):
+                                gmm.plot_components(dim, axs[k, j])
 
                 if not self.timing:
                     self.sample()
                     hmlog.savesim(self)
                 else:
-                    if self.comm.Get_rank() == 0:
-                        t0 = time.time()
 
-                    for GMM in self.GMMs:
-                        GMM.sample()
-
-                    if self.comm.Get_rank() == 0:
-                        t1 = time.time()
-                        t_GMM += np.double(t1-t0)
+                    for gmm in self.GMMs:
+                        gmm.sample()
+                    timer.timepoint('GMM')
 
                     self.update_prior()
-
-                    if self.comm.Get_rank() == 0:
-                        t2 = time.time()
-                        t_load += np.double(t2-t1)
+                    timer.timepoint('load')
 
                     if self.comm.Get_rank() == 0:
                         for k in range(self.K):
@@ -1093,16 +1096,10 @@ class hierarical_mixture_mpi(object):
                             self.wishart_p_nus[k].sample()
                     self.comm.Barrier()
                     self.update_GMM()
-
-                    if self.comm.Get_rank() == 0:
-                        t3 = time.time()
-                        t_rest += np.double(t3-t2)
+                    timer.timepoint('hGMM rank=0')
 
                     hmlog.savesim(self)
-
-                    if self.comm.Get_rank() == 0:
-                        t4 = time.time()
-                        t_save += np.double(t4-t3)
+                    timer.timepoint('save')
 
         except UserWarning as w:
             raise SimulationError(str(w), name=name, it=i)
@@ -1114,6 +1111,9 @@ class hierarical_mixture_mpi(object):
                 self.blog = hmlog
         else:
             self.log = hmlog
+
+        if self.timing:
+            timer.print_timepoints(iterations)
 
         return hmlog
 

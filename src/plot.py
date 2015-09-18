@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as colors
-from utils.plot_util import black_ip
+from .utils.plot_util import black_ip
 
 def autocorr(x_in, lag=100):
     """
@@ -241,7 +241,7 @@ def component_plot(mus,Sigmas,dim,ax,colors=None,lw=2):
         mu,Sigma    -   mixture component parameters
         dim         -   dimensions for projection
     '''
-    
+
     q_y = [np.inf,-np.inf]
     q_x = [np.inf,-np.inf]
     K = len(mus)

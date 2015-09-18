@@ -6,7 +6,8 @@ updated: May 28, 2015: added AMCMC
 '''
 import numpy as np
 import numpy.random as npr
-from BayesFlow.utils.gammad import ln_gamma_d
+#from BayesFlow.utils.gammad import ln_gamma_d
+from ...utils.gammad import ln_gamma_d
 
 def f_prior_nu(x, nu  =0.01): 
 	"""
@@ -136,6 +137,8 @@ class nu_class(object):
 		
 		for i in range(self.iterations):  # @UnusedVariable
 			self.sample_()
+			if self.AMCMC:
+				self.update_AMCMC()
 			
 		return self.nu
 			
@@ -208,17 +211,16 @@ class nu_class(object):
 		"""
 		Using roberts and rosenthal method for tunning the acceptance rate
 		"""
-	
-	
-		if (self.amcmc_count +1) % self.amcmc_batch == 0:
 
-			delta = np.min([self.amcmc_delta_max, (self.count_mcmc/self.amcmc_batch)**(-self.amcmc_delta_rate)])
+		if (self.amcmc_count +1) % self.amcmc_batch == 0:
+	
+			delta = np.min([self.amcmc_delta_max, (self.amcmc_count/self.amcmc_batch)**(-self.amcmc_delta_rate)])
 			
-			if self.amcmc_accept / self.amcmc_count > self.amcmc_desired_accept:
+			if self.amcmc_accept / self.amcmc_batch > self.amcmc_desired_accept:
 				self.sigma *= np.exp(delta) 
 			else:
 				self.sigma /= np.exp(delta)
 			
-			self.amcmc_count  = 0.
+			#self.amcmc_count  = 0.
 			self.amcmc_accept = 0.
 		

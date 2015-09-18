@@ -7,13 +7,18 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-from BayesFlow.PurePython.distribution import wishart, multivariatenormal, logisticMNormal
-from BayesFlow.PurePython.GMM import sample_mu_Xbar, sample_mu, log_dir, log_betapdf, sample_sigma, sample_sigma_xxT
-import scipy.special as sps
-#import matplotlib.pyplot as plt
-import scipy.linalg as sla
-from BayesFlow.utils.gammad import ln_gamma_d
 import cPickle as pickle
+import scipy.linalg as sla
+import scipy.special as sps
+
+#from BayesFlow.PurePython.distribution import wishart, multivariatenormal, logisticMNormal
+from .distribution import wishart, multivariatenormal, logisticMNormal
+#from BayesFlow.PurePython.GMM import sample_mu_Xbar, sample_mu, log_dir, log_betapdf, sample_sigma, sample_sigma_xxT
+from .GMM import sample_mu_Xbar, sample_mu, log_dir, log_betapdf, sample_sigma, sample_sigma_xxT
+#import matplotlib.pyplot as plt
+#from BayesFlow.utils.gammad import ln_gamma_d
+from ..utils.gammad import ln_gamma_d
+
 
 def sample_mu_integrate(n, Y_sum, Sigma_eps, Sigma):
 	"""
@@ -67,7 +72,7 @@ def sample_mu_integrate(n, Y_sum, Sigma_eps, Sigma):
 
 
 def underconstruct(func):
-	print("%s is not implimented yet"%func.__name__)
+	#print("%s is not implimented yet"%func.__name__)
 	def decorotar(*args, **kwargs):
 		
 		return func(*args,**kwargs)

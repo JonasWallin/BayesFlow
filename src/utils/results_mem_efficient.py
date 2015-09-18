@@ -6,27 +6,14 @@ from mpi4py import MPI
 from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
 
-from BayesFlow.PurePython.distribution.wishart import invwishartrand
-from BayesFlow import HMlog
-from BayesFlow.exceptions import NoOtherClusterError, EmptyClusterError
-import Bhattacharyya as bhat
-import diptest
-from plot_util import get_colors
-from .random import rmvn
-
-
-class LazyProperty(object):
-
-    def __init__(self, func):
-        self._func = func
-        self.__name__ = func.__name__
-        self.__doc__ = func.__doc__
-
-    def __get__(self, obj, cls=None):
-        if obj is None:
-            return None
-        result = obj.__dict__[self.__name__] = self._func(obj)
-        return result
+from ..PurePython.distribution.wishart import invwishartrand
+from .. import HMlog
+from ..exceptions import NoOtherClusterError, EmptyClusterError
+from . import Bhattacharyya as bhat
+from . import diptest
+from .plot_util import get_colors
+from .random_ import rmvn
+from lazy_property import LazyProperty
 
 
 def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):
@@ -426,6 +413,14 @@ class Traces(object):
         self.mulat_prod = bmlog_prod.theta_sim
         self.nu_burn = bmlog_burn.nu_sim
         self.nu_prod = bmlog_prod.nu_sim
+        try:
+            self.nu_sigma_burn = bmlog_burn.nu_sigma_sim
+            self.nu_sigma_prod = bmlog_prod.nu_sigma_sim
+            print "self.nu_sigma_burn.shape = {}".format(self.nu_sigma_burn.shape)
+            print "self.nu_sigma_prod.shape = {}".format(self.nu_sigma_prod.shape)
+        except AttributeError:
+            print "No nu_sigma in log."
+            pass
 
         self.K = self.mulat_burn.shape[1]
 
@@ -434,6 +429,9 @@ class Traces(object):
 
     def get_nu(self):
         return np.vstack([self.nu_burn, self.nu_prod])
+
+    def get_nu_sigma(self):
+        return np.vstack([self.nu_sigma_burn, self.nu_sigma_prod])
 
 
 class FCsample(object):
@@ -815,6 +813,26 @@ class Components(object):
                 bhd[k, l] = bhat.bhattacharyya_distance(
                     self.mupers[j, k, :], self.Sigmapers[j, k, :, :],
                     self.mulat[l, :], self.Sigmalat[l, :])
+        return bhd
+
+    def get_bh_distance_to_own_latent(self):
+        '''
+            Get Bhattacharyya distance from sample component to
+            corresponding (own) latent component.
+
+            Returns a (self.J x self.K) array where element (j, k)
+            is the distance from sample component k to latent
+            component k in sample j.
+        '''
+        bhd = np.empty((self.J, self.K))
+        for j in range(self.J):
+            for k in range(self.K):
+                if self.active_komp[j, k] < 0.05:
+                    bhd[j, k] = np.nan
+                else:
+                    bhd[j, k] = bhat.bhattacharyya_distance(
+                        self.mupers[j, k, :], self.Sigmapers[j, k, :, :],
+                        self.mulat[k, :], self.Sigmalat[k, :])
         return bhd
 
     def get_bh_overlap(self, j):

@@ -14,8 +14,8 @@ import copy as cp
 #import utils.Bhattacharyya as bhat
 #from utils import diptest
 #import utils.discriminant as discr
-import BMplot as bmp
-from utils.results import MetaData, Traces, MimicSample, Clustering, Components, get_medprop_pers
+from .import BMplot as bmp
+from .utils.results import MetaData, Traces, MimicSample, Clustering, Components, get_medprop_pers
 
 #def GMM_means_for_best_BIC(data,Ks,n_init=10,n_iter=100,covariance_type='full'):
 #    data = data[~np.isnan(data[:,0]),:]

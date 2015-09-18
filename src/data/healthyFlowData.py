@@ -6,12 +6,17 @@ Created on Wed Jan  7 16:15:47 2015
 """
 from __future__ import division
 import numpy as np
-from rpy2.robjects.packages import importr
-from rpy2.rinterface import RRuntimeError
-import rpy2.robjects as robjects
-from BayesFlow.utils.dat_util import percentilescale
+try:
+    from rpy2.robjects.packages import importr
+    from rpy2.rinterface import RRuntimeError
+    import rpy2.robjects as robjects
+except ImportError as e:
+    print "{} --- will not be able to load dataset healthyFlowData".format(e)
 
-def load(Nsamp = None,scale = True):
+from ..utils.dat_util import percentilescale
+
+
+def load(Nsamp=None, scale=True):
     '''
         Load data from R package 'healthyFlowData'.
 
@@ -31,10 +36,10 @@ def load(Nsamp = None,scale = True):
     robjects.r('data(hd)')
     J = robjects.r('length(hd.flowSet)')[0]
     if not Nsamp is None:
-        J = min(J,Nsamp)
+        J = min(J, Nsamp)
     data = []
     sampnames = []
-    donorids = []    
+    donorids = []
     for j in range(J):
         samp = str(j+1)
         sampnames.append('sample'+samp)
@@ -42,13 +47,14 @@ def load(Nsamp = None,scale = True):
         donorids.append(robjects.r('hd.flowSet@phenoData@data$subject[['+samp+']]')[0])
 
     marker_lab = [ma for ma in np.array(robjects.r('hd.flowSet@colnames'))]
-    metasamp = {'names':sampnames,'donorid': donorids}
-    metadata = {'samp':metasamp,'marker_lab':marker_lab}
+    metasamp = {'names': sampnames, 'donorid': donorids}
+    metadata = {'samp': metasamp, 'marker_lab': marker_lab}
     if scale:
         percentilescale(data)
-        
-    return data,metadata
-        
-#data,metadata = load()
-#print "data = {}".format(data)
-#print "metadata = {}".format(metadata)
+
+    return data, metadata
+
+if __name__ == '__main__':
+    data, metadata = load()
+    print "data = {}".format(data)
+    print "metadata = {}".format(metadata)
