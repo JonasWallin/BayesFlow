@@ -517,26 +517,26 @@ class TracePlot(object):
         '''
             Plot trace plots of latent means and nus.
         '''
-        if fig == None:
+        if fig is None:
             fig = plt.figure()
         for k in range(self.traces.K):
-            ax = plt.subplot2grid((1, self.traces.K+1), (0, k))
-            self.mulat(k,ax,yscale)
+            ax = plt.subplot2grid((1, self.traces.K), (0, k))
+            self.mulat(k, ax, yscale)
             ax.set_title('theta_'+'{}'.format(k+1))
-        ax = plt.subplot2grid((1, self.traces.K+1), (0, k+1))
-        self.nu(ax)
-        ax.set_title('nu',fontsize=16)
-        return fig,ax
+        # ax = plt.subplot2grid((1, self.traces.K+1), (0, k+1))
+        # self.nu(ax)
+        # ax.set_title('nu',fontsize=16)
+        return fig, ax
         
-    def mulat(self,k,ax=None,yscale=True):
+    def mulat(self, k, ax=None, yscale=True):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
         ax.plot(self.traces.ind, self.traces.get_mulat_k(self.order[k]))
-        ax.set_xlim(0,self.traces.ind[-1])
+        ax.set_xlim(0, self.traces.ind[-1])
         if yscale:
-            ax.set_ylim(-.2,1.2)
-            ax.axes.yaxis.set_ticks([0.1,0.9])
+            ax.set_ylim(-.2, 1.2)
+            ax.axes.yaxis.set_ticks([0.1, 0.9])
         plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
         
     def nu(self,ax=None):
@@ -544,10 +544,19 @@ class TracePlot(object):
             fig = plt.figure()
             ax = fig.add_subplot(111)
         ax.plot(self.traces.ind, self.traces.get_nu())
-        ax.set_xlim(0,self.traces.ind[-1])
+        ax.set_xlim(0, self.traces.ind[-1])
         ax.set_yscale('log')
         ax.axes.yaxis.set_ticks([100, 1000])
         plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+
+    def nu_sigma(self, ax=None):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        ax.plot(self.traces.ind, self.traces.get_nu_sigma())
+        ax.set_xlim(0, self.traces.ind[-1])
+        plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+
 
 class MimicPlot(object):
     
