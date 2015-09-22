@@ -128,11 +128,17 @@ class Mres(object):
                 tol = mmfArgs.pop('tol')
             else:
                 tol = 1./4
+            if 'min' in mmfArgs and mmfArgs['min']:
+                fun_bh = self.get_min_bh_overlap_data
+                fun_dip = self.get_min_bh_dt_overlap_dip2
+            else:
+                fun_bh = self.get_median_bh_overlap_data
+                fun_dip = self.get_median_bh_dt_overlap_dip2
             print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
-            self.hierarchical_merge(self.get_median_bh_overlap_data, thr, **mmfArgs)
+            self.hierarchical_merge(fun_bh, thr, **mmfArgs)
             print """Merging components with median Bhattacharyya overlap
                      at least {} and robust dip test at least {}""".format(lowthr, dipthr)
-            self.hierarchical_merge(self.get_median_bh_dt_overlap_dip2, thr=lowthr,
+            self.hierarchical_merge(fun_dip, thr=lowthr,
                                     bhatthr=lowthr, dipthr=dipthr, tol=tol, **mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
@@ -200,6 +206,13 @@ class Mres(object):
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_medprop_pers(bhd, fixvalind, fixval)
 
+    def get_min_bh_overlap_data(self, fixvalind=None, fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
+        bhd = [clust.get_bh_overlap_data() for clust in self.clusts]
+        #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
+        return self.get_minprop_pers(bhd, fixvalind, fixval)
+
     def get_median_bh_dt_overlap_dip(self, bhatthr, dipthr, fixvalind=None, fixval=-1):
         if fixvalind is None:
             fixvalind = []
@@ -224,6 +237,19 @@ class Mres(object):
                 return mbhd
             fixvalind.append(ind)
             mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+        return mbhd
+
+    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, fixvalind=None, fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
+        mbhd = self.get_min_bh_overlap_data(fixvalind, fixval)
+        while (mbhd > bhatthr).any():
+            ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
+            print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.okdiptest2(ind, dipthr, tol):
+                return mbhd
+            fixvalind.append(ind)
+            mbhd = self.get_min_bh_overlap_data(fixvalind, fixval)
         return mbhd
 
     def okdiptest(self, ind, thr):
@@ -368,6 +394,26 @@ class Mres(object):
             for l in range(med_prop.shape[1]):
                 prop_kl = np.array([pr[k, l] for pr in prop])
                 med_prop[k, l] = np.median(prop_kl[~np.isnan(prop_kl)])
+                if np.isnan(med_prop[k, l]):
+                    med_prop[k, l] = fixval
+
+        for ind in fixvalind:
+            if len(ind) == 1:
+                med_prop[ind, :] = fixval
+            else:
+                med_prop[ind[0], ind[1]] = fixval
+                med_prop[ind[1], ind[0]] = fixval
+        return med_prop
+
+    @staticmethod
+    def get_minprop_pers(prop, fixvalind=None, fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
+        med_prop = np.empty(prop[0].shape)
+        for k in range(med_prop.shape[0]):
+            for l in range(med_prop.shape[1]):
+                prop_kl = np.array([pr[k, l] for pr in prop])
+                med_prop[k, l] = np.min(prop_kl[~np.isnan(prop_kl)])
                 if np.isnan(med_prop[k, l]):
                     med_prop[k, l] = fixval
 
