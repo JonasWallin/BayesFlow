@@ -199,17 +199,17 @@ class Mres(object):
         overlap = [clust.get_overlap() for clust in self.clusts]
         return self.get_medprop_pers(overlap, fixvalind, fixval)
 
-    def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1):
+    def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        bhd = [clust.get_bh_overlap_data() for clust in self.clusts]
+        bhd = [clust.get_bh_overlap_data(min_weight) for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_medprop_pers(bhd, fixvalind, fixval)
 
-    def get_min_bh_overlap_data(self, fixvalind=None, fixval=-1):
+    def get_min_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        bhd = [clust.get_bh_overlap_data() for clust in self.clusts]
+        bhd = [clust.get_bh_overlap_data(min_weight) for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_minprop_pers(bhd, fixvalind, fixval)
 
@@ -226,30 +226,32 @@ class Mres(object):
             mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
         return mbhd
 
-    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, fixvalind=None, fixval=-1):
+    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
+                                      fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
             print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
             if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
             fixvalind.append(ind)
-            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
         return mbhd
 
-    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, fixvalind=None, fixval=-1):
+    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
+                                   fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        mbhd = self.get_min_bh_overlap_data(fixvalind, fixval)
+        mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
             print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
             if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
             fixvalind.append(ind)
-            mbhd = self.get_min_bh_overlap_data(fixvalind, fixval)
+            mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
         return mbhd
 
     def okdiptest(self, ind, thr):
@@ -639,47 +641,63 @@ class SampleClustering(object):
 
     def get_overlap(self):
         '''
-            Estimated misclassification probability between two super clusters, i.e.
-            probability that Y_i is classified as belonging to l when it
-            truly belongs to k.
+            Estimated misclassification probability between two super
+            clusters, i.e. probability that Y_i is classified as
+            belonging to l when it truly belongs to k.
         '''
         S = len(self.mergeind)
         overlap = np.zeros((S, S))
         for k in range(S):
             for l in range(S):
-                overlap[k, l] = self.get_classif_freq(k).T.dot(self.get_classif_freq(l)).todense()
+                overlap[k, l] = self.get_classif_freq(k).T.dot(
+                    self.get_classif_freq(l)).todense()
             overlap[k, :] /= self.get_W(k)
             overlap[k, k] = 0
         return overlap
 
-    def get_bh_overlap_data(self, dd=None, ks=None):
+    def get_bh_overlap_data(self, dd=None, ks=None, min_weight=0):
+        '''
+            Clusters with less than min_weight will get weight nan.
+        '''
         if ks is None:
             S = len(self.mergeind)
             ks = range(S)
         else:
             S = len(ks)
-        bhd = -np.ones((S, S))
+        bhd = np.nan*np.ones((S, S))
         mus = [self.get_mean(k) for k in ks]
         Sigmas = [self.get_scatter(k) for k in ks]
+        weights = [self.get_W(k) for k in ks]
 
         for k in range(S):
+            bhd[k, k] = 0
+            if weights[k] < min_weight:
+                continue
             for l in range(S):
                 if l != k:
+                    if weights[l] < min_weight:
+                        continue
                     if dd is None:
-                        bhd[k, l] = bhat.bhattacharyya_overlap(mus[k], Sigmas[k], mus[l], Sigmas[l])
+                        bhd[k, l] = bhat.bhattacharyya_overlap(
+                            mus[k], Sigmas[k], mus[l], Sigmas[l])
                     else:
-                        bhd[k, l] = bhat.bhattacharyya_overlap(mus[k][0, dd], Sigmas[k][dd, dd].reshape(1, 1), mus[l][0, dd], Sigmas[l][dd, dd].reshape(1, 1))
-            bhd[k, k] = 0
+                        bhd[k, l] = bhat.bhattacharyya_overlap(
+                            mus[k][0, dd], Sigmas[k][dd, dd].reshape(1, 1),
+                            mus[l][0, dd], Sigmas[l][dd, dd].reshape(1, 1))
             #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))
         return bhd
 
     def get_pdip_discr_jkl(self, k, l, dim=None):
         '''
-            p-value of diptest of unimodality for the merger of super cluster k and l
+            p-value of diptest of unimodality for the merger of super
+            cluster k and l
 
             Input:
-                dim     - dimension along which the test should be performed. If dim is None, the test will be performed on the projection onto Fisher's discriminant coordinate.
+                dim     - dimension along which the test should be
+                          performed. If dim is None, the test will be
+                          performed on the projection onto Fisher's
+                          discriminant coordinate.
         '''
         clf_k = self.get_classif_freq(k)
         clf_l = self.get_classif_freq(l)
@@ -703,7 +721,8 @@ class SampleClustering(object):
 
     def discriminant_projection(self, s1, s2):
         '''
-            Projection of a data set onto Fisher's discriminant coordinate between two super clusters.
+            Projection of a data set onto Fisher's discriminant
+            coordinate between two super clusters.
         '''
         mu1, Sigma1 = self.get_mean(s1).T, self.get_scatter(s1)
         mu2, Sigma2 = self.get_mean(s2).T, self.get_scatter(s2)
