@@ -202,14 +202,14 @@ class Mres(object):
     def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        bhd = [clust.get_bh_overlap_data(min_weight) for clust in self.clusts]
+        bhd = [clust.get_bh_overlap_data(min_weight=min_weight) for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_medprop_pers(bhd, fixvalind, fixval)
 
     def get_min_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        bhd = [clust.get_bh_overlap_data(min_weight) for clust in self.clusts]
+        bhd = [clust.get_bh_overlap_data(min_weight=min_weight) for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_minprop_pers(bhd, fixvalind, fixval)
 
