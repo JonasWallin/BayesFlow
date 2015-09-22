@@ -368,18 +368,18 @@ class HMlog(HMlogB):
         return jsondict
 
     def save(self, savedir):
-        self.syndata_dir = os.path.join(savedir, 'syndata')
+        syndata_dir = os.path.join(savedir, 'syndata')
         if self.rank == 0:
-            if not os.path.exists(self.syndata_dir):
-                os.mkdir(self.syndata_dir)
+            if not os.path.exists(syndata_dir):
+                os.mkdir(syndata_dir)
         self.comm.Barrier()
 
         for j, name in enumerate(self.savesampnames_loc):
-            with open(os.path.join(self.syndata_dir, name+'_MODEL.pkl'), 'w') as f:
+            with open(os.path.join(syndata_dir, name+'_MODEL.pkl'), 'w') as f:
                 pickle.dump(self.Y_sim_loc[j], f, -1)
 
         if self.rank == 0:
-            with open(os.path.join(self.syndata_dir, 'pooled_MODEL.pkl'), 'w') as f:
+            with open(os.path.join(syndata_dir, 'pooled_MODEL.pkl'), 'w') as f:
                 pickle.dump(self.Y_pooled_sim, f, -1)
             if not hasattr(self, 'savesampnames'):
                 self.set_savesampnames()
@@ -388,10 +388,7 @@ class HMlog(HMlogB):
     @classmethod
     def load(cls, savedir, comm=MPI.COMM_WORLD):
         hmlog = super(HMlog, cls).load(savedir, logname='log', comm=comm)
-        try:
-            syndata_dir = hmlog.syndata_dir
-        except:
-            syndata_dir = os.path.join(savedir, 'syndata')
+        syndata_dir = os.path.join(savedir, 'syndata')
 
         # TODO! Load dat to all cores instead
         if comm.Get_rank() == 0:
@@ -531,10 +528,10 @@ class HMElog(HMlog):
         return jsondict
 
     def save(self, savedir):
-        self.classif_freq_dir = os.path.join(savedir, 'classif_freq/')
+        classif_freq_dir = os.path.join(savedir, 'classif_freq/')
         if self.rank == 0:
-            if not os.path.exists(self.classif_freq_dir):
-                os.mkdir(self.classif_freq_dir)
+            if not os.path.exists(classif_freq_dir):
+                os.mkdir(classif_freq_dir)
         self.comm.Barrier()
         # try:
         #     print "names_loc at rank {}: {}".format(self.rank,self.names_loc)
@@ -545,16 +542,13 @@ class HMElog(HMlog):
         #             io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))
         # else:
         for j, name in enumerate(self.names_loc):
-            io.mmwrite(os.path.join(self.classif_freq_dir, name+'_CLASSIF_FREQ.mtx'), sparse.coo_matrix(self.classif_freq_loc[j]))
+            io.mmwrite(os.path.join(classif_freq_dir, name+'_CLASSIF_FREQ.mtx'), sparse.coo_matrix(self.classif_freq_loc[j]))
         super(HMElog, self).save(savedir)
 
     @classmethod
     def load(cls, savedir, comm=MPI.COMM_WORLD):
         hmlog = super(HMElog, cls).load(savedir, comm)
-        try:
-            classif_freq_dir = hmlog.classif_freq_dir
-        except:
-            classif_freq_dir = os.path.join(savedir, 'classif_freq')
+        classif_freq_dir = os.path.join(savedir, 'classif_freq')
 
         # TODO! Load classif freq to all cores
         if comm.Get_rank() == 0:

@@ -28,10 +28,10 @@ def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
     if expdir[-1] != '/':
         expdir += '/'
 
-    if not os.path.exists(expdir):
-        os.mkdir(expdir)
-
     if rank == 0:
+        if not os.path.exists(expdir):
+            os.mkdir(expdir)
+        
         run = 1
         while os.path.exists(expdir+'run'+str(run)+'/'):
             run += 1

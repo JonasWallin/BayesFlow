@@ -290,8 +290,11 @@ def M_step_pooled(comm, data, mus, Sigmas, pis):
     weights = [np.empty((dat.shape[0], K)) for dat in data]
     for j, dat in enumerate(data):
         for k in range(K):
+            #try:
             weights[j][:, k] = stats.multivariate_normal.pdf(dat, mus[k],
                                                              Sigmas[k])
+            #except ValueError:
+            #    weights[j][:, k] = 0
     for weight in weights:
         weight *= pis
         weight /= np.sum(weight, axis=1).reshape(-1, 1)
