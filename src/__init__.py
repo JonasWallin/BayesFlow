@@ -13,6 +13,7 @@ from .hier_GMM_MPI import load_hGMM
 from .HMlog import HMlogB, HMlog, HMElog
 from .HMres import HMres
 from .reproducible_setup import Prior, BalancedPrior, SimPar, PostProcPar, setup_sim
+from .exceptions import SimulationError
 __all__ = ['mixture','hierarical_mixture','hierarical_mixture_mpi','load_hGMM',
            'HMlogB','HMlog','HMElog','HMres','Prior',
            'BalancedPrior','SimPar','PostProcPar','setup_sim']

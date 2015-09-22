@@ -235,7 +235,7 @@ class BalancedPrior(Prior):
     """
 
     def latent_cluster_means(self, t_inf=None, t_ex=np.nan, alpha_Sk=None,
-                             Sk_ex=np.nan, alpha_sk=None):
+                             Sk_ex=np.nan):
         """
             Priors on latent cluster means
 
@@ -253,7 +253,10 @@ class BalancedPrior(Prior):
             Sks = np.zeros((0, self.d))
         else:
             ts = t_inf
-            Sks = alpha_Sk/(self.n_J*self.J)*np.ones((t_inf.shape[0], self.d))
+            nan_ind = np.isnan(ts)
+            ts[nan_ind] = t_ex
+            Sks = alpha_Sk/(self.J)*np.ones((t_inf.shape[0], self.d))
+            Sks[nan_ind] = Sk_ex
 
         if ts.shape[0] < self.K:
             self.K_inf = ts.shape[0]
