@@ -128,15 +128,15 @@ class Mres(object):
                 tol = mmfArgs.pop('tol')
             else:
                 tol = 1./4
-            if 'min' in mmfArgs and mmfArgs['min']:
+            if 'min' in mmfArgs and mmfArgs.pop('min'):
                 fun_bh = self.get_min_bh_overlap_data
                 fun_dip = self.get_min_bh_dt_overlap_dip2
             else:
                 fun_bh = self.get_median_bh_overlap_data
                 fun_dip = self.get_median_bh_dt_overlap_dip2
-            print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
+            print "Merging components with median/min Bhattacharyya overlap at least {}".format(thr)
             self.hierarchical_merge(fun_bh, thr, **mmfArgs)
-            print """Merging components with median Bhattacharyya overlap
+            print """Merging components with median/min Bhattacharyya overlap
                      at least {} and robust dip test at least {}""".format(lowthr, dipthr)
             self.hierarchical_merge(fun_dip, thr=lowthr,
                                     bhatthr=lowthr, dipthr=dipthr, tol=tol, **mmfArgs)
