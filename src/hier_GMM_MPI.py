@@ -1132,7 +1132,7 @@ class hierarical_mixture_mpi(object):
 			if  self.comm.Get_rank() == 0:
 				t3 = time.time()
 				t_rest += np.double(t3-t2) 
-  
+				
 			hmlog.savesim(self)
 			if  self.comm.Get_rank() == 0:
 				t4 = time.time()

@@ -9,6 +9,7 @@ import BayesFlow as bf
 import sys
 from mpi4py import MPI
 import numpy as np
+import scipy.spatial as ss
 
 def setup_model(y, K, active_prior = 10., time_it = True, silent=False):
 	'''
@@ -201,9 +202,59 @@ def label_sort(labels, *args):
 	"""
 	for j in range(labels.shape[0]):
 		if labels[j,0] != -1:	
+			label_flip = np.fliplr(np.atleast_2d(labels[j,:]))[0]
 			for thing in args:
 				if len(thing.shape) > 2:
-					thing[j,labels[j,0],:], thing[j,labels[j,1],:] = thing[j,labels[j,1],:], thing[j,labels[j,0],:] 
+					thing[j,labels[j,:],:] = thing[j,label_flip,:]
 				else:
-					thing[j,labels[j,0]], thing[j,labels[j,1]] = thing[j,labels[j,1]], thing[j,labels[j,0]]  
-				
+					thing[j,labels[j,:]] = thing[j,label_flip]
+					
+	
+def sort_mus(mus, mus_true):
+	'''
+		Takes a true mu vector (mus_true) and tries to find the cloest mus
+		to that vector through distances
+		returns the index ''converting'' mus to mus_true
+	'''
+	
+	K = mus.shape[1] #number of classes
+	mus_true_mean = []
+	mus_mean = []
+	for k in range(K):
+		mus_true_mean.append(np.array(np.ma.masked_invalid( mus_true[:,k,:]).mean(0)))
+		mus_mean.append(     np.array(np.ma.masked_invalid( mus[:,k,:].T   ).mean(0)))
+		
+		
+	mus_true_mean =  np.array(mus_true_mean)
+	mus_mean =  np.array(mus_mean)
+	
+	ss_mat =  ss.distance.cdist( mus_true_mean, mus_mean, "euclidean")
+	mu_true_index = np.array([i for i in range(K)])
+	col_index = []
+	for k in range(K):
+		k_ = np.argmin(ss_mat[k,:])
+		ss_mat = np.delete(ss_mat, (k_), axis=1)
+		
+		col_index.append(mu_true_index[k_])	
+		mu_true_index = np.delete(mu_true_index, (k_))
+	
+	return col_index
+
+def sort_thetas(thetas_est, thetas_true):	
+	
+	
+	
+	ss_mat =  ss.distance.cdist(thetas_true,
+							    np.mean(thetas_est,0)
+							    )
+	
+	K = thetas_true.shape[0]
+	col_index = np.zeros((K), dtype = np.int)
+	for k in range(K):  # @UnusedVariable
+		theta_est_index = np.floor(np.argmin(ss_mat)/K)
+		theta_index    = np.argmin(ss_mat)%K
+		col_index[theta_est_index] = np.int(theta_index)
+		ss_mat[theta_est_index,:] = np.inf
+		ss_mat[:,theta_index] = np.inf
+	
+	return col_index

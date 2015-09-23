@@ -631,7 +631,7 @@ class mixture(object):
 		"""	
 	
 		if npr.rand() < self.p_switch:
-				labels = npr.choice(self.K,2,replace=False)
+				labels = npr.choice(self.K,2,replace=False).astype(np.int)
 				if np.sum(self.active_komp[labels]) == 0:
 						return np.array([-1,-1])
 					
