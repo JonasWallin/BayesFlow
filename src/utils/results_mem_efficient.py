@@ -7,13 +7,14 @@ from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
 
 from ..PurePython.distribution.wishart import invwishartrand
-from .. import HMlog
+from ..HMlog import HMlog
 from ..exceptions import NoOtherClusterError, EmptyClusterError
 from . import Bhattacharyya as bhat
 from . import diptest
+from .lazy_property import LazyProperty
+from .initialization.MatchComponents import MatchComponents
 from .plot_util import get_colors
 from .random_ import rmvn
-from lazy_property import LazyProperty
 
 
 def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):
@@ -568,6 +569,8 @@ class Cluster(object):
         if dims is None:
             dims = range(self.data.shape[1])
         pdip = np.zeros(len(dims))
+        if len(self.indices) == 0:
+            return np.nan*pdip
         for i, dd in enumerate(dims):
             xcum, ycum = diptest.cum_distr(self.data[self.indices, dd], self.weights/self.W)
             dip = diptest.dip_from_cdf(xcum, ycum)
@@ -637,6 +640,8 @@ class SampleClustering(object):
         clf = self.get_classif_freq(k)
         W = self.get_W(k)
         pdip = np.zeros(len(dims))
+        if len(clf.indices) == 0:
+            return np.nan*pdip
         for i, dd in enumerate(dims):
             xcum, ycum = diptest.cum_distr(self.data[clf.indices, dd], clf.data/W)
             dip = diptest.dip_from_cdf(xcum, ycum)
@@ -785,6 +790,31 @@ class SampleClustering(object):
     #     return data[clf > min_clf]
 
 
+class DataSetClustering(object):
+
+    def __init__(self, sample_clusts):
+        self.sample_clusts = sample_clusts
+        self.J = len(self.sample_clusts)
+        self.K = self.sample_clusts[0].K
+        self.d = self.sample_clusts[0].d
+
+    def get_pdip_summary(self):
+        pdipsummary = {'Median': np.empty((self.K, self.d)),
+                       '25th percentile': np.empty((self.K, self.d)),
+                       'Minimum': np.empty((self.K, self.d))}
+        for k in range(self.K):
+            pdk = np.vstack([samp_cl.get_pip(k) for samp_cl in self.sample_clusts])
+            pdk = pdk[~np.isnan(pdk[:, 0]), :]
+            if len(pdk) == 0:
+                pdipsummary['Median'][k, :] = np.nan
+                pdipsummary['25th percentile'][k, :] = np.nan
+                pdipsummary['Minimum'][k, :] = np.nan
+            else:
+                pdipsummary['Median'][k, :] = np.median(pdk, 0)
+                pdipsummary['25th percentile'][k, :] = np.percentile(pdk, 25, 0)
+                pdipsummary['Minimum'][k, :] = np.min(pdk, 0)
+        return pdipsummary
+
 
 class Components(object):
     '''
@@ -814,6 +844,18 @@ class Components(object):
         hmlog = HMlog.load(savedir, comm)
         p = hmlog.prob_sim_mean[:, :hmlog.K]
         return cls(hmlog, p)
+
+    @classmethod
+    def load_matched(cls, savedir, lamb, verbose=False, dist='bhat', comm=MPI.COMM_WORLD):
+        if comm.Get_rank() == 0:
+            start_components = cls.load(savedir, MPI.COMM_SELF)
+            match_comp = MatchComponents(start_components, lamb, verbose, dist=dist)
+            match_comp.names = start_components.names
+        else:
+            match_comp = None
+
+        match_comp = comm.bcast(match_comp)
+        return match_comp
 
     def estimate_Sigma_mu(self):
         Sigma_mu = np.empty((self.K, self.d, self.d))

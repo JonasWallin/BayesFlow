@@ -3,7 +3,7 @@ Created on Aug 10, 2014
 
 @author: jonaswallin
 '''
-from __future__ import print_function
+from __future__ import print_function, division
 import sys
 import numpy as np
 import numpy.random as npr
@@ -33,8 +33,8 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 	sigma_theta = []
 	for sigma in sigmas:
 		var_ = np.sort(np.linalg.eig(sigma)[0])
-		z_sigma = var_ * npr.randn(*sigma.shape)
-		sigma_theta.append( sigma + np.dot(z_sigma.T,z_sigma)) 
+		z_sigma = var_[0] * npr.randn(*sigma.shape)
+		sigma_theta.append( 0.1*(sigma +  np.dot(z_sigma.T,z_sigma)) )
 
 	if not silent:
 		print("done")
@@ -42,10 +42,10 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 	
 	nu = 100
 	ratio_act = np.array([ 1.,  0.95,  0.2,  0.1 ,  0.9,  1,  1,
-        1,  1 ,  1,  0.95,  0.99])
+		1,  1 ,  1,  0.95,  0.99])
 	Y, act_Class, mus  = simulate_data_( thetas = thetas,
-				 	sigma_theta = sigma_theta, 
-				 	sigmas = sigmas,
+					 sigma_theta = sigma_theta, 
+					 sigmas = sigmas,
 					weights =  weights,
 					nu = nu, 
 					ratio_act = ratio_act, 
@@ -62,7 +62,7 @@ def simulate_data_v1(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  
 	
 	"""
 
-	if seed != None:
+	if seed is not None:
 		npr.seed(seed)
 		
 		
@@ -70,9 +70,9 @@ def simulate_data_v1(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  
 	P = [0.49, 0.3, 0.2 , 0.01 ]
 	Thetas = [np.array([0.,0, 0]), np.array([0, -2, 1]), np.array([1., 2, 0]), np.array([-2,2,1.5])]
 	Z_Sigma  = [np.array([[1.27, 0.25, 0],[0.25, 0.27, -0.001],[0., -0.001, 0.001]]),
-			    np.array([[0.06, 0.04, -0.03],[0.04, 0.05, 0],[-0.03, 0., 0.09]]),
-			    np.array([[0.44, 0.08, 0.08],[0.08, 0.16, 0],[0.08, 0., 0.16]]),
-			    0.01*np.eye(3)]
+				np.array([[0.06, 0.04, -0.03],[0.04, 0.05, 0],[-0.03, 0., 0.09]]),
+				np.array([[0.44, 0.08, 0.08],[0.08, 0.16, 0],[0.08, 0., 0.16]]),
+				0.01*np.eye(3)]
 	Sigmas = [0.1*np.eye(3), 0.1*spl.toeplitz([2.,0.5,0]),0.1* spl.toeplitz([2.,-0.5,1]),
 			  0.1*spl.toeplitz([1.,.3,.3]) ] 
 	
@@ -92,15 +92,15 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 					seed = None, silent = True):
 	"""
 		simulating data given:
-		*thetas*      list of latent means
+		*thetas*	  list of latent means
 		*sigma_theta* variation between the means
-		*sigmas*      list of latent covariances
-		*weights*     list of probabilites
-		*nu*          inverse wishart parameter
-		*ratio_act*     probabilility that the cluster is active at a person
-		*n_cells*     number of cells at a person
+		*sigmas*	  list of latent covariances
+		*weights*	 list of probabilites
+		*nu*		  inverse wishart parameter
+		*ratio_act*	 probabilility that the cluster is active at a person
+		*n_cells*	 number of cells at a person
 		*n_persons*   number of persons
-		*seed*        random number generator
+		*seed*		random number generator
 	"""
 	
 	if seed is None:
@@ -163,6 +163,20 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 	return Y, act_class, mus.T
 	
 if __name__ == "__main__":
-	
-	
-	Y = simulate_data(nCells = 10**2, nPersons = 10)[0]
+
+
+	import matplotlib.pyplot as plt
+	n_persons = 20
+ 	seed = 123456
+	n_cells   = 10**4
+	Y, act_Class, mus , thetas, sigmas, weights = simulate_data_v2(n_cells = n_cells, n_persons = n_persons, seed = seed)
+	K = len(thetas[:,0])
+	color = plt.cm.rainbow(np.linspace(0,1,K))
+	for k in range(4):
+		plt.figure()
+		for j in range(mus.shape[1]):
+			plt.text(thetas[j ,2*k], thetas[j ,2*k + 1], str(j), color = color[j],  fontsize=14)
+		for i in range(n_persons):
+			for j in range(mus.shape[1]):
+				plt.scatter(mus[2*k,j,i], mus[2*k + 1,j,i], color = color[j], s=4 )
+	plt.show()

@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from . import GMM
 from .distribution import normal_p_wishart, Wishart_p_nu
 from .GMM import mixture
+from .utils.results_mem_efficient import Components
 from .utils.timer import Timer
 from .utils.initialization.EM import EM_pooled
 from .utils import load_fcdata
@@ -650,6 +651,23 @@ class hierarical_mixture_mpi(object):
             param[k]['sigma'] = self.GMMs[0].prior[k]['sigma']['Q']/(self.GMMs[0].prior[k]['sigma']['nu']-self.d-1)
         for gmm in self.GMMs:
             gmm.set_param(param, active_only=True)
+
+    def set_init_from_matched_previous(self, prior, match_comp):
+
+        self.set_latent_init(prior, thetas=match_comp.latent.mus,
+                             expSigmas=match_comp.latent.Sigmas)
+        for gmm in self.GMMs:
+            j = match_comp.names.index(gmm.name)
+            comp = match_comp.samp_comps[j]
+            param = [None]*prior.K
+            for k in range(prior.K):
+                param[k] = {}
+                param[k]['mu'] = comp.get_mu(k)
+                param[k]['sigma'] = comp.get_mu(k)
+            gmm.set_param(param)
+            gmm.p = np.array([comp.get_p(k) for k in range(prior.K)])
+            gmm.active_komp = np.array([k in comp.ks for k in range(prior.K)]
+                                       + [True]*prior.noise_class, dtype='bool')
 
     def deactivate_outlying_components(self, aquitted=None, bhat_distance=False):
         any_deactivated_loc = 0
