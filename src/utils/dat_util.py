@@ -120,7 +120,7 @@ def percentilescale(data, q=(1., 99.), qvalues=None):
         q       -   percentiles to be computed. q[0] is the percentile
                     will be scaled to 0, q[1] is the percentile that
                     will be scaled to 1 (in the pooled data).
-        qvalues -   tuple of percentile values. If provided percentiles
+        qvalues -   tuple of percentile values. If provided, percentiles
                     does not have to be computed.
     '''
     if qvalues is None:
