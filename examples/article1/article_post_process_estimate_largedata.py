@@ -17,10 +17,10 @@ matplotlib.rcParams['ps.useafm'] = True
 matplotlib.rcParams['pdf.use14corefonts'] = True
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
-res=np.load('sim_data.npy')
+res=np.load('/Users/jonaswallin/repos/BaysFlow/script/sim_data.npy')
 theta = res[3]
 mus = res[2]
-simulation_result=np.load('simulation_result.npy').item()
+simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
 
 
 K = theta.shape[0]

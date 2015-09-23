@@ -16,13 +16,13 @@ npr.seed(1)
 K = 11
 
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
-	save_data = False
-	SIM          = 10**1
-	SIM_burnin_1 = 10**1
-	SIM_burnin_2 = 10**1
-	N_CELLS = 60
+	save_data = True
+	SIM          = 10**2
+	SIM_burnin_1 = 10**2
+	SIM_burnin_2 = 10**2
+	N_CELLS = 60000
 	THIN = 1
-	N_PERSONS = 20
+	N_PERSONS = 144
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
