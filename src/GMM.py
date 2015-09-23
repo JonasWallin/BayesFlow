@@ -5,14 +5,16 @@ Created on Fri Jun 20 23:33:57 2014
 @author: jonaswallin
 """
 
-import PurePython.GMM
 import numpy as np
+
+#import PurePython.GMM
+from .PurePython import GMM as PPGMM
+#import BayesFlow.mixture_util.GMM_util as GMM_util
+from .mixture_util import GMM_util
+from .plot import component_plot
 #import bayesianmixture.distributions.rng_cython as rng_cython
-import BayesFlow.mixture_util.GMM_util as GMM_util
 
-
-
-class mixture(PurePython.GMM.mixture):
+class mixture(PPGMM.mixture):
 	"""
 		The main Gaussian mixture model
 	"""
@@ -217,3 +219,5 @@ class mixture(PurePython.GMM.mixture):
 		if norm==True:
 			GMM_util.calc_exp_normalize(self.prob_X, p, np.array(range(self.K + self.noise_class), dtype = np.int )[active_komp])
 
+	def plot_components(self, dim, ax, colors=None, lw=2):
+		return component_plot(self.mu, self.sigma, dim, ax, colors, lw)

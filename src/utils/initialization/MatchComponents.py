@@ -1,8 +1,8 @@
 import numpy as np
-import Bhattacharyya as bhat
-from flow_match import flow_match
-
 import matplotlib.pyplot as plt
+
+from .. import Bhattacharyya as bhat
+from .flow_match import flow_match
 
 
 class SampleComponents(object):
@@ -36,6 +36,27 @@ class SampleComponents(object):
     def get_component(self, k):
         i = self.ks.index(k)
         return self.mus[i], self.Sigmas[i], self.p[i]
+
+    def get_mu(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan*np.zeros_like(self.mus[0])
+        return self.mus[i]
+
+    def get_Sigma(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan*np.zeros_like(self.Sigmas[0])
+        return self.Sigmas[i]
+
+    def get_p(self, k):
+        try:
+            i = self.ks.index(k)
+        except ValueError:
+            return np.nan
+        return self.p[i]
 
     def remove_component(self, k):
         i = self.ks.index(k)
@@ -78,7 +99,7 @@ class SampleComponents(object):
 
     def concatenate(self, samp_comp):
         for k in samp_comp.ks:
-            self.append_component(*samp_comp.get_component(k), k = k)
+            self.append_component(*samp_comp.get_component(k), k=k)
 
     def move_unmatched_to_matched(self):
         self.concatenate(self.unmatched_comp)
@@ -102,11 +123,10 @@ class SampleComponents(object):
 
     def match_to(self, latent, lamb):
         bhd = self.bhattacharyya_distance_to(latent)
-        np.set_printoptions(precision=3, suppress = True)
-        print "bhd.shape = {}".format(bhd.shape)
+        np.set_printoptions(precision=3, suppress=True)
         match12, match21, matching_cost, unmatch_penalty = flow_match(bhd, lamb)
-        print "match12 = {}".format(match12)
-        print "match21 = {}".format(match21)
+        #print "match12 = {}".format(match12)
+        #print "match21 = {}".format(match21)
 
         old_ks = self.ks[:]
         self.unmatched_comp = SampleComponents(j=self.j)
@@ -137,13 +157,14 @@ class SampleComponents(object):
         self.ks = [new_ks_dict[kk] for kk in self.ks]
 
 
-def match_components(comps, lamb):
+def match_components(comps, lamb, verbose=False):
     samp_comps = [SampleComponents(comps, j) for j in range(comps.J)]
     latent = SampleComponents(comps)
 
     for i, sc in enumerate(samp_comps):
-        print "matching components sample {}".format(i)
-        print "components sample {}: {}".format(i, sc.ks)
+        if verbose:
+            print "matching components sample {}".format(i)
+            print "components sample {}: {}".format(i, sc.ks)
         sc.match_to(latent, lamb)
 
     new_latent = samp_comps[0].unmatched_comp
@@ -151,10 +172,12 @@ def match_components(comps, lamb):
     samp_comps[0].move_unmatched_to_matched()
 
     for sc in samp_comps[1:]:
-        print "new_latent.ks = {}".format(new_latent.ks)
+        if verbose:
+            print "new_latent.ks = {}".format(new_latent.ks)
         sc.unmatched_comp.match_to(new_latent, lamb)
         sc.unmatched_comp.unmatched_comp.relabel(latent.K+new_latent.K)
-        print "sc.unmatched_comp.unmatched_comp.ks = {}".format(sc.unmatched_comp.unmatched_comp.ks)
+        if verbose:
+            print "sc.unmatched_comp.unmatched_comp.ks = {}".format(sc.unmatched_comp.unmatched_comp.ks)
         new_latent.concatenate(sc.unmatched_comp.unmatched_comp)
 
         sc.unmatched_comp.move_unmatched_to_matched()
@@ -167,38 +190,38 @@ def match_components(comps, lamb):
 
 def center_plot(samp_comps, latent, fig=None, totplots=1, plotnbr=1,
                 yscale=False, ks=None):
-        '''
-            The centers of all components, mu, are plotted along one dimension.
-        '''
-        if fig is None:
-            fig = plt.figure()
+    '''
+        The centers of all components, mu, are plotted along one dimension.
+    '''
+    if fig is None:
+        fig = plt.figure()
 
-        d = len(latent.mus[0])
+    d = len(latent.mus[0])
 
-        ks_ = latent.ks[:]
-        if not ks is None:
-            ks_ = list(set(ks_).intersection(ks))
-        ks_.sort(key=lambda k: latent.get_component(k)[2])  # sort by size
+    ks_ = latent.ks[:]
+    if not ks is None:
+        ks_ = list(set(ks_).intersection(ks))
+    ks_.sort(key=lambda k: latent.get_component(k)[2])  # sort by size
 
-        S = len(ks_)
-        nbr_cols = 2*totplots-1
-        col_start = 2*(plotnbr-1)
+    S = len(ks_)
+    nbr_cols = 2*totplots-1
+    col_start = 2*(plotnbr-1)
 
-        for s, k in enumerate(ks_):
-            ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
-            for sc in samp_comps:
-                if k in sc.ks:
-                    ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
-            ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
-            ax.plot([0, d-1], [.5, .5], color='grey')
-            if s == S-1:
-                ax.axes.xaxis.set_ticks(range(d))
-                #ax.set_xticklabels(self.marker_lab)
-            else:
-                ax.axes.xaxis.set_ticks([])
-            if not yscale:
-                ax.axes.yaxis.set_ticks([])
-                ax.set_ylim(0, 1)
-            else:
-                ax.axes.yaxis.set_ticks([.2, .8])
-                ax.set_ylim(-.1, 1.1)
+    for s, k in enumerate(ks_):
+        ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
+        for sc in samp_comps:
+            if k in sc.ks:
+                ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
+        ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
+        ax.plot([0, d-1], [.5, .5], color='grey')
+        if s == S-1:
+            ax.axes.xaxis.set_ticks(range(d))
+            #ax.set_xticklabels(self.marker_lab)
+        else:
+            ax.axes.xaxis.set_ticks([])
+        if not yscale:
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, 1)
+        else:
+            ax.axes.yaxis.set_ticks([.2, .8])
+            ax.set_ylim(-.1, 1.1)

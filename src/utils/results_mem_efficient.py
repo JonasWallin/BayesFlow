@@ -2,26 +2,18 @@ from __future__ import division
 import numpy as np
 import warnings
 from sklearn import mixture as skmixture
+from mpi4py import MPI
+from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
 
-from BayesFlow.PurePython.distribution.wishart import invwishartrand
-import Bhattacharyya as bhat
-import diptest
-from plot_util import get_colors
-from .random import rmvn
-
-class LazyProperty(object):
-
-    def __init__(self, func):
-        self._func = func
-        self.__name__ = func.__name__
-        self.__doc__ = func.__doc__
-
-    def __get__(self, obj, cls=None):
-        if obj is None:
-            return None
-        result = obj.__dict__[self.__name__] = self._func(obj)
-        return result
+from ..PurePython.distribution.wishart import invwishartrand
+from .. import HMlog
+from ..exceptions import NoOtherClusterError, EmptyClusterError
+from . import Bhattacharyya as bhat
+from . import diptest
+from .plot_util import get_colors
+from .random_ import rmvn
+from lazy_property import LazyProperty
 
 
 def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):
@@ -132,10 +124,22 @@ class Mres(object):
         elif method == 'bhat_hier_dip':
             lowthr = mmfArgs.pop('lowthr')
             dipthr = mmfArgs.pop('dipthr')
-            print "Merging components with median Bhattacharyya overlap at least {}".format(thr)
-            self.hierarchical_merge(self.get_median_bh_overlap_data, thr, **mmfArgs)
-            print "Merging components with median Bhattacharyya overlap at least {} and robust dip test at least {}".format(lowthr, dipthr)
-            self.hierarchical_merge(self.get_median_bh_dt_overlap_dip2, thr=lowthr, bhatthr=lowthr, dipthr=dipthr, **mmfArgs)
+            if 'tol' in mmfArgs:
+                tol = mmfArgs.pop('tol')
+            else:
+                tol = 1./4
+            if 'min' in mmfArgs and mmfArgs.pop('min'):
+                fun_bh = self.get_min_bh_overlap_data
+                fun_dip = self.get_min_bh_dt_overlap_dip2
+            else:
+                fun_bh = self.get_median_bh_overlap_data
+                fun_dip = self.get_median_bh_dt_overlap_dip2
+            print "Merging components with median/min Bhattacharyya overlap at least {}".format(thr)
+            self.hierarchical_merge(fun_bh, thr, **mmfArgs)
+            print """Merging components with median/min Bhattacharyya overlap
+                     at least {} and robust dip test at least {}""".format(lowthr, dipthr)
+            self.hierarchical_merge(fun_dip, thr=lowthr,
+                                    bhatthr=lowthr, dipthr=dipthr, tol=tol, **mmfArgs)
             #self.hclean()
         elif method == 'no_merging':
             pass
@@ -153,7 +157,8 @@ class Mres(object):
         mm = mergeMeasureFun(**mmfArgs)
         ind = np.unravel_index(np.argmax(mm), mm.shape)
         if mm[ind] > thr:
-            print "Threshold passed at value {} for {} and {}, merging".format(mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
+            print "Threshold passed at value {} for {} and {}, merging".format(
+                mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
             self.merge_kl(ind)
             self.hierarchical_merge(mergeMeasureFun, thr, **mmfArgs)
 
@@ -191,21 +196,22 @@ class Mres(object):
     def get_median_overlap(self, fixvalind=None, fixval=-1):
         if fixvalind is None:
             fixvalind = []
-        # overlap = []
-        # for clust in self.clusts:
-        #     overlap.append(clust.get_overlap())
         overlap = [clust.get_overlap() for clust in self.clusts]
         return self.get_medprop_pers(overlap, fixvalind, fixval)
 
-    def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1):
+    def get_median_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        # bhd = []
-        # for clust in self.clusts:
-        #     bhd.append(clust.get_bh_overlap_data())
-        bhd = [clust.get_bh_overlap_data() for clust in self.clusts]
+        bhd = [clust.get_bh_overlap_data(min_weight=min_weight) for clust in self.clusts]
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_medprop_pers(bhd, fixvalind, fixval)
+
+    def get_min_bh_overlap_data(self, fixvalind=None, fixval=-1, min_weight=0):
+        if fixvalind is None:
+            fixvalind = []
+        bhd = [clust.get_bh_overlap_data(min_weight=min_weight) for clust in self.clusts]
+        #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
+        return self.get_minprop_pers(bhd, fixvalind, fixval)
 
     def get_median_bh_dt_overlap_dip(self, bhatthr, dipthr, fixvalind=None, fixval=-1):
         if fixvalind is None:
@@ -220,17 +226,32 @@ class Mres(object):
             mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
         return mbhd
 
-    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, fixvalind=None, fixval=-1):
+    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
+                                      fixvalind=None, fixval=-1, min_weight=0):
         if fixvalind is None:
             fixvalind = []
-        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
             print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
-            if self.okdiptest2(ind, dipthr):
+            if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
             fixvalind.append(ind)
-            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
+        return mbhd
+
+    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
+                                   fixvalind=None, fixval=-1, min_weight=0):
+        if fixvalind is None:
+            fixvalind = []
+        mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
+        while (mbhd > bhatthr).any():
+            ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
+            print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.okdiptest2(ind, dipthr, tol):
+                return mbhd
+            fixvalind.append(ind)
+            mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
         return mbhd
 
     def okdiptest(self, ind, thr):
@@ -251,7 +272,11 @@ class Mres(object):
             print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
-    def okdiptest2(self, ind, thr):
+    def okdiptest2(self, ind, thr, tol=1./4):
+        '''
+            tol is the proportion of samples that is allowed to
+            be below dip test threshold thr.
+        '''
         k, l = ind
         dims = [None]+self.get_dims_with_low_bhat_overlap(ind)
         for dim in dims:
@@ -264,7 +289,7 @@ class Mres(object):
                 except EmptyClusterError:
                     nbr_computable -= 1
 
-                if below > np.floor(nbr_computable/4):
+                if below > np.floor(nbr_computable*tol):
                     print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
             print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
@@ -382,6 +407,26 @@ class Mres(object):
                 med_prop[ind[1], ind[0]] = fixval
         return med_prop
 
+    @staticmethod
+    def get_minprop_pers(prop, fixvalind=None, fixval=-1):
+        if fixvalind is None:
+            fixvalind = []
+        med_prop = np.empty(prop[0].shape)
+        for k in range(med_prop.shape[0]):
+            for l in range(med_prop.shape[1]):
+                prop_kl = np.array([pr[k, l] for pr in prop])
+                med_prop[k, l] = np.min(prop_kl[~np.isnan(prop_kl)])
+                if np.isnan(med_prop[k, l]):
+                    med_prop[k, l] = fixval
+
+        for ind in fixvalind:
+            if len(ind) == 1:
+                med_prop[ind, :] = fixval
+            else:
+                med_prop[ind[0], ind[1]] = fixval
+                med_prop[ind[1], ind[0]] = fixval
+        return med_prop
+
 
 class MetaData(object):
 
@@ -416,6 +461,14 @@ class Traces(object):
         self.mulat_prod = bmlog_prod.theta_sim
         self.nu_burn = bmlog_burn.nu_sim
         self.nu_prod = bmlog_prod.nu_sim
+        try:
+            self.nu_sigma_burn = bmlog_burn.nu_sigma_sim
+            self.nu_sigma_prod = bmlog_prod.nu_sigma_sim
+            print "self.nu_sigma_burn.shape = {}".format(self.nu_sigma_burn.shape)
+            print "self.nu_sigma_prod.shape = {}".format(self.nu_sigma_prod.shape)
+        except AttributeError:
+            print "No nu_sigma in log."
+            pass
 
         self.K = self.mulat_burn.shape[1]
 
@@ -424,6 +477,9 @@ class Traces(object):
 
     def get_nu(self):
         return np.vstack([self.nu_burn, self.nu_prod])
+
+    def get_nu_sigma(self):
+        return np.vstack([self.nu_sigma_burn, self.nu_sigma_prod])
 
 
 class FCsample(object):
@@ -492,11 +548,17 @@ class Cluster(object):
 
     @LazyProperty
     def wXXT(self):
-        wXXT = np.zeros((self.data.shape[1], self.data.shape[1]))
-        for i, ind in enumerate(self.indices):
-            x = self.data[ind, :].reshape(1, -1)
-            wXXT += self.weights[i]*x.T.dot(x)
+        d = self.data.shape[1]
+        dat = self.data[self.indices, :]
+        wXXT = (dat*self.weights.reshape(-1, 1)).T.dot(dat)
+        if wXXT.shape != (d, d):
+            raise ValueError
         return wXXT
+        #wXXT = np.zeros((self.data.shape[1], self.data.shape[1]))
+#        for i, ind in enumerate(self.indices):
+#            x = self.data[ind, :].reshape(1, -1)
+#            wXXT += self.weights[i]*x.T.dot(x)
+#        return wXXT
 
     def get_pdip(self, dims=None):
         if dims is None:
@@ -579,47 +641,63 @@ class SampleClustering(object):
 
     def get_overlap(self):
         '''
-            Estimated misclassification probability between two super clusters, i.e.
-            probability that Y_i is classified as belonging to l when it
-            truly belongs to k.
+            Estimated misclassification probability between two super
+            clusters, i.e. probability that Y_i is classified as
+            belonging to l when it truly belongs to k.
         '''
         S = len(self.mergeind)
         overlap = np.zeros((S, S))
         for k in range(S):
             for l in range(S):
-                overlap[k, l] = self.get_classif_freq(k).T.dot(self.get_classif_freq(l)).todense()
+                overlap[k, l] = self.get_classif_freq(k).T.dot(
+                    self.get_classif_freq(l)).todense()
             overlap[k, :] /= self.get_W(k)
             overlap[k, k] = 0
         return overlap
 
-    def get_bh_overlap_data(self, dd=None, ks=None):
+    def get_bh_overlap_data(self, dd=None, ks=None, min_weight=0):
+        '''
+            Clusters with less than min_weight will get weight nan.
+        '''
         if ks is None:
             S = len(self.mergeind)
             ks = range(S)
         else:
             S = len(ks)
-        bhd = -np.ones((S, S))
+        bhd = np.nan*np.ones((S, S))
         mus = [self.get_mean(k) for k in ks]
         Sigmas = [self.get_scatter(k) for k in ks]
+        weights = [self.get_W(k) for k in ks]
 
         for k in range(S):
+            bhd[k, k] = 0
+            if weights[k] < min_weight:
+                continue
             for l in range(S):
                 if l != k:
+                    if weights[l] < min_weight:
+                        continue
                     if dd is None:
-                        bhd[k, l] = bhat.bhattacharyya_overlap(mus[k], Sigmas[k], mus[l], Sigmas[l])
+                        bhd[k, l] = bhat.bhattacharyya_overlap(
+                            mus[k], Sigmas[k], mus[l], Sigmas[l])
                     else:
-                        bhd[k, l] = bhat.bhattacharyya_overlap(mus[k][0, dd], Sigmas[k][dd, dd].reshape(1, 1), mus[l][0, dd], Sigmas[l][dd, dd].reshape(1, 1))
-            bhd[k, k] = 0
+                        bhd[k, l] = bhat.bhattacharyya_overlap(
+                            mus[k][0, dd], Sigmas[k][dd, dd].reshape(1, 1),
+                            mus[l][0, dd], Sigmas[l][dd, dd].reshape(1, 1))
             #print "nbr nan in bhd[j]: {}".format(np.sum(np.isnan(bhd[j])))
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))
         return bhd
 
     def get_pdip_discr_jkl(self, k, l, dim=None):
         '''
-            p-value of diptest of unimodality for the merger of super cluster k and l
+            p-value of diptest of unimodality for the merger of super
+            cluster k and l
 
             Input:
-                dim     - dimension along which the test should be performed. If dim is None, the test will be performed on the projection onto Fisher's discriminant coordinate.
+                dim     - dimension along which the test should be
+                          performed. If dim is None, the test will be
+                          performed on the projection onto Fisher's
+                          discriminant coordinate.
         '''
         clf_k = self.get_classif_freq(k)
         clf_l = self.get_classif_freq(l)
@@ -643,7 +721,8 @@ class SampleClustering(object):
 
     def discriminant_projection(self, s1, s2):
         '''
-            Projection of a data set onto Fisher's discriminant coordinate between two super clusters.
+            Projection of a data set onto Fisher's discriminant
+            coordinate between two super clusters.
         '''
         mu1, Sigma1 = self.get_mean(s1).T, self.get_scatter(s1)
         mu2, Sigma2 = self.get_mean(s2).T, self.get_scatter(s2)
@@ -702,9 +781,6 @@ class SampleClustering(object):
     #     return data[clf > min_clf]
 
 
-class EmptyClusterError(Exception):
-    pass
-
 
 class Components(object):
     '''
@@ -726,7 +802,14 @@ class Components(object):
         self.Sigmalat = bmlog.Sigmaexp_sim_mean
         self.nu = np.mean(bmlog.nu_sim, axis=0)
         self.p = p
-        self.active_komp = bmlog.active_komp[:,:self.K]  # excluding noise component
+        self.active_komp = bmlog.active_komp[:, :self.K]  # excluding noise component
+        self.names = bmlog.names
+
+    @classmethod
+    def load(cls, savedir, comm=MPI.COMM_WORLD):
+        hmlog = HMlog.load(savedir, comm)
+        p = hmlog.prob_sim_mean[:, :hmlog.K]
+        return cls(hmlog, p)
 
     def estimate_Sigma_mu(self):
         Sigma_mu = np.empty((self.K, self.d, self.d))
@@ -734,7 +817,7 @@ class Components(object):
         for k in range(self.K):
             mu_centered_k = mu_centered[:, k, :]
             mu_centered_k = mu_centered_k[~np.isnan(mu_centered_k[:, 0]), :]
-            if mu_centered_k.shape[0] <=1:
+            if mu_centered_k.shape[0] <= 1:
                 Sigma_mu[k, :, :] = np.nan
             else:
                 Sigma_mu[k, :, :] = mu_centered_k.T.dot(mu_centered_k)/(mu_centered_k.shape[0]-1)
@@ -795,6 +878,26 @@ class Components(object):
                 bhd[k, l] = bhat.bhattacharyya_distance(
                     self.mupers[j, k, :], self.Sigmapers[j, k, :, :],
                     self.mulat[l, :], self.Sigmalat[l, :])
+        return bhd
+
+    def get_bh_distance_to_own_latent(self):
+        '''
+            Get Bhattacharyya distance from sample component to
+            corresponding (own) latent component.
+
+            Returns a (self.J x self.K) array where element (j, k)
+            is the distance from sample component k to latent
+            component k in sample j.
+        '''
+        bhd = np.empty((self.J, self.K))
+        for j in range(self.J):
+            for k in range(self.K):
+                if self.active_komp[j, k] < 0.05:
+                    bhd[j, k] = np.nan
+                else:
+                    bhd[j, k] = bhat.bhattacharyya_distance(
+                        self.mupers[j, k, :], self.Sigmapers[j, k, :, :],
+                        self.mulat[k, :], self.Sigmalat[k, :])
         return bhd
 
     def get_bh_overlap(self, j):
@@ -879,18 +982,22 @@ class Components(object):
         for suco in self.mergeind:
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
-                for j in range(self.J):
-                    corrdist = self.get_center_dist()
+                if sum(otherind) == 0:
+                    raise NoOtherClusterError
+                corrdist = self.get_center_dist()
+                for j in range(self.J):                
                     wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] 
                         - self.mulat[otherind, :], axis=1))
-                    distquo[j, k] = wrongdist/corrdist
+                    distquo[j, k] = wrongdist/corrdist[j, k]
         return distquo
 
     def get_latent_bhattacharyya_overlap_quotient(self):
         distquo = np.zeros((self.J, self.K))
         for suco in self.mergeind:
             for k in suco:
-                otherind = np.array([not (kk in suco) for kk in range(self.K)])
+                otherind = [kk for kk in range(self.K) if not kk in suco]# np.array([not (kk in suco) for kk in range(self.K)])
+                if len(otherind) == 0:
+                    raise NoOtherClusterError
                 for j in range(self.J):
                     corrdist = bhat.bhattacharyya_overlap(self.mupers[j, k, :],
                         self.Sigmapers[j, k, :, :], self.mulat[k, :],
@@ -902,7 +1009,7 @@ class Components(object):
                     distquo[j, k] = corrdist/wrongdist
         return distquo
 
-    def mu_dist_percentiles(self, q=99.99, Ntest=100000):
+    def mu_dist_percentiles(self, q=99.99, Ntest=100000, robust_Sigma_mu=False):
         try:
             percentile_dict = self._mu_dist_percentiles
         except AttributeError:
@@ -912,6 +1019,13 @@ class Components(object):
             return percentile_dict[(q,Ntest)]
         except KeyError:
             pass
+
+        if not robust_Sigma_mu:
+            Sigma_mu = self.Sigma_mu
+        else:
+            mcd = MinCovDet().fit(self.mupers)
+            Sigma_mu = mcd.covariance_
+            print "Number of MCD outliers: {}".format(np.sum(~mcd.support_))
         percentiles = np.empty(self.K)
         frobenius_dists = np.empty(Ntest)
         for k in range(self.K):
@@ -920,10 +1034,11 @@ class Components(object):
             else:
                 for n in range(Ntest):
                     mu = rmvn(
-                        self.mulat[k, :], self.Sigma_mu[k, :, :])
+                        self.mulat[k, :], Sigma_mu[k, :, :])
                     frobenius_dists[n] = np.linalg.norm(mu - self.mulat[k, :])
                 percentiles[k] = np.percentile(frobenius_dists, q)
-                print "Percentiles for {} out of {} computed".format(k+1, self.K)
+                print "\r Percentiles for {} out of {} computed".format(k+1, self.K),
+        print ''
         percentile_dict[(q,Ntest)] = percentiles
         return percentiles
         
@@ -932,17 +1047,17 @@ class Components(object):
             Find which components in which sample that have
             locations (mu_jk values) that are outliers at a given
             percentile, i.e. that have a Euclidean distance to the
-            latent mean (theta_k) that is larger than the given 
+            latent mean (theta_k) that is larger than the given
             percentile in a sample of distances to the latent mean
             with locations drawn from the prior model of mu_jk.
-            
+
             q       - percentile
             Ntest   - number of random samples
-            
+
             Returns (J X K) matrix.
         '''
         centerd = self.get_center_dist()
-        outliers = (centerd - 
+        outliers = (centerd -
                     self.mu_dist_percentiles(q, Ntest)[np.newaxis, :]) > 0
         return outliers
 
@@ -953,7 +1068,7 @@ class Components(object):
             self._Sigma_dist_percentiles = {}
             percentile_dict = self._Sigma_dist_percentiles
         try:
-            return percentile_dict[(q,Ntest)]
+            return percentile_dict[(q, Ntest)]
         except KeyError:
             pass
         percentiles = np.empty(self.K)
@@ -964,8 +1079,9 @@ class Components(object):
                     self.nu[k], self.Sigmalat[k, :, :]*(self.nu[k]-self.d-1))
                 frobenius_dists[n] = np.linalg.norm(Sig - self.Sigmalat[k, :, :])
             percentiles[k] = np.percentile(frobenius_dists, q)
-            print "Percentiles for {} out of {} computed".format(k+1, self.K)
-        percentile_dict[(q,Ntest)] = percentiles
+            print "\r Percentiles for {} out of {} computed".format(k+1, self.K),
+        print ''
+        percentile_dict[(q, Ntest)] = percentiles
         return percentiles
 
     def Sigma_outliers(self, q=99.99, Ntest=100000):  

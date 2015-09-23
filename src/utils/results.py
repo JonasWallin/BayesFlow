@@ -5,10 +5,10 @@ import copy as cp
 from sklearn import mixture as skmixture
 import matplotlib.pyplot as plt
 
-import Bhattacharyya as bhat
-import diptest
-import discriminant as discr
-from plot_util import get_colors 
+from . import Bhattacharyya as bhat
+from . import diptest
+from . import discriminant as discr
+from .plot_util import get_colors
 
 def get_medprop_pers(prop,fixvalind=[],fixval=-1):
     med_prop = np.empty(prop[0].shape)

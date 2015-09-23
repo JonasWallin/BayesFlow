@@ -3,11 +3,12 @@ Created on Jul 2, 2014
 
 @author: jonaswallin
 '''
-from distribution_cython import invWishart, multivariatenormal, Wishart  # @UnresolvedImport
-from BayesFlow.PurePython.distribution.priors import nu_class 
 import numpy as np
-
 import cPickle as pickle
+
+from .distribution_cython import invWishart, multivariatenormal, Wishart  # @UnresolvedImport
+#from BayesFlow.PurePython.distribution.priors import nu_class 
+from ..PurePython.distribution.priors import nu_class 
 
 
 # make it so that that invWishart returns sigma,Q, logdet(sigma)
@@ -131,7 +132,7 @@ class Wishart_p_nu(object):
 		methods for sampling \nu, Q given Q_s, {\Sigma} \nu_s 
 	"""
 	
-	def __init__(self, prior = None, param = None):
+	def __init__(self, prior = None, param = None, AMCMC=False):
 		"""
 			prior dict
 			prior['nu'] ->  None
@@ -141,7 +142,7 @@ class Wishart_p_nu(object):
 			param['nu']    -> dict ['Q'] 
 			param['Q']     -> dict ['nu']
 		"""
-		self.nu_class = nu_class()
+		self.nu_class = nu_class(AMCMC=AMCMC)
 		self.Q_class  = Wishart()
 		self.param = {}
 		if not prior is None:

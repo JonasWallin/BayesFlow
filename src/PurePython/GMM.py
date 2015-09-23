@@ -8,15 +8,17 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-from BayesFlow.PurePython.distribution import wishart
-import scipy.special as sps
-#import matplotlib.pyplot as plt
-import scipy.linalg as sla
-from BayesFlow.utils.gammad import ln_gamma_d
-from BayesFlow.utils.Bhattacharyya import bhattacharyya_overlap
-import cPickle as pickle
-from ..utils import rmvn
 import time
+import scipy.special as sps
+import cPickle as pickle
+import scipy.linalg as sla
+#import matplotlib.pyplot as plt
+
+from .distribution import wishart
+from ..utils.gammad import ln_gamma_d
+from ..utils.Bhattacharyya import bhattacharyya_distance
+from ..utils import rmvn
+
 
 def log_betapdf(p, a, b):
 	
@@ -631,7 +633,13 @@ class mixture(object):
 		"""	
 	
 		if npr.rand() < self.p_switch:
+<<<<<<< HEAD
 				labels = npr.choice(self.K,2,replace=False).astype(np.int)
+=======
+				if self.K < 2:
+					return np.array([-1, -1])
+				labels = npr.choice(self.K,2,replace=False)
+>>>>>>> 87a44180e603021a7606e85dc5ab7b865463e68e
 				if np.sum(self.active_komp[labels]) == 0:
 						return np.array([-1,-1])
 					
@@ -918,6 +926,13 @@ class mixture(object):
 			X[x == self.K,:] = x_
 		return X
 	
+	@classmethod
+	def simulate_mixture(cls, mu, Sigma, p, n):
+		mix = cls(K=len(mu))
+		mix.mu, mix.sigma, mix.p = mu, Sigma, p
+		mix.d = len(mu[0])
+		return mix.simulate_data(n)
+
 	def simulate_one_obs(self):
 		"""
 			if there exists noise class it __will__ be used
@@ -951,7 +966,7 @@ class mixture(object):
 				if not bhat_dist:
 					dist = np.linalg.norm(thetas - self.mu[k].reshape(1,self.d),axis=1)
 				else:
-					dist = [-bhattacharyya_overlap(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
+					dist = [bhattacharyya_distance(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
 					#print "thetas = {}".format(thetas)
 					#print "mu = {}".format(self.mu)
