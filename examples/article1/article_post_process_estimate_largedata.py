@@ -9,10 +9,14 @@ import scipy.spatial as ss
 from article_util import sort_mus, sort_thetas
 from article_plotfunctions import  plot_theta
 import matplotlib.pyplot as plt
+import matplotlib.pyplot
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.pyplot import cm 
 
-
+matplotlib.rcParams['ps.useafm'] = True
+matplotlib.rcParams['pdf.use14corefonts'] = True
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 res=np.load('sim_data.npy')
 theta = res[3]
 mus = res[2]

@@ -6,27 +6,23 @@ Created on Jul 11, 2014
 from __future__ import division
 import article_simulatedata
 from mpi4py import MPI
-import BayesFlow as bf
-from article_util import setup_model, burin_1, burin_2, main_run, sort_mus
-from article_plotfunctions import  plot_theta
+from article_util import setup_model, burin_1, burin_2, main_run
 import numpy as np
 import numpy.random as npr
-import matplotlib
 
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+
+
 npr.seed(1)
 K = 11
 
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
-	SIM          = 10**2
-	SIM_burnin_1 = 10**2
-	SIM_burnin_2 = 10**2
-	N_CELLS = 60000
+	save_data = False
+	SIM          = 10**1
+	SIM_burnin_1 = 10**1
+	SIM_burnin_2 = 10**1
+	N_CELLS = 60
 	THIN = 1
-	N_PERSONS = 200
+	N_PERSONS = 20
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
@@ -82,10 +78,13 @@ hier_gmm.print_timing()
 
 
 if MPI.COMM_WORLD.Get_rank() == 0: 
-	import sys
-	print('saveing data')
-	sys.stdout.flush()
-	np.save('simulation_result.npy', simulation_result) 
+	
+	if save_data:
+		import sys
+		print('saveing data')
+		sys.stdout.flush()
+		np.save('simulation_result.npy', simulation_result) 
 	#simulation_result=np.load('simulation_result.npy').item()
 	data_ = [y, act_komp, mus, thetas, sigmas, weights]
-	np.save('sim_data.npy', data_) 
+	if save_data:
+		np.save('sim_data.npy', data_) 
