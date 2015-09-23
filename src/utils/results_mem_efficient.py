@@ -415,7 +415,11 @@ class Mres(object):
         for k in range(med_prop.shape[0]):
             for l in range(med_prop.shape[1]):
                 prop_kl = np.array([pr[k, l] for pr in prop])
-                med_prop[k, l] = np.min(prop_kl[~np.isnan(prop_kl)])
+                non_nan_ind = ~np.isnan(prop_kl)
+                if np.sum(non_nan_ind) == 0:
+                    med_prop[k, l] = fixval
+                else:
+                    med_prop[k, l] = np.min(prop_kl[non_nan_ind])
                 if np.isnan(med_prop[k, l]):
                     med_prop[k, l] = fixval
 
