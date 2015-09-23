@@ -110,6 +110,12 @@ def plotQ(Qs):
 	return figs
 
 def plot_theta(theta_percentile):
+	'''
+		To plot one need to add the options:
+		matplotlib.rc('text', usetex=True)
+		matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+	
+	'''
 	spines_to_remove = []
 	K = theta_percentile.shape[0]
 	d = theta_percentile.shape[1]
@@ -118,11 +124,12 @@ def plot_theta(theta_percentile):
 	theta_percentile[:,:,2] = np.abs(theta_percentile[:,:,2] - theta_percentile[:,:,1])
 	xticklabels  =[]
 	
-	fig = plt.figure(figsize=(6,0.5))
-	fig.subplots_adjust(wspace=0)
+	fig = plt.figure(figsize=(1.5 * d,1.1 * (int(np.ceil(K/4))+1)))
+	fig.subplots_adjust(hspace=1.25, wspace=0)
 	for j in range(K):
 		xticklabels = []
-		ax = plt.subplot2grid((1,4), (0,j))
+		ax = plt.subplot2grid((int(np.ceil(K/4))+1, 4), (int(np.round(j/4)) ,j % 4))
+		
 		for i in range(d):
 			xticklabels.append("%d"%(i + 1))
 		
@@ -144,7 +151,7 @@ def plot_theta(theta_percentile):
 			ax.axes.yaxis.set_ticks(np.linspace(y_lim[0],y_lim[1],2))
 			ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
 		ax.set_xlabel(r"$\boldsymbol{\theta}_{%d}$"%(j + 1), fontsize = 14)
-		ax.xaxis.set_label_coords(0.5, -0.75) 
+		ax.xaxis.set_label_coords(0.5, -0.65) 
 		for spine in spines_to_remove:
 			ax.spines[spine].set_visible(False)
 	return fig
