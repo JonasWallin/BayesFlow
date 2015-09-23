@@ -10,7 +10,8 @@ import numpy as np
 
 from .HMplot import HMplot
 from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components, MetaData
-
+from .utils.initialization.distributed_data import DataMPI
+from .utils.initialization.EM import EMD_to_generated_from_model
 
 class HMres(Mres):
     """
@@ -83,3 +84,12 @@ class HMres(Mres):
     @property
     def K_active(self):
         return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
+
+    def earth_movers_distance_to_generated(self):
+        emds = []
+        for j, dat in enumerate(self.data):
+            mus, Sigmas, ps = self.get_mix(j)
+            N_synsamp = dat.shape[0]
+            emds.append(EMD_to_generated_from_model(
+                DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp, gamma=1, nbins=50))
+        return np.vstack(emds)

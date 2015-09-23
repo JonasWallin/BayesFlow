@@ -343,8 +343,9 @@ class Mres(object):
             pdip = np.zeros((self.J, self.d))
             for j, clust in enumerate(self.clusts):
                 pdip[j, :] = clust.get_pdip(k)
-            print "Diptest computed for component {}".format(k)
+            print "\r Diptest computed for component {}".format(k),
             pdiplist.append(np.copy(pdip))
+        print ''
         self.pdiplist = pdiplist
         return self.pdiplist
 
@@ -362,8 +363,9 @@ class Mres(object):
             pdip = np.zeros((self.J, self.d))
             for j, clust in enumerate(self.clusts):
                 pdip[j, :] = clust.clusters[k].get_pdip()
-            print "Diptest computed for component {}".format(k)
+            print "\r Diptest computed for component {}".format(k),
             pdiplist.append(np.copy(pdip))
+        print ''
         self.pdiplist_comp = pdiplist
         return self.pdiplist_comp
 

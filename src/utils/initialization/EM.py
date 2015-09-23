@@ -124,8 +124,8 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
                 max_log_lik = log_lik
 
         elif selection == 'EMD':
-            emd = EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis,
-                                              N_synsamp, gamma)
+            emd = max(EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis,
+                                                  N_synsamp, gamma))
             if emd < min_emd:
                 best_mus, best_Sigmas, best_pis = mus, Sigmas, pis
                 min_emd = emd
@@ -156,9 +156,9 @@ def EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis, N_synsamp, gamma=1, 
     real_data = data_mpi.subsample_to_root(N_synsamp)
     if comm.Get_rank() == 0:
         syn_data = mixture.simulate_mixture(mus, Sigmas, pis, N_synsamp)
-        emd = max([earth_movers_distance(syn_data, real_data, nbins=nbins, dim=[i, j],
-                                         gamma=gamma)
-                   for i in range(d) for j in range(i+1, d)])
+        emd = [earth_movers_distance(syn_data, real_data, nbins=nbins, dim=[i, j],
+                                     gamma=gamma)
+               for i in range(d) for j in range(i+1, d)]
     else:
         emd = None
     return comm.bcast(emd)
