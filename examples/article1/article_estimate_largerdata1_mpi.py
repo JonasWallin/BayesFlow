@@ -22,7 +22,7 @@ if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
 	SIM_burnin_2 = 10**2
 	N_CELLS = 60000
 	THIN = 1
-	N_PERSONS = 144
+	N_PERSONS = 72
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
