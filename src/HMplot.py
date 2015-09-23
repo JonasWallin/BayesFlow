@@ -792,29 +792,52 @@ class HMplot(object):
             names = self.sampnames
         else:
             names = [name]
-        for m in range(len(plotdim)):
-            ax = plt.subplot2grid((len(plotdim), 4), (m, 0))
-            ql = self.cop.latent(plotdim[m], ax=ax, plotlab=True)
+        D = len(plotdim)
+
+        if name in self.mcsp:
+            loadsyn = True
+        else:
+            loadsyn = False
+            print "no mimic found, generating new data"
+            j = self.sampnames.index(name)
+            realdata = self.bmres.data[j]
+            N = self.bmres.data[j].shape[0]
+            syndata = self.bmres.generate_from_mix(j, N)
+
+        for m, dim in enumerate(plotdim):
+            ax = plt.subplot2grid((D, 4), (m, 0))
+            _ = self.cop.latent(dim, ax=ax, plotlab=True)
             #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
             #ax.set_ylabel(labels[plotdim[m][1]], fontsize=16)
             ax.set_xlim(*lim)
             ax.set_ylim(*lim)
-            
-            ax = plt.subplot2grid((len(plotdim), 4), (m, 1))
-            qa = self.cop.allsamp(plotdim[m], names=names, ax=ax, plotlabx=True)
+
+            ax = plt.subplot2grid((D, 4), (m, 1))
+            _ = self.cop.allsamp(dim, names=names, ax=ax, plotlabx=True)
             #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
             ax.set_xlim(*lim)
             ax.set_ylim(*lim)
-            
-            ax = plt.subplot2grid((len(plotdim), 4), (m, 2))
-            self.mcsp[name].realplot.hist2d(plotdim[m], bins=bins, ax=ax, lims=lim)
-            if m == 0:
-                ax.set_title(name+'(real)')
-            
-            ax = plt.subplot2grid((len(plotdim), 4), (m, 3))
-            self.mcsp[name].synplot.hist2d(plotdim[m], bins=bins, ax=ax, lims=lim)
-            if m == 0:
-                ax.set_title(name+'(synthetic)')
+
+            if loadsyn:
+                ax = plt.subplot2grid((D, 4), (m, 2))
+                self.mcsp[name].realplot.hist2d(dim, bins=bins, ax=ax, lims=lim)
+                if m == 0:
+                    ax.set_title(name+'(real)')
+
+                ax = plt.subplot2grid((D, 4), (m, 3))
+                self.mcsp[name].synplot.hist2d(dim, bins=bins, ax=ax, lims=lim)
+                if m == 0:
+                    ax.set_title(name+'(synthetic)')
+            else:
+                ax = plt.subplot2grid((D, 4), (m, 2))
+                plot.hist2d(realdata, dim, bins, ax=ax, lims=lim, labels=self.marker_lab)
+                if m == 0:
+                    ax.set_title(name+'(real)')
+
+                ax = plt.subplot2grid((D, 4), (m, 3))
+                plot.hist2d(syndata, dim, bins, ax=ax, lims=lim, labels=self.marker_lab)
+                if m == 0:
+                    ax.set_title(name+'(synthetic)')
 
         return fig
 
@@ -843,18 +866,3 @@ class HMplot(object):
         if colorbar:
             fig.colorbar(p)
         return fig
-
-    
-
-
-
-
-
-    
-
-
-
-
-
-
-
