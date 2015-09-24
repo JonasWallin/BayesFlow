@@ -17,12 +17,12 @@ K = 11
 
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
 	save_data = True
-	SIM          = 10**2
-	SIM_burnin_1 = 10**2
-	SIM_burnin_2 = 10**2
-	N_CELLS = 60000
+	SIM          = 20
+	SIM_burnin_1 = 20
+	SIM_burnin_2 = 20
+	N_CELLS = 2000
 	THIN = 1
-	N_PERSONS = 72
+	N_PERSONS = 40
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
@@ -47,7 +47,7 @@ locals().update(data)
 # COLLECTING THE DATA
 ####
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
-	y, act_komp, mus, thetas, sigmas, weights = article_simulatedata.simulate_data_v2(
+	y, act_komp, mus, thetas, sigmas, weights, x = article_simulatedata.simulate_data_v2(
 														 n_cells = N_CELLS, 
 														 n_persons = N_PERSONS,
 														 silent = True)
@@ -62,6 +62,11 @@ else:
 ########################
 
 hier_gmm = setup_model(y, K)
+
+prior = {}
+prior.K_inf = 0
+hier_gmm.set_init(prior, method='EM_pooled', WIS= False, selection = 'sum_min_dist',
+                           rho=0, n_iter=50, n_init=3)
 
 burin_1(hier_gmm, sim = SIM_burnin_1 )
 burin_2(hier_gmm, sim = SIM_burnin_2 )

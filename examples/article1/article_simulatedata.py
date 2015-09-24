@@ -43,7 +43,7 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 	nu = 100
 	ratio_act = np.array([ 1.,  0.95,  0.2,  0.1 ,  0.9,  1,  1,
 		1,  1 ,  1,  0.95,  0.99])
-	Y, act_Class, mus  = simulate_data_( thetas = thetas,
+	Y, act_Class, mus, x  = simulate_data_( thetas = thetas,
 					 sigma_theta = sigma_theta, 
 					 sigmas = sigmas,
 					weights =  weights,
@@ -54,7 +54,7 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 					seed = seed,
 					silent = silent)
 	
-	return Y, act_Class, mus , thetas, sigmas, weights
+	return Y, act_Class, mus , thetas, sigmas, weights, x
 
 def simulate_data_v1(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  [1., 1., 0.8, 0.1]):
 	"""
@@ -117,7 +117,7 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 	for i in range(K):
 		act_class[:np.int(np.ceil(n_persons * ratio_act[i])), i] = 1.
 	Y = []
-	
+	x = []
 	nu  = 100
 	mus = []
 	
@@ -152,7 +152,9 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 		p_ /= np.sum(p_)
 		mix_obj.p = p_
 		mix_obj.d = dim
-		Y.append(mix_obj.simulate_data(n_cells))
+		Y_,x_ =  mix_obj.simulate_data2(n_cells)
+		Y.append(Y_)
+		x.append(x_)
 		
 		if not silent:
 			print("done")
@@ -160,7 +162,7 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 		
 	mus = np.array(mus)
 	
-	return Y, act_class, mus.T
+	return Y, act_class, mus.T, x
 	
 if __name__ == "__main__":
 

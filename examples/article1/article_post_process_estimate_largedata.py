@@ -18,6 +18,7 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 res=np.load('/Users/jonaswallin/repos/BaysFlow/script/sim_data.npy')
+#res=np.load('sim_data.npy')
 theta = res[3]
 mus = res[2]
 simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
@@ -37,9 +38,9 @@ for k in range(K):
 		if(len(k_pos[0]) > 0):
 			k_ = k_pos[0][0]
 			mu_k = mus[:,k_,:].T
-			std_theta = np.max(np.abs(np.array(simulation_result['theta'])[:,col_index[k],:]- theta[k]),0)
+			std_theta = np.sqrt(np.nanvar(simulation_result['mus'][:,col_index[k],:],0))#np.max(np.abs(np.array(simulation_result['theta'])[:,col_index[k],:]- theta[k]),0)
 			theta_err = (np.array(simulation_result['theta'])[:,col_index[k],:] - theta[k])/std_theta
-			perc_ = np.percentile(theta_err,[2.5,50,97.5],axis=0)
+			perc_ = np.percentile(theta_err,[0.005,50,99.5],axis=0)
 			perc_theta.append(np.array(perc_).T)
 
 
@@ -64,14 +65,6 @@ for k in range(K):
 	index = np.isnan(mu_k[0,:])==False
 	
 	
-	ax_mu1.scatter(mu_k[0, index], mu_k[1, index], mu_k[2, index], s=50, edgecolor=color[k], facecolors='none')
-	ax_mu1.scatter(mu_k_est[:,0], mu_k_est[:,1], mu_k_est[:,2], s=1, edgecolor=color[k], facecolors='none')
-	
-	ax_mu2.scatter(mu_k[3, index], mu_k[4, index], mu_k[5, index], s=50, edgecolor=color[k], facecolors='none')
-	ax_mu2.scatter(mu_k_est[:,3], mu_k_est[:,4], mu_k_est[:,5], s=1, edgecolor=color[k], facecolors='none')
-	ax_mu3.scatter(mu_k[4, index], mu_k[5, index], mu_k[7, index], s=50, edgecolor=color[k], facecolors='none')
-	ax_mu3.scatter(mu_k_est[:,4], mu_k_est[:,5], mu_k_est[:,7], s=1, edgecolor=color[k], facecolors='none')
 
-fig_mu1.savefig('f1_1.pdf', type="pdf",transparent=True,bbox_inches='tight')
-fig_mu2.savefig('f1_2.pdf', type="pdf",transparent=True,bbox_inches='tight')
-fig_mu3.savefig('f1_3.pdf', type="pdf",transparent=True,bbox_inches='tight')
+fig4 = plt.figure()
+plt.scatter(np.array(range(1,K+1)),np.array(range(1,K+1)),color=color,s=50)
