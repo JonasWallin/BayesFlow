@@ -659,11 +659,16 @@ class hierarical_mixture_mpi(object):
         for gmm in self.GMMs:
             j = match_comp.names.index(gmm.name)
             comp = match_comp.samp_comps[j]
+            print "*"*30
+            print "gmm {} has matched comp {}".format(gmm.name, comp.ks)
             param = [None]*prior.K
             for k in range(prior.K):
                 param[k] = {}
                 param[k]['mu'] = comp.get_mu(k)
-                param[k]['sigma'] = comp.get_mu(k)
+                param[k]['sigma'] = comp.get_Sigma(k)
+                if k > 17:
+                    if k in comp.ks:
+                        print "param[{}] = {}".format(k, param[k])
             gmm.set_param(param)
             gmm.p = np.array([comp.get_p(k) for k in range(prior.K)])
             gmm.active_komp = np.array([k in comp.ks for k in range(prior.K)]
@@ -1067,7 +1072,7 @@ class hierarical_mixture_mpi(object):
     def simulate(self, simpar, name='simulation', printfrq=100,
                  stop_if_cl_off=True, plotting=False, plotdim=None):
 
-        if self.comm.Get_size() > 1:        
+        if self.comm.Get_size() > 1:
             sys.excepthook = self.mpiexceptabort
         if stop_if_cl_off:
             warnings.filterwarnings("error", 'One cluster turned off in all samples')
@@ -1084,23 +1089,26 @@ class hierarical_mixture_mpi(object):
 
         try:
             for i in range(iterations):
-                if i % printfrq == 0 and self.comm.Get_rank() == 0:
-                    print "{} iteration = {}".format(name, i)
-                    if self.timing:
-                        timer.print_timepoints(iter=i)
+                if i % printfrq == 0:
                     if plotting:
-                        # fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
-                        #                         sharex=True, sharey=True,
-                        #                         squeeze=False)
-                        # for j, gmm in enumerate(self.GMMs):
-                        #     for k, dim in enumerate(plotdim):
-                        #         gmm.plot_components(dim, axs[k, j])
-                        fig, axs = plt.subplots(self.K, figsize=(3, 12))
-                        for k, ax in enumerate(axs):
-                            for gmm in self.GMMs:
-                                ax.plot(range(self.d), gmm.mu[k])
-                                ax.plot([0, self.d-1], [.5, .5], color='grey')
-                                ax.set_ylim(-.1, 1.1)
+                        mus = self.get_mus()
+                    if self.comm.Get_rank() == 0:
+                        print "{} iteration = {}".format(name, i)
+                        if self.timing:
+                            timer.print_timepoints(iter=i)
+                        if plotting:
+                            # fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
+                            #                         sharex=True, sharey=True,
+                            #                         squeeze=False)
+                            # for j, gmm in enumerate(self.GMMs):
+                            #     for k, dim in enumerate(plotdim):
+                            #         gmm.plot_components(dim, axs[k, j])
+                            fig, axs = plt.subplots(self.K, figsize=(3, 12))
+                            for k, ax in enumerate(axs):
+                                for j in range(mus.shape[0]):
+                                    ax.plot(range(self.d), mus[j, k, :])
+                                    ax.plot([0, self.d-1], [.5, .5], color='grey')
+                                    ax.set_ylim(-.1, 1.1)
 
                 if not self.timing:
                     self.sample()

@@ -900,6 +900,7 @@ class Components(object):
             mus = np.vstack([self.mupers[j, :, :], mu_noise.reshape(1, self.d)])
             Sigmas = np.vstack([self.Sigmapers[j, :, :, :], Sigma_noise.reshape(1, self.d, self.d)])
             ps = np.vstack([self.p[j, :].reshape(-1, 1), np.array(p_noise[j]).reshape(1, 1)])
+            ps /= np.sum(ps)
         else:
             mus = self.mupers[j, :, :]
             Sigmas = self.Sigmapers[j, :, :, :]

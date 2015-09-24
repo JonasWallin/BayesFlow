@@ -547,6 +547,7 @@ class HMElog(HMlog):
 
     @classmethod
     def load(cls, savedir, comm=MPI.COMM_WORLD):
+        print "issubclass(cls, HMElog) = {}".format(issubclass(cls, HMElog))
         hmlog = super(HMElog, cls).load(savedir, comm)
         classif_freq_dir = os.path.join(savedir, 'classif_freq')
 

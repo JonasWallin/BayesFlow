@@ -263,7 +263,7 @@ class MatchComponents(object):
             for sc in samp_comps:
                 if k in sc.ks:
                     ax.plot(range(d), sc.get_component(k)[0], color=(0, 0, 1, 0.5))
-            ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
+            #ax.plot(range(d), latent.get_component(k)[0], color=(0, 0, 0))
             ax.plot([0, d-1], [.5, .5], color='grey')
             if s == S-1:
                 ax.axes.xaxis.set_ticks(range(d))
