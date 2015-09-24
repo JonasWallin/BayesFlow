@@ -96,8 +96,10 @@ class HMres(Mres):
         for j, dat in enumerate(self.data):
             mus, Sigmas, ps = self.get_mix(j)
             N_synsamp = int(dat.shape[0]//10)
-            emds.append(EMD_to_generated_from_model(
-                DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp, gamma=1, nbins=50)/N_synsamp)
+            emds.append(
+                np.array(EMD_to_generated_from_model(
+                    DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp, gamma=1, nbins=50))
+                * (1./N_synsamp))
             print "\r EMD computed for {} components".format(j+1),
         print "\r ",
         print ""
