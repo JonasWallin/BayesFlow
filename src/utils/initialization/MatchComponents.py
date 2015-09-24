@@ -239,7 +239,7 @@ class MatchComponents(object):
 
     @staticmethod
     def _center_plot(samp_comps, latent, fig=None, totplots=1, plotnbr=1,
-                     yscale=False, ks=None):
+                     yscale=False, ks=None, sorting=False):
         '''
             The centers of all components, mu, are plotted along one dimension.
         '''
@@ -251,7 +251,8 @@ class MatchComponents(object):
         ks_ = latent.ks[:]
         if not ks is None:
             ks_ = list(set(ks_).intersection(ks))
-        ks_.sort(key=lambda k: latent.get_component(k)[2])  # sort by size
+        if sorting:
+            ks_.sort(key=lambda k: -latent.get_component(k)[2])  # sort by size
 
         S = len(ks_)
         nbr_cols = 2*totplots-1

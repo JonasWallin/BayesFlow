@@ -1089,12 +1089,18 @@ class hierarical_mixture_mpi(object):
                     if self.timing:
                         timer.print_timepoints(iter=i)
                     if plotting:
-                        fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
-                                                sharex=True, sharey=True,
-                                                squeeze=False)
-                        for j, gmm in enumerate(self.GMMs):
-                            for k, dim in enumerate(plotdim):
-                                gmm.plot_components(dim, axs[k, j])
+                        # fig, axs = plt.subplots(len(plotdim), len(self.GMMs),
+                        #                         sharex=True, sharey=True,
+                        #                         squeeze=False)
+                        # for j, gmm in enumerate(self.GMMs):
+                        #     for k, dim in enumerate(plotdim):
+                        #         gmm.plot_components(dim, axs[k, j])
+                        fig, axs = plt.subplots(self.K, figsize=(3, 12))
+                        for k, ax in enumerate(axs):
+                            for gmm in self.GMMs:
+                                ax.plot(range(self.d), gmm.mu[k])
+                                ax.plot([0, self.d-1], [.5, .5], color='grey')
+                                ax.set_ylim(-.1, 1.1)
 
                 if not self.timing:
                     self.sample()
