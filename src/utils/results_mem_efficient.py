@@ -88,7 +88,8 @@ class Mres(object):
             sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
         for j in range(self.J):
-            self.clusts.append(SampleClustering(self.data[j], classif_freq[j], self.mergeind, sim, K))
+            self.clusts.append(SampleClustering(self.data[j], classif_freq[j],
+                               self.mergeind, sim, K, self.names[j]))
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
 
     @property
@@ -585,11 +586,12 @@ class SampleClustering(object):
         Object containing information about clustering of the data.
     '''
 
-    def __init__(self, data, classif_freq, mergeind, sim, K):
+    def __init__(self, data, classif_freq, mergeind, sim, K, name):
         self.data = data
         self.mergeind = mergeind
         self.sim = sim
         self.K = K
+        self.name = name
 
         classif_freq = classif_freq.tocsc()
             # Transform sparse matrix to enable column slicing
