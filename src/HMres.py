@@ -32,6 +32,7 @@ class HMres(Mres):
 
             self.meta_data = MetaData(meta_data)
             self.meta_data.sort(hmlog.names)
+            self.names = self.meta_data.samp['names']
             self.data = [data[j] for j in self.meta_data.order]
 
             super(HMres, self).__init__(hmlog.d, hmlog.K, hmlog.prob_sim_mean[:, :hmlog.K],

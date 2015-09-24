@@ -62,7 +62,7 @@ class ClustPlot(object):
     #         ax.set_ylabel(self.pop_lab[self.order[k]])
     #     return fig
     
-    def pdip(self, fig=None, colorbar=True):
+    def pdip_summary(self, fig=None, colorbar=True):
         '''
             Plot p-value of Hartigan's dip test for each cluster.
             Results are plotted order by cluster size, with largest cluster
@@ -80,6 +80,27 @@ class ClustPlot(object):
             ax.axes.yaxis.set_ticks([])
             ax.set_ylim(0, self.clust.K)
             ax.set_xlabel(s)
+        if colorbar:
+            fig.colorbar(p)
+        return fig
+        
+    def pdip(self, fig=None, colorbar=True):
+        '''
+            Plot p-value of Hartigan's dip test for each cluster.
+            Results are plotted order by cluster size, with largest cluster
+            in top.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        for j, cl in self.clust.sample_clusts:
+            pdip = cl.get_pdip()
+            ax = fig.add_subplot(1, len(self.clust.sample_clusts), j+1)
+            p = ax.pcolormesh(pdip[self.order[::-1], :])
+            p.set_clim(0, 1)
+            ax.axes.xaxis.set_ticks([])
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, self.clust.K)
+            ax.set_title(cl.name)
         if colorbar:
             fig.colorbar(p)
         return fig
@@ -841,7 +862,7 @@ class HMplot(object):
 
         return fig
 
-    def pdip(self, suco=True, fig=None, colorbar=True):
+    def pdip_summary(self, suco=True, fig=None, colorbar=True):
         '''
             Plot p-value of Hartigan's dip test for each cluster.
             Results are plotted order by cluster size, with largest cluster
@@ -863,6 +884,33 @@ class HMplot(object):
             ax.axes.yaxis.set_ticks([])
             ax.set_ylim(0, len(order))
             ax.set_xlabel(s)
+        if colorbar:
+            fig.colorbar(p)
+        return fig
+
+    def pdip(self, suco=True, fig=None, colorbar=True):
+        '''
+            Plot p-value of Hartigan's dip test for each cluster.
+            Results are plotted order by cluster size, with largest cluster
+            in top.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        if suco:
+            order = self.suco_ord
+        else:
+            order = self.comp_ord
+            
+        pdiplist = self.bmres.get_pdip(suco)
+        for i, k in enumerate(order):
+            pdip = pdiplist[k]
+            ax = fig.add_subplot(1, len(pdiplist), i+1)
+            p = ax.pcolormesh(pdip[::-1, :])
+            p.set_clim(0, 1)
+            ax.axes.xaxis.set_ticks([])
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, pdip.shape[0])
+            ax.set_xlabel("k = {}".format(k))
         if colorbar:
             fig.colorbar(p)
         return fig
