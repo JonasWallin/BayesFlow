@@ -3,26 +3,28 @@ Created on Jul 11, 2014
 
 @author: jonaswallin
 '''
+from __future__ import print_function
 from __future__ import division
 import article_simulatedata
 from mpi4py import MPI
 from article_util import setup_model, burin_1, burin_2, main_run
 import numpy as np
 import numpy.random as npr
+import sys
 
 
 
-npr.seed(1)
+npr.seed(10)
 K = 11
 
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
 	save_data = True
-	SIM          = 20
-	SIM_burnin_1 = 20
-	SIM_burnin_2 = 20
-	N_CELLS = 2000
+	SIM          = 1501
+	SIM_burnin_1 = 1501
+	SIM_burnin_2 = 1501
+	N_CELLS = 20000
 	THIN = 1
-	N_PERSONS = 40
+	N_PERSONS = 20
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
@@ -63,14 +65,11 @@ else:
 
 hier_gmm = setup_model(y, K)
 
-prior = {}
-prior.K_inf = 0
-hier_gmm.set_init(prior, method='EM_pooled', WIS= False, selection = 'sum_min_dist',
-                           rho=0, n_iter=50, n_init=3)
+
 
 burin_1(hier_gmm, sim = SIM_burnin_1 )
-burin_2(hier_gmm, sim = SIM_burnin_2 )
-simulation_result = main_run(hier_gmm, sim = SIM)
+burin_2(hier_gmm, sim = SIM_burnin_2, p_act = [0., 0.] )
+simulation_result = main_run(hier_gmm, sim = SIM, p_act = [0,0.])
 np.set_printoptions(precision=2)
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
 	print(simulation_result['mus'][0])
@@ -81,15 +80,13 @@ hier_gmm.print_timing()
 
 
 
+mus_sim = hier_gmm.get_mus()
 
 if MPI.COMM_WORLD.Get_rank() == 0: 
-	
+	data_ = [y, act_komp, mus, thetas, sigmas, weights]
 	if save_data:
-		import sys
 		print('saveing data')
 		sys.stdout.flush()
 		np.save('simulation_result.npy', simulation_result) 
-	#simulation_result=np.load('simulation_result.npy').item()
-	data_ = [y, act_komp, mus, thetas, sigmas, weights]
-	if save_data:
+		np.save('mus_sim.npy', mus_sim)
 		np.save('sim_data.npy', data_) 

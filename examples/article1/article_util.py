@@ -69,6 +69,8 @@ def burin_1(hGMM, sim = 2000, p_label = 1., silent = False):
 				print('*', end='')
 				sys.stdout.flush()
 		hGMM.sample()
+		#if i % 200 == 0:
+		#	bf.distance_sort_MPI(hGMM)
 
 	if not silent and (MPI.COMM_WORLD.Get_rank() == 0):   # @UndefinedVariable 
 		print(', done')
@@ -101,6 +103,10 @@ def burin_2(hGMM, sim = 8000, p_label = 1., p_act = [0.7, 0.7], silent= False):
 					print('*', end='')
 					sys.stdout.flush()
 		hGMM.sample()
+	
+	
+		
+	bf.distance_sort_MPI(hGMM) 
 		
 	if not silent and (MPI.COMM_WORLD.Get_rank() == 0): # @UndefinedVariable 
 		print(', done')
