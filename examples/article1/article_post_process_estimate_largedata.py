@@ -21,9 +21,9 @@ matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 res=np.load('sim_data.npy')
 theta = res[3]
 mus = res[2]
-simulation_result = np.load('simulation_result.npy').item()
-mus_sim =  np.load('mus.npy')
-#simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
+#simulation_result = np.load('simulation_result.npy').item()
+simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
+mus_sim =  np.load('/Users/jonaswallin/repos/BaysFlow/script/mus_sim.npy')
 
 
 K = theta.shape[0]
@@ -79,3 +79,4 @@ fig_mu3.savefig('f1_3.pdf', type="pdf",transparent=True,bbox_inches='tight')
 
 fig4 = plt.figure()
 plt.scatter(np.array(range(1,K+1)),np.array(range(1,K+1)),color=color,s=50)
+fig4.savefig('color_reminder.pdf', type="pdf",transparent=True,bbox_inches='tight')
