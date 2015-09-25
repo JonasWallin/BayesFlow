@@ -106,7 +106,7 @@ def burin_2(hGMM, sim = 8000, p_label = 1., p_act = [0.7, 0.7], silent= False):
 	
 	
 		
-	bf.distance_sort_MPI(hGMM) 
+	#bf.distance_sort_MPI(hGMM) 
 		
 	if not silent and (MPI.COMM_WORLD.Get_rank() == 0): # @UndefinedVariable 
 		print(', done')
