@@ -18,13 +18,14 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 #res=np.load('/Users/jonaswallin/repos/BaysFlow/script/sim_data.npy')
+#res=np.load('/Users/jonaswallin/repos/BaysFlow/examples/article1/sim_data_v1.npy')
 res=np.load('/Users/jonaswallin/repos/BaysFlow/examples/article1/sim_data.npy')
 theta = res[3]
 mus = res[2]
-#simulation_result = np.load('simulation_result.npy').item()
-#mus_sim = np.load('mus_sim.npy')
-simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result_v1.npy').item()
-mus_sim =  np.load('/Users/jonaswallin/repos/BaysFlow/script/mus_sim_v1.npy')
+simulation_result = np.load('simulation_result.npy').item()
+mus_sim = np.load('mus_sim.npy')
+#simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
+#mus_sim =  np.load('/Users/jonaswallin/repos/BaysFlow/script/mus_sim.npy')
 
 
 K = theta.shape[0]
