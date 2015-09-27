@@ -13,7 +13,7 @@ import scipy.spatial as ss
 import copy as cp
 
 
-def HGMM_pre_burnin(Hier_GMM, init_iter = 40, prec = 1, iteration = 10, mutate_iteration = 20, burst_iteration = 20, silent = False):
+def HGMM_pre_burnin(Hier_GMM, init_iter = 40, prec = 1, iteration = 10, mutate_iteration = 20, burst_iteration = 20, local_iter = 5, silent = False):
 	"""	
 		A mutation type algorithm to find good starting lcoation for MCMC
 		*prec* precentage of data counting as outlier
@@ -37,10 +37,11 @@ def HGMM_pre_burnin(Hier_GMM, init_iter = 40, prec = 1, iteration = 10, mutate_i
 					   iteration 		= iteration,
 					   mutate_iteration = mutate_iteration,
 					   burst_iteration  = burst_iteration,
-					   silent           = silent )
+					   silent           = silent,
+					   local_iter       = local_iter)
 	Hier_GMM.comm.Barrier()
 
-def GMM_pre_burnin(GMM, prec = 1, iteration = 10, mutate_iteration = 20, burst_iteration = 20, silent= False):
+def GMM_pre_burnin(GMM, prec = 1, iteration = 10, mutate_iteration = 20, burst_iteration = 20, local_iter = 5, silent= False):
 	"""	
 		A mutation type algorithm to find good starting lcoation for MCMC
 		*prec* precentage of data counting as outlier
@@ -54,6 +55,8 @@ def GMM_pre_burnin(GMM, prec = 1, iteration = 10, mutate_iteration = 20, burst_i
 		mutate(GMM, prec, iteration = mutate_iteration, silent = silent)
 		mutate(GMM, prec, iteration = mutate_iteration, silent = silent, rand_class =True)
 		burst(GMM,         iteration = burst_iteration, silent = silent)
+		for k in range(local_iter):  # @UnusedVariable
+			GMM.sample()
 
 def draw_outlier_point(GMM, prec = 0.1):
 	"""
