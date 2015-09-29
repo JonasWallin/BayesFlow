@@ -169,7 +169,7 @@ class HMres(Mres):
         for j, i_dim in top_N:
             print "emd_dim[i_dim] = {}".format(emd_dim[i_dim])
             print "axs[j:j+1, :].shape = {}".format(axs[j:j+1, :].shape)
-            self.plot.component_fit(emd_dim[i_dim], name=self.names[j], axs=axs[j:j+1, :])
+            self.plot.component_fit([emd_dim[i_dim]], name=self.names[j], axs=axs[j, :].reshape(1, -1))
         if not savedir is None:
             fig_fit.savefig(os.path.join(savedir, 'fit_max_emd.pdf'), type='pdf',
                             transparent=False, bbox_inches='tight')
