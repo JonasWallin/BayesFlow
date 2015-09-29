@@ -921,6 +921,31 @@ class mixture(object):
 			x_ = npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = n_count)
 			X[x == self.K,:] = x_
 		return X
+
+	def simulate_data2(self,n):
+		"""
+			simulates data using current Sigma, mu, p
+			if there exists noise class it __will__ be used
+		"""
+		
+		p = np.zeros_like(self.p)
+		p[:] = self.p[:]
+		p[np.isnan(p)] = 0 
+		#if self.noise_class:
+		#	p = p[:-1]
+		#	p /= np.sum(p)		
+		x_ = npr.multinomial(1, p, size=n)
+		_, x = np.where(x_)  
+		X =np.zeros((n,self.d))
+		for k in range(self.K):
+			n_count = np.sum(x == k)
+			x_ = npr.multivariate_normal(self.mu[k], self.sigma[k],size = n_count)
+			X[x == k,:] = x_
+		if self.noise_class:
+			n_count = np.sum(x == self.K)
+			x_ = npr.multivariate_normal(self.noise_mean, self.noise_sigma,size = n_count)
+			X[x == self.K,:] = x_
+		return X, x
 	
 	@classmethod
 	def simulate_mixture(cls, mu, Sigma, p, n):

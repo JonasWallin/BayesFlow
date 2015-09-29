@@ -73,7 +73,7 @@ def setup_package():
 	packages=['BayesFlow','BayesFlow.PurePython',
 			'BayesFlow.PurePython.distribution','BayesFlow.distribution',
 			'BayesFlow.utils','BayesFlow.mixture_util',
-			'BayesFlow.data','BayesFlow.utils.initialization'],
+			'BayesFlow.data','BayesFlow.utils.initialization','BayesFlow.tests'],
 	package_dir={'BayesFlow': 'src/'},
 	ext_modules = [Extension("BayesFlow.mixture_util.GMM_util",
 						   sources=["src/mixture_util/GMM_util.pyx",

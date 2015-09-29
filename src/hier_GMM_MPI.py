@@ -29,7 +29,7 @@ from . import HMlog
 
 #TODO: change to geomtrical median instead of mean!!
 #TODO: if a cluster is turned off use the latent mean insead of mu
-#        and then it will work!
+#		and then it will work!
 def distance_sort(hGMM):
     """
         sorts the clusters after the geometrical mean of the means
@@ -40,7 +40,13 @@ def distance_sort(hGMM):
     for com_obj in range(size):
         if hGMM.comm.Get_rank() == com_obj:
             if hGMM.comm.Get_rank() == 0:
-                mus  = [hGMM.GMMs[0].mu[k].reshape((1, hGMM.d)) for k in range(hGMM.K)]
+                mu_param = [npw.param for npw in hGMM.normal_p_wisharts]
+                mus = []
+                for k in range(hGMM.K):
+                    if np.isnan(hGMM.GMMs[0].mu[k][0])==False:
+                        mus.append(hGMM.GMMs[0].mu[k].reshape((1, hGMM.d)))
+                    else:
+                        mus.append(mu_param[k]['theta'].reshape((1, hGMM.d)))
                 GMMs = hGMM.GMMs[1:]
             else:
                 GMMs = hGMM.GMMs
@@ -53,7 +59,10 @@ def distance_sort(hGMM):
                 for index in index_k:
                     #print mus_t
                     #print mus_t - GMM.mu[index]
-                    dist = np.linalg.norm(mus_t - GMM.mu[index],axis=1)
+                    if np.isnan(GMM.mu[index][0]) == False:
+                        dist = np.linalg.norm(mus_t - GMM.mu[index],axis=1)
+                    else:
+                        dist = np.linalg.norm(mus_t - GMM.prior[index]['mu']['theta'].transpose(),axis=1)
                     i = np.argsort(dist)[0]
                     mus_t[i,:] = np.inf
                     list_temp[index] = i 
@@ -595,12 +604,12 @@ class hierarical_mixture_mpi(object):
         self.prior.resize_var_priors(c)
         self.set_var_prior()
 
-    def set_init(self, prior, thetas=None, expSigmas=None, method='random', **kw):
+    def set_init(self, prior=None, thetas=None, expSigmas=None, method='random', **kw):
         self.set_latent_init(prior, thetas=thetas, expSigmas=expSigmas,
                              method=method, **kw)
         self.set_GMM_init()
 
-    def set_latent_init(self, prior, thetas=None, expSigmas=None,
+    def set_latent_init(self, prior=None, thetas=None, expSigmas=None,
                         method='random', **kw):
 
         rank = self.comm.Get_rank()
