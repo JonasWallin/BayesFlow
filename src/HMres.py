@@ -136,6 +136,12 @@ class HMres(Mres):
                 raise BadQualityError('Trace plots not ok')
             print "Bad answer. Are trace plots ok? (y/n)"
 
+    def check_noise(self):
+        if self.noise_class:
+            self.quality['max_p_noise'] = np.max(self.p_noise)
+            if (self.p_noise > 0.01).any():
+                raise BadQualityError('Too high noise level')
+
     def check_outliers(self):
         bh_out = np.sum(self.components.get_latent_bhattacharyya_overlap_quotient() < 1)
         eu_out = np.sum(self.components.get_center_distance_quotient() < 1)
@@ -178,6 +184,7 @@ class HMres(Mres):
 
     def check_quality(self, savedir=None, N_emd=5):
         self.check_active_komp()
+        self.check_noise()
         #self.check_convergence()
         self.check_outliers()
         self.check_dip(savedir)
@@ -214,10 +221,9 @@ class HMres(Mres):
             mus.append(self.noise_mu)
             Sigmas.append(self.noise_sigma)
             ps.append(self.p_noise[j])
-        print "[mu.shape for mu in mus] = {}".format([mu.shape for mu in mus])
-        print "[sigma.shape for sigma in Sigmas] = {}".format([sigma.shape for sigma in Sigmas])
         print "ps = {}".format(ps)
         print "np.sum(ps) = {}".format(np.sum(ps))
+        ps /= np.sum(ps)  # renormalizing
         return mus, Sigmas, np.array(ps)
 
     def generate_from_mix(self, j, N):
