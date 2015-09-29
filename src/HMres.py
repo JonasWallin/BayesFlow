@@ -162,12 +162,14 @@ class HMres(Mres):
         emd, emd_dim = self.earth_movers_distance_to_generated()
         self.quality['emd'] = {'min': np.min(emd), 'max': np.max(emd), 'median': np.median(emd)}
         fig, ax = plt.subplots(figsize=(15, 4))
-        im = ax.imshow(emd.T, interpoloation='None')
+        im = ax.imshow(emd.T, interpolation='None')
         plt.colorbar(im, orientation='horizontal')
-        top_N = np.unravel_index(np.argpartition(-emd.ravel(), N)[:N], emd.shape)
+        top_N = zip(*np.unravel_index(np.argpartition(-emd.ravel(), N)[:N], emd.shape))
         fig_fit, axs = plt.subplots(N, 4)
         for j, i_dim in top_N:
-            self.plot.component_fit(emd_dim[i_dim], name=self.names[j], axs=axs[j, :])
+            print "emd_dim[i_dim] = {}".format(emd_dim[i_dim])
+            print "axs[j:j+1, :].shape = {}".format(axs[j:j+1, :].shape)
+            self.plot.component_fit(emd_dim[i_dim], name=self.names[j], axs=axs[j:j+1, :])
         if not savedir is None:
             fig_fit.savefig(os.path.join(savedir, 'fit_max_emd.pdf'), type='pdf',
                             transparent=False, bbox_inches='tight')
@@ -176,7 +178,7 @@ class HMres(Mres):
 
     def check_quality(self, savedir=None, N_emd=5):
         self.check_active_komp()
-        self.check_convergence()
+        #self.check_convergence()
         self.check_outliers()
         self.check_dip(savedir)
         self.check_emd(N_emd, savedir)
@@ -237,9 +239,10 @@ class HMres(Mres):
                     DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
                     gamma=1, nbins=50, dims=dims))
                 * (1./N_synsamp))
-            print "\r EMD computed for {} components".format(j+1),
+            print "\r EMD computed for {} samples".format(j+1),
         print "\r ",
         print ""
         self._earth_movers_distance_to_generated = np.vstack(emds)
         self._emd_dims = dims
+        print "dims = {}".format(dims)
         return self._earth_movers_distance_to_generated, self._emd_dims
