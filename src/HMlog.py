@@ -408,10 +408,11 @@ class HMlog(HMlogB):
             with open(os.path.join(syndata_dir, 'pooled_MODEL.pkl'), 'r') as f:
                 hmlog.Y_pooled_sim = pickle.load(f)
 
-        if not hasattr(hmlog, 'noise_mu'):
-            hmlog.noise_mu = 0.5*np.ones(hmlog.d)
-        if not hasattr(hmlog, 'noise_sigma'):
-            hmlog.noise_sigma = 0.5**2*np.eye(hmlog.d)
+        if hmlog.noise_class:
+            if hmlog.noise_mu is None:
+                hmlog.noise_mu = 0.5*np.ones(hmlog.d)
+            if hmlog.noise_sigma is None:
+                hmlog.noise_sigma = 0.5**2*np.eye(hmlog.d)
 
         #print "np.sum(hmlog.prob_sim_mean, axis=1) = {}".format(np.sum(hmlog.prob_sim_mean, axis=1))
         #print "hmlog.active_komp = {}".format(hmlog.active_komp)

@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 from . import GMM
 from .distribution import normal_p_wishart, Wishart_p_nu
 from .GMM import mixture
-from .utils.results_mem_efficient import Components
 from .utils.timer import Timer
 from .utils.initialization.EM import EM_pooled
 from .utils import load_fcdata

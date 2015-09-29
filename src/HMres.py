@@ -212,6 +212,8 @@ class HMres(Mres):
             mus.append(self.noise_mu)
             Sigmas.append(self.noise_sigma)
             ps.append(self.p_noise[j])
+        print "[mu.shape for mu in mus] = {}".format([mu.shape for mu in mus])
+        print "[sigma.shape for sigma in Sigmas] = {}".format([sigma.shape for sigma in Sigmas])
         print "ps = {}".format(ps)
         print "np.sum(ps) = {}".format(np.sum(ps))
         return mus, Sigmas, np.array(ps)
