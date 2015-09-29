@@ -80,11 +80,17 @@ class HMres(Mres):
         print "metadata = {}".format(metadata)
         res = cls(hmlog, hmlog_burn, data, metadata, comm=comm)
         try:
+            print "savedir = {}".format(savedir)
             with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
                 postproc_res = json.load(f)
         except IOError:
             pass
         else:
+            for attr in ['_earth_movers_distance_to_generated', 'pdiplist']:
+                try:
+                    setattr(res, attr, np.load(os.path.join(savedir, attr+'.npy')))
+                except IOError:
+                    pass
             for attr in postproc_res:
                 setattr(res, attr, postproc_res[attr])
         return res
@@ -92,15 +98,20 @@ class HMres(Mres):
     def save(self, savedir):
         if self.rank == 0:
             savedict = {}
-            for attr in ['mergeind', 'postproc_par', 'pdiplist',
-                         '_earth_movers_distance_to_generated', '_emd_dims',
+            for attr in ['mergeind', 'postproc_par', '_emd_dims',
                          'quality', 'merged']:
                 try:
                     savedict[attr] = getattr(self, attr)
-                except:
+                except AttributeError:
                     pass
             with open(os.path.join(savedir, 'postproc_results.json'), 'w') as f:
                 json.dump(savedict, f)
+            for attr in ['_earth_movers_distance_to_generated', 'pdiplist']:
+                try:
+                    np.save(os.path.join(savedir, attr+'.npy'), getattr(self, attr))
+                except AttributeError:
+                    pass
+
 
     @Mres.mergeind.setter
     def mergeind(self, mergeind):
@@ -171,12 +182,12 @@ class HMres(Mres):
         im = ax.imshow(emd.T, interpolation='None')
         plt.colorbar(im, orientation='horizontal')
         top_N = zip(*np.unravel_index(np.argpartition(-emd.ravel(), N)[:N], emd.shape))
-        fig_fit, axs = plt.subplots(N, 4)
-        for j, i_dim in top_N:
-            print "emd_dim[i_dim] = {}".format(emd_dim[i_dim])
-            print "axs[j:j+1, :].shape = {}".format(axs[j:j+1, :].shape)
-            self.plot.component_fit([emd_dim[i_dim]], name=self.names[j], axs=axs[j, :].reshape(1, -1))
+        fig_fit, axs = plt.subplots(N, 4, figsize=(15, 15))
+        for i, (j, i_dim) in enumerate(top_N):
+            self.plot.component_fit([emd_dim[i_dim]], name=self.names[j], axs=axs[i, :].reshape(1, -1))
         if not savedir is None:
+            fig.savefig(os.path.join(savedir, 'emd.pdf'), type='pdf',
+                        transparent=False, bbox_inches='tight')
             fig_fit.savefig(os.path.join(savedir, 'fit_max_emd.pdf'), type='pdf',
                             transparent=False, bbox_inches='tight')
         else:
