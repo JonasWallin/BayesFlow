@@ -1,7 +1,6 @@
 from __future__ import division
 import numpy as np
 import warnings
-from sklearn import mixture as skmixture
 from mpi4py import MPI
 from sklearn.covariance import MinCovDet
 #from scipy.stats import multivariate_normal
@@ -13,77 +12,26 @@ from . import Bhattacharyya as bhat
 from . import diptest
 from .lazy_property import LazyProperty
 from .initialization.MatchComponents import MatchComponents
-from .plot_util import get_colors
 from .random_ import rmvn
-
-
-def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):
-    data = data[~np.isnan(data[:, 0]), :]
-    data = data[~np.isinf(data[:, 0]), :]
-    bestbic = np.inf
-    for K in Ks:
-        g = skmixture.GMM(n_components=K, covariance_type=covariance_type, n_init=n_init, n_iter=n_iter)
-        g.fit(data)
-        bic = g.bic(data)
-        print "BIC for {} clusters: {}".format(K, bic)
-        if bic < bestbic:
-            means = g.means_
-            bestbic = bic
-    if means.shape[0] == np.max(Ks):
-        warnings.warn("Best BIC obtained for maximum K")
-    if means.shape[0] == np.min(Ks):
-        warnings.warn("Best BIC obtained for minimum K")
-    return means
-
-
-def lognorm_pdf(Y, mu, Sigma, p):
-
-    Ycent = Y - mu
-    return np.log(p) - np.log(np.linalg.det(Sigma))/2 - np.sum(Ycent*np.linalg.solve(Sigma, Ycent.T).T, axis=1)/2
-
-
-def quantile(y, w, alpha):
-    '''
-        Returns alpha quantile(s) (alpha can be a vector) of empirical probability distribution of data y weighted by w
-    '''
-    alpha = np.array(alpha)
-    alpha_ord = np.argsort(alpha)
-    alpha_sort = alpha[alpha_ord]
-    y_ord = np.argsort(y)
-    y_sort = y[y_ord]
-    cumdistr = np.cumsum(w[y_ord])
-    q = np.empty(alpha.shape)
-    if cumdistr[-1] == 0:
-        q[:] = float('nan')
-        return q
-    cumdistr /= cumdistr[-1]
-    j = 0
-    i = 0
-    while j < len(alpha) and i < len(cumdistr):
-        if alpha_sort[j] < cumdistr[i]:
-            q[j] = y_sort[i]
-            j += 1
-        else:
-            i += 1
-    if j < len(alpha):
-        q[j:] = y_sort[-1]
-    return q[np.argsort(alpha_ord)]
+from .plot_util import get_colors
 
 
 class Mres(object):
 
-    def __init__(self, d, K, p, classif_freq, p_noise=None, sim=None):
+    def __init__(self, d, K, p, classif_freq, p_noise=None, sim=None,
+                 maxnbrsucocol=8):
 
         self.d = d
         self.K = K  # NB! Noise cluster not included in this
+        self.J = len(self.data)
         self.p = p
         self.p_noise = p_noise
+        self.maxnbrsucocol = maxnbrsucocol
 
         self.merged = False
         self.mergeMeth = ''
         self.mergeind = [[k] for k in range(self.K)]
 
-        self.J = len(self.data)
         if sim is None:
             sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
@@ -93,6 +41,46 @@ class Mres(object):
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
 
     @property
+    def mergeind(self):
+        return self._mergeind
+
+    @mergeind.setter
+    def mergeind(self, mergeind):
+        '''
+            Sets also canonical ordering and colors for plots.
+        '''
+        for s, suco in enumerate(mergeind):
+            sc_ord = np.argsort(-np.array(np.sum(self.p, axis=0)[suco]))
+            mergeind[s] = [suco[i] for i in sc_ord]  # Change order within each super component
+        self._mergeind = mergeind
+        self._suco_ord = np.argsort(-np.sum(self.p_merged, axis=0))
+        self._comp_ord = [ind for sco in self._suco_ord for ind in self._mergeind[sco]]
+        self._comp_colors, suco_colors = get_colors(
+            self._mergeind, self._suco_ord, self._comp_ord, self.maxnbrsucocol)
+
+    @property
+    def mergeind_sorted(self):
+        print "self.mergeind = {}".format(self.mergeind)
+        print "self.suco_ord = {}".format(self.suco_ord)
+        return [self.mergeind[sco] for sco in self.suco_ord]
+
+    @property
+    def comp_ord(self):
+        return self._comp_ord
+
+    @property
+    def suco_ord(self):
+        return self._suco_ord
+
+    @property
+    def comp_colors(self):
+        return self._comp_colors
+
+    @property
+    def suco_colors(self):
+        return self._suco_colors
+
+    @property
     def p_merged(self):
         p_mer = np.zeros((self.J, len(self.mergeind)))
         for s, m_ind in enumerate(self.mergeind):
@@ -100,20 +88,15 @@ class Mres(object):
         return p_mer
 
     def get_order(self):
-        for s, suco in enumerate(self.mergeind):
-            sc_ord = np.argsort(-np.array(np.sum(self.p, axis=0)[suco]))
-            self.mergeind[s] = [suco[i] for i in sc_ord]  # Change order within each super component
-        prob_mer = [np.sum(self.p[:, scind]) for scind in self.mergeind]
-        suco_ord = np.argsort(-np.array(prob_mer))
-        mergeind_sort = [self.mergeind[i] for i in suco_ord]
-        print "mergeind_sort = {}".format(mergeind_sort)
-        comp_ord = [ind for suco in mergeind_sort for ind in suco]
-        return comp_ord, suco_ord
-
-    def get_colors_and_order(self, maxnbrsucocol=8):
-        comp_ord, suco_ord = self.get_order()
-        comp_col, suco_col = get_colors(self.mergeind, suco_ord, comp_ord, maxnbrsucocol)
-        return comp_col, suco_col, comp_ord, suco_ord
+        # for s, suco in enumerate(self.mergeind):
+        #     sc_ord = np.argsort(-np.array(np.sum(self.p, axis=0)[suco]))
+        #     self.mergeind[s] = [suco[i] for i in sc_ord]  # Change order within each super component
+        # prob_mer = [np.sum(self.p[:, scind]) for scind in self.mergeind]
+        # suco_ord = np.argsort(-np.array(prob_mer))
+        # mergeind_sort = [self.mergeind[i] for i in suco_ord]
+        # print "mergeind_sort = {}".format(mergeind_sort)
+        # comp_ord = [ind for suco in mergeind_sort for ind in suco]
+        return self._comp_ord, self._suco_ord
 
     def merge(self, method, thr, **mmfArgs):
         self.complist = [[k] for k in range(self.K)]
@@ -165,8 +148,10 @@ class Mres(object):
             self.hierarchical_merge(mergeMeasureFun, thr, **mmfArgs)
 
     def merge_kl(self, ind):
-        self.mergeind[ind[1]] += self.mergeind[ind[0]]
-        self.mergeind.pop(ind[0])
+        mergeind = self.mergeind
+        mergeind[ind[1]] += mergeind[ind[0]]
+        mergeind.pop(ind[0])
+        self.mergeind = mergeind
         #self.complist[ind[1]] = [self.complist[ind[1]], self.complist[ind[0]]]
         #self.complist[ind[0]] = []
 
@@ -269,9 +254,11 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable/4):
-                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
+                        self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
-            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
+                self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
     def okdiptest2(self, ind, thr, tol=1./4):
@@ -292,9 +279,11 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable*tol):
-                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
+                        self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
-            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
+                self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
     def get_dims_with_low_bhat_overlap(self, ind):
@@ -751,6 +740,35 @@ class SampleClustering(object):
         w = np.linalg.solve(Sigma1+Sigma2, mu2-mu1)
         w /= np.linalg.norm(w)
         return w
+
+    @staticmethod
+    def quantile(y, w, alpha):
+        '''
+            Returns alpha quantile(s) (alpha can be a vector) of empirical
+            probability distribution of data y weighted by w
+        '''
+        alpha = np.array(alpha)
+        alpha_ord = np.argsort(alpha)
+        alpha_sort = alpha[alpha_ord]
+        y_ord = np.argsort(y)
+        y_sort = y[y_ord]
+        cumdistr = np.cumsum(w[y_ord])
+        q = np.empty(alpha.shape)
+        if cumdistr[-1] == 0:
+            q[:] = float('nan')
+            return q
+        cumdistr /= cumdistr[-1]
+        j = 0
+        i = 0
+        while j < len(alpha) and i < len(cumdistr):
+            if alpha_sort[j] < cumdistr[i]:
+                q[j] = y_sort[i]
+                j += 1
+            else:
+                i += 1
+        if j < len(alpha):
+            q[j:] = y_sort[-1]
+        return q[np.argsort(alpha_ord)]
 
     # def get_quantiles(self, alpha, j=None, ks=None, dds=None):
     #     '''

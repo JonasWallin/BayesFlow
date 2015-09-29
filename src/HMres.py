@@ -5,14 +5,20 @@ Created on Mon Aug 18 18:35:14 2014
 @author: johnsson
 """
 from __future__ import division
+import os
 from mpi4py import MPI
 import numpy as np
+import json
+import matplotlib.pyplot as plt
 
 from .HMplot import HMplot
+from .HMlog import HMlogB, HMElog
 from .PurePython.GMM import mixture
+from .utils.dat_util import load_fcdata
 from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components, MetaData
 from .utils.initialization.distributed_data import DataMPI
 from .utils.initialization.EM import EMD_to_generated_from_model
+from .exceptions import BadQualityError
 
 
 class HMres(Mres):
@@ -20,13 +26,16 @@ class HMres(Mres):
         Class for processing results from MCMC simulation, e.g. for merging and computing dip test
     """
 
-    def __init__(self, hmlog, hmlog_burn, data, meta_data, comm=MPI.COMM_WORLD):
+    def __init__(self, hmlog, hmlog_burn, data, meta_data,
+                 comm=MPI.COMM_WORLD, maxnbrsucocol=8):
         self.comm = comm
         self.rank = comm.Get_rank()
         if self.rank == 0:
             self.noise_class = hmlog.noise_class
             if self.noise_class:
                 self.p_noise = hmlog.prob_sim_mean[:, hmlog.K]
+                self.noise_mu = hmlog.noise_mu
+                self.noise_sigma = hmlog.noise_sigma
             else:
                 self.p_noise = None
 
@@ -36,7 +45,8 @@ class HMres(Mres):
             self.data = [data[j] for j in self.meta_data.order]
 
             super(HMres, self).__init__(hmlog.d, hmlog.K, hmlog.prob_sim_mean[:, :hmlog.K],
-                                        hmlog.classif_freq, self.p_noise, hmlog.sim)
+                                        hmlog.classif_freq, self.p_noise, hmlog.sim,
+                                        maxnbrsucocol)
 
             self.sim = hmlog.sim
 
@@ -56,6 +66,121 @@ class HMres(Mres):
 
             self.plot = HMplot(self, self.meta_data.marker_lab)
 
+            self.quality = {}
+
+    @classmethod
+    def load(cls, savedir, data_kws, comm=MPI.COMM_SELF):
+        hmlog_burn = HMlogB.load(savedir, comm=comm)
+        hmlog = HMElog.load(savedir, comm=comm)
+        metadata = data_kws.copy()
+        marker_lab = metadata.pop('marker_lab')
+        data = load_fcdata(hmlog.names, comm=comm, **metadata)
+        metadata.update(marker_lab=marker_lab)
+        metadata.update(samp={'names': hmlog.names})
+        print "metadata = {}".format(metadata)
+        res = cls(hmlog, hmlog_burn, data, metadata, comm=comm)
+        try:
+            with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
+                postproc_res = json.load(f)
+        except IOError:
+            pass
+        else:
+            for attr in postproc_res:
+                setattr(res, attr, postproc_res[attr])
+        return res
+
+    def save(self, savedir):
+        if self.rank == 0:
+            savedict = {}
+            for attr in ['mergeind', 'postproc_par', 'pdiplist',
+                         '_earth_movers_distance_to_generated', '_emd_dims',
+                         'quality', 'merged']:
+                try:
+                    savedict[attr] = getattr(self, attr)
+                except:
+                    pass
+            with open(os.path.join(savedir, 'postproc_results.json'), 'w') as f:
+                json.dump(savedict, f)
+
+    @Mres.mergeind.setter
+    def mergeind(self, mergeind):
+        Mres.mergeind.fset(self, mergeind)
+        if hasattr(self, 'components'):
+            self.components.mergeind = self._mergeind
+
+    def check_active_komp(self):
+        if ((self.active_komp > 0.05)*(self.active_komp < 0.95)).any():
+            self.quality['ok_active_komp'] = False
+            raise BadQualityError('Active components not in ok range')
+        else:
+            self.quality['ok_active_komp'] = True
+
+    def check_convergence(self):
+        if 'convergence' in self.quality:
+            if self.quality['convergence'] == 'no':
+                raise BadQualityError('No convergence')
+            else:
+                return
+        self.traces.plot.all(fig=plt.figure(figsize=(18, 4)), yscale=True)
+        self.traces.plot.nu()
+        self.traces.plot.nu_sigma()
+        plt.show()
+        print "Are trace plots ok? (y/n)"
+        while 1:
+            ans = raw_input()
+            if ans.lower() == 'y':
+                self.quality['convergence'] = 'yes'
+                break
+            if ans.lower() == 'n':
+                self.quality['convergence'] = 'no'
+                raise BadQualityError('Trace plots not ok')
+            print "Bad answer. Are trace plots ok? (y/n)"
+
+    def check_outliers(self):
+        bh_out = np.sum(self.components.get_latent_bhattacharyya_overlap_quotient() < 1)
+        eu_out = np.sum(self.components.get_center_distance_quotient() < 1)
+        self.quality['outliers'] = {'bhat': bh_out, 'eucl_loc': eu_out}
+        if bh_out+eu_out > 0:
+            raise BadQualityError('Not closest to own latent component, bhat: {}, eu: {}'.format(
+                                  bh_out, eu_out))
+
+    def check_dip(self, savedir=None):
+        self.get_pdip()
+        fig_dip = self.plot.pdip()
+        fig_dip_summary = self.plot.pdip_summary()
+        if not savedir is None:
+            fig_dip.savefig(os.path.join(savedir, 'dip.pdf'), type='pdf',
+                            transparent=False, bbox_inches='tight')
+            fig_dip_summary.savefig(os.path.join(savedir, 'dip_summary.pdf'),
+                                    type='pdf', transparent=False, bbox_inches='tight')
+        else:
+            plt.show()
+        if (self.get_pdip_summary(suco=True)['25th percentile'] < 0.28).any():
+            raise BadQualityError('25th percentile of pdip not ok')
+
+    def check_emd(self, N=5, savedir=None):
+        emd, emd_dim = self.earth_movers_distance_to_generated()
+        self.quality['emd'] = {'min': np.min(emd), 'max': np.max(emd), 'median': np.median(emd)}
+        fig, ax = plt.subplots(figsize=(15, 4))
+        im = ax.imshow(emd.T, interpoloation='None')
+        plt.colorbar(im, orientation='horizontal')
+        top_N = np.unravel_index(np.argpartition(-emd.ravel(), N)[:N], emd.shape)
+        fig_fit, axs = plt.subplots(N, 4)
+        for j, i_dim in top_N:
+            self.plot.component_fit(emd_dim[i_dim], name=self.names[j], axs=axs[j, :])
+        if not savedir is None:
+            fig_fit.savefig(os.path.join(savedir, 'fit_max_emd.pdf'), type='pdf',
+                            transparent=False, bbox_inches='tight')
+        else:
+            plt.show()
+
+    def check_quality(self, savedir=None, N_emd=5):
+        self.check_active_komp()
+        self.check_convergence()
+        self.check_outliers()
+        self.check_dip(savedir)
+        self.check_emd(N_emd, savedir)
+
     def merge(self, method, thr, **mmfArgs):
         if self.rank == 0:
             if method == 'bhat':
@@ -70,6 +195,7 @@ class HMres(Mres):
                 self.comm.send(self.mergeind, dest=i, tag=2)
         else:
             self.mergeind = self.comm.recv(source=0, tag=2)
+        self.postproc_par = {'method': method, 'thr': thr, 'mmfArgs': mmfArgs}
 
     def get_bh_distance_to_own_latent(self):
         return self.components.get_bh_distance_to_own_latent()
@@ -81,8 +207,14 @@ class HMres(Mres):
         active = self.active_komp[j, :] > 0.05
         mus = [self.components.mupers[j, k, :] for k in range(self.K) if active[k]]
         Sigmas = [self.components.Sigmapers[j, k, :, :] for k in range(self.K) if active[k]]
-        ps = self.components.p[j, active]
-        return mus, Sigmas, ps
+        ps = [self.components.p[j, k] for k in range(self.K) if active[k]]
+        if self.noise_class:
+            mus.append(self.noise_mu)
+            Sigmas.append(self.noise_sigma)
+            ps.append(self.p_noise[j])
+        print "ps = {}".format(ps)
+        print "np.sum(ps) = {}".format(np.sum(ps))
+        return mus, Sigmas, np.array(ps)
 
     def generate_from_mix(self, j, N):
         mus, Sigmas, ps = self.get_mix(j)
@@ -93,15 +225,21 @@ class HMres(Mres):
         return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
 
     def earth_movers_distance_to_generated(self):
+        if hasattr(self, '_earth_movers_distance_to_generated'):
+            return self._earth_movers_distance_to_generated, self._emd_dims
         emds = []
+        dims = [(i, j) for i in range(self.d) for j in range(i+1, self.d)]
         for j, dat in enumerate(self.data):
             mus, Sigmas, ps = self.get_mix(j)
             N_synsamp = int(dat.shape[0]//10)
             emds.append(
                 np.array(EMD_to_generated_from_model(
-                    DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp, gamma=1, nbins=50))
+                    DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
+                    gamma=1, nbins=50, dims=dims))
                 * (1./N_synsamp))
             print "\r EMD computed for {} components".format(j+1),
         print "\r ",
         print ""
-        return np.vstack(emds)
+        self._earth_movers_distance_to_generated = np.vstack(emds)
+        self._emd_dims = dims
+        return self._earth_movers_distance_to_generated, self._emd_dims

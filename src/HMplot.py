@@ -15,6 +15,289 @@ import copy
 from .utils.results_mem_efficient import DataSetClustering
 
 
+class HMplot(object):
+
+    def __init__(self, bmres, marker_lab=None):
+        self.bmres = bmres
+        #self.comp_colors, self.suco_colors, self.comp_ord, self.suco_ord = self.get_colors_and_order()
+
+        self.clp = ClustPlot(bmres.clusts, self.comp_colors, self.comp_ord)
+        #if hasattr(bmres, 'clust_m'):
+        #    self.clp_m = ClustPlot(bmres.clust_m, self.suco_colors, self.suco_ord)
+        self.cop = CompPlot(bmres.components, self.comp_colors, self.comp_ord, self.suco_ord)
+        self.trp = TracePlot(bmres.traces, self.comp_ord)
+
+        self.mcsp = {}
+        for mimic_key in bmres.mimics:
+            mimic = bmres.mimics[mimic_key]
+            self.mcsp[mimic_key] = MimicPlot(mimic)
+
+        if marker_lab is None:
+            try:
+                marker_lab = bmres.meta_data.marker_lab
+            except:
+                marker_lab = ['']*bmres.d
+        self.set_marker_lab(marker_lab)
+        self.set_sampnames(bmres.meta_data.samp['names'])
+
+    @property
+    def comp_ord(self):
+        return self.bmres.comp_ord
+
+    @property
+    def suco_ord(self):
+        return self.bmres.suco_ord
+
+    @property
+    def comp_colors(self):
+        return self.bmres.comp_colors
+
+    @property
+    def suco_colors(self):
+        return self.bmres.suco_colors
+
+    def set_marker_lab(self, marker_lab):
+        self.marker_lab = marker_lab
+        #self.clp_nm.set_marker_lab(marker_lab)
+        #if hasattr(self, 'clp_m'):
+        #    self.clp_m.set_marker_lab(marker_lab)
+        self.cop.set_marker_lab(marker_lab)
+        for mc in self.mcsp:
+            self.mcsp[mc].set_marker_lab(marker_lab)
+
+    def set_population_lab(self, pop_lab):
+        order = np.argsort(self.suco_ord)
+        self.pop_lab = [pop_lab[k] for k in order]
+        self.clp_nm.set_population_lab(pop_lab)
+        self.clp_m.set_population_lab(pop_lab)
+
+    def set_sampnames(self, names):
+        self.sampnames = names
+        self.cop.set_sampnames(names)
+
+    def component_fit(self, plotdim, name='pooled', lim=[-.2, 1.2], bins=100,
+                      axs=None, **figargs):
+        if axs is None:
+            fig, axs = plt.subplots(len(plotdim), 4, squeeze=False, **figargs)
+
+        #labels = self.bmres.meta_data.marker_lab
+        if name == 'pooled':
+            names = self.sampnames
+        else:
+            names = [name]
+
+        if name in self.mcsp:
+            loadsyn = True
+        else:
+            loadsyn = False
+            print "no mimic found, generating new data"
+            j = self.sampnames.index(name)
+            realdata = self.bmres.data[j]
+            N = self.bmres.data[j].shape[0]
+            syndata = self.bmres.generate_from_mix(j, N)
+
+        for m, dim in enumerate(plotdim):
+            _ = self.cop.latent(dim, ax=axs[m, 0], plotlab=True)
+            #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
+            #ax.set_ylabel(labels[plotdim[m][1]], fontsize=16)
+            axs[m, 0].set_xlim(*lim)
+            axs[m, 0].set_ylim(*lim)
+
+            _ = self.cop.allsamp(dim, names=names, ax=axs[m, 1], plotlabx=True)
+            #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
+            axs[m, 1].set_xlim(*lim)
+            axs[m, 1].set_ylim(*lim)
+
+            if loadsyn:
+                self.mcsp[name].realplot.hist2d(dim, bins=bins, ax=axs[m, 2], lims=lim)
+                if m == 0:
+                    axs[m, 2].set_title(name+'(real)')
+
+                self.mcsp[name].synplot.hist2d(dim, bins=bins, ax=axs[m, 3], lims=lim)
+                if m == 0:
+                    axs[m, 3].set_title(name+'(synthetic)')
+            else:
+                plot.hist2d(realdata, dim, bins, ax=axs[m, 2], lims=lim, labels=self.marker_lab)
+                if m == 0:
+                    axs[m, 2].set_title(name+'(real)')
+
+                plot.hist2d(syndata, dim, bins, ax=axs[m, 3], lims=lim, labels=self.marker_lab)
+                if m == 0:
+                    axs[m, 3].set_title(name+'(synthetic)')
+
+        return axs
+
+    def pca_biplot(self, comp, ax=None, poplabsh=None, sampmarkers=None):
+        '''
+            PCA biplot of mixture component probabilities. Sample groups are
+            determined by meta_data 'donorid'.
+
+            comp        -   which principal components to plot
+            ax          -   where to plot
+            poplabsh    -   shift of population labels
+            sampmarkers -   markers to use for samples
+        '''
+        #if sampmarkers is None:
+        #    sampmarkers = [(4, 0, 45), (3, 0), (0, 3), (4, 2)]
+        #if poplabsh is None:
+        #    poplabsh = [[0, 0], [0, -.02], [0, 0], [-.1, 0], [.22, 0], [.06, -.06]]
+        if not hasattr(self, 'pop_lab'):
+            self.pop_lab = None
+        plot.pca_biplot(self.bmres.p_merged, comp, ax, varcol=self.suco_colors, varlabels=self.pop_lab,
+                        varlabsh=poplabsh, sampleid=self.bmres.meta_data.samp['donorid'], sampmarkers=sampmarkers)
+
+    def pca_screeplot(self, ax=None):
+        plot.pca_screeplot(self.bmres.p, ax)
+
+    def pdip(self, suco=True, fig=None, colorbar=True):
+        '''
+            Plot p-value of Hartigan's dip test for each cluster.
+            Results are plotted order by cluster size, with largest
+            cluster in top.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        if suco:
+            order = self.suco_ord
+        else:
+            order = self.comp_ord
+
+        pdiplist = self.bmres.get_pdip(suco)
+        print "len(pdiplist) = {}".format(len(pdiplist))
+        print "len(order) = {}".format(len(order))
+        print "suco = {}".format(suco)
+        for i, k in enumerate(order):
+            pdip = pdiplist[k]
+            ax = fig.add_subplot(1, len(pdiplist), i+1)
+            p = ax.pcolormesh(pdip[::-1, :])
+            p.set_clim(0, 1)
+            ax.axes.xaxis.set_ticks([])
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, pdip.shape[0])
+            ax.set_xlabel("k = {}".format(k))
+        if colorbar:
+            fig.colorbar(p)
+        return fig
+
+    def pdip_summary(self, suco=True, fig=None, colorbar=True):
+        '''
+            Plot p-value of Hartigan's dip test for each cluster.
+            Results are plotted order by cluster size, with largest
+            cluster in top.
+        '''
+        if fig is None:
+            fig = plt.figure()
+        if suco:
+            order = self.suco_ord
+        else:
+            order = self.comp_ord
+        pdipsum = self.bmres.get_pdip_summary(suco)
+        S = ['Median', '25th percentile', 'Minimum']
+        for i, s in enumerate(S):
+            ax = fig.add_subplot(1, 3, i+1)
+            p = ax.pcolormesh(pdipsum[s][order[::-1], :])
+            p.set_clim(0, 1)
+            ax.axes.xaxis.set_ticks([])
+            ax.axes.yaxis.set_ticks([])
+            ax.set_ylim(0, len(order))
+            ax.set_xlabel(s)
+        if colorbar:
+            fig.colorbar(p)
+        return fig
+
+    def prob(self, suco=True, fig=None, totplots=1, plotnbr=1, ks=None):
+            '''
+                Plot probabilities of belonging to each cluster
+            '''
+            if fig is None:
+                fig = plt.figure()
+            nbr_cols = 2*totplots-1
+            col_start = 2*(plotnbr-1)
+
+            if suco:
+                order = self.suco_ord
+                prob = self.bmres.p_merged
+            else:
+                order = self.comp_ord
+                prob = self.bmres.p
+
+            if ks is None:
+                K = prob.shape[1]
+                ks = range(K)
+            else:
+                K = len(ks)
+                if suco:
+                    raise ValueError, "Selection of ks not supported for super components"
+
+            J = prob.shape[0]
+            #K = prob.shape[1]
+
+            for i, k in enumerate(ks):
+                ax = fig.add_subplot(K, nbr_cols, i*nbr_cols + col_start+1)
+                ax.scatter(range(J), prob[:, order[k]])
+                ax.set_yscale('log')
+                ax.set_ylim(1e-3, 1)
+                ax.axes.yaxis.set_ticks([1e-2, 1e-1])
+                xlim = ax.get_xlim()
+                ax.plot([xlim[0], xlim[1]], [1e-2, 1e-2], color='grey')
+                ax.plot([xlim[0], xlim[1]], [1e-1, 1e-1], color='grey')
+                ax.axes.xaxis.set_ticks([])
+                ax.set_xlim(-1, J)
+
+            return fig
+
+    def prob_bars(self, suco=True, fig=None, js=None):
+        if fig is None:
+            fig = plt.figure()
+
+        if suco:
+            order = self.suco_ord
+            colors = self.suco_colors
+            prob = self.bmres.p_merged
+        else:
+            order = self.comp_ord
+            colors = self.comp_colors
+            prob = self.bmres.p
+
+        if js is None:
+            js = range(self.bmres.J)
+
+        prob_list = [prob[j, :] for j in js]
+        J = len(js)
+        ymax = 1.2*np.max(prob_list)
+
+        for i, j in enumerate(js):
+            ax = fig.add_subplot(J, 1, i+1)
+            plot.plot_pbars(prob[i], 0, ymax, order=order, colors=colors, ax=ax)
+
+        return fig
+
+    def scatter(self, dim, j, ax=None):
+        '''
+            Plots the scatter plot of the data over dim.
+            Clusters are plotted with their canonical colors (see BMPlot).
+        '''
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+
+        samp_clust = self.bmres.clusts[j]
+        data = samp_clust.data[:, dim]
+        x = samp_clust.x_sample
+
+        if len(dim) == 2:
+            for k in range(self.bmres.K):
+                ax.plot(data[x == k, 0], data[x == k, 1], '+', label='k = %d' % (k+1), color=self.comp_colors[k])
+            ax.plot(data[x == self.bmres.K, 0], data[x == self.bmres.K, 1], '+', label='outliers', color='black')
+
+        elif len(dim) == 3:
+            for k in range(self.bmres.K):
+                ax.plot(data[x == k, 0], data[x == k, 1], data[x == k, 2], '+', label='k = %d' % (k+1), color=self.comp_colors[k])
+            ax.plot(data[x == self.bmres.K, 0], data[x == self.bmres.K, 1], data[x == self.bmres.K, 2], '+', label='outliers', color='black')
+
+        return ax
+
+
 class ClustPlot(object):
 
     def __init__(self, samp_clusts, colors, order):
@@ -634,283 +917,3 @@ class FCplot(object):
                 if ax.get_ylim()[1] < 5:
                     ax.set_ylim(*ylim)
         
-class HMplot(object):
-    
-    def __init__(self, bmres, marker_lab = None):
-        self.bmres = bmres
-        self.comp_colors, self.suco_colors, self.comp_ord, self.suco_ord = self.get_colors_and_order()
-        
-        self.clp = ClustPlot(bmres.clusts, self.comp_colors, self.comp_ord)
-        #if hasattr(bmres, 'clust_m'):
-        #    self.clp_m = ClustPlot(bmres.clust_m, self.suco_colors, self.suco_ord)
-        self.cop = CompPlot(bmres.components, self.comp_colors, self.comp_ord, self.suco_ord)
-        self.trp = TracePlot(bmres.traces, self.comp_ord)
-        
-        self.mcsp = {}
-        for mimic_key in bmres.mimics:
-            mimic = bmres.mimics[mimic_key]
-            self.mcsp[mimic_key] = MimicPlot(mimic)
-            #self.mcsp.append(MimicPlot(mimic))
-            
-        if marker_lab is None:
-            try:
-                marker_lab = bmres.meta_data.marker_lab
-            except:
-                marker_lab = ['']*bmres.d
-        self.set_marker_lab(marker_lab)
-        self.set_sampnames(bmres.meta_data.samp['names'])
-        
-    def set_marker_lab(self, marker_lab):
-        self.marker_lab = marker_lab
-        #self.clp_nm.set_marker_lab(marker_lab)
-        #if hasattr(self, 'clp_m'):
-        #    self.clp_m.set_marker_lab(marker_lab)
-        self.cop.set_marker_lab(marker_lab)
-        for mc in self.mcsp:
-            self.mcsp[mc].set_marker_lab(marker_lab)
-
-    def set_sampnames(self, names):
-        self.sampnames = names
-        self.cop.set_sampnames(names)
-
-    def set_population_lab(self, pop_lab):
-        order = np.argsort(self.suco_ord)
-        self.pop_lab = [pop_lab[k] for k in order]
-        self.clp_nm.set_population_lab(pop_lab)
-        self.clp_m.set_population_lab(pop_lab)
-
-    def get_colors_and_order(self):
-        '''
-            Get order of components (first orderd by super component size, then by
-            individual component size) and colors to use for representing components.
-            
-            This gives canonical ordering and colors for other plots.
-        '''      
-        comp_col, suco_col, comp_ord, suco_ord = self.bmres.get_colors_and_order()
-        
-        return comp_col, suco_col, comp_ord, suco_ord
-
-    def prob_bars(self, suco=True, fig=None, js = None):
-        if fig is None:
-            fig = plt.figure()
-
-        if suco:
-            order = self.suco_ord
-            colors = self.suco_colors
-            prob = self.bmres.p_merged
-        else:
-            order = self.comp_ord
-            colors = self.comp_colors
-            prob = self.bmres.p
-
-        if js is None:
-            js = range(self.bmres.J)
-
-        prob_list = [prob[j, :] for j in js]
-        J = len(js)
-        ymax = 1.2*np.max(prob_list)
-
-        for i, j in enumerate(js):
-            ax = fig.add_subplot(J, 1, i+1)
-            plot.plot_pbars(prob[i], 0, ymax, order=order, colors=colors, ax=ax)
-
-        return fig
-
-    def prob(self, suco=True, fig=None, totplots=1, plotnbr=1, ks=None):
-            '''
-                Plot probabilities of belonging to each cluster
-            '''
-            if fig is None:
-                fig = plt.figure()
-            nbr_cols = 2*totplots-1
-            col_start = 2*(plotnbr-1)
-
-
-            if suco:
-                order = self.suco_ord
-                prob = self.bmres.p_merged
-            else:
-                order = self.comp_ord
-                prob = self.bmres.p
-                
-            if ks is None:
-                K = prob.shape[1]
-                ks = range(K)
-            else:
-                K = len(ks)
-                if suco:
-                    raise ValueError, "Selection of ks not supported for super components"
-
-            J = prob.shape[0]
-            #K = prob.shape[1]
-
-            for i, k in enumerate(ks):
-                ax = fig.add_subplot(K, nbr_cols, i*nbr_cols + col_start+1)
-                ax.scatter(range(J), prob[:, order[k]])
-                ax.set_yscale('log')
-                ax.set_ylim(1e-3, 1)
-                ax.axes.yaxis.set_ticks([1e-2, 1e-1])
-                xlim = ax.get_xlim()
-                ax.plot([xlim[0], xlim[1]], [1e-2, 1e-2], color='grey')
-                ax.plot([xlim[0], xlim[1]], [1e-1, 1e-1], color='grey')
-                ax.axes.xaxis.set_ticks([])
-                ax.set_xlim(-1, J)
-
-            return fig
-
-    def pca_biplot(self, comp, ax=None, poplabsh=None, sampmarkers=None):
-        '''
-            PCA biplot of mixture component probabilities. Sample groups are 
-            determined by meta_data 'donorid'.
-            
-            comp        -   which principal components to plot
-            ax          -   where to plot
-            poplabsh    -   shift of population labels
-            sampmarkers -   markers to use for samples
-        '''
-        #if sampmarkers is None:
-        #    sampmarkers = [(4, 0, 45), (3, 0), (0, 3), (4, 2)]
-        #if poplabsh is None:
-        #    poplabsh = [[0, 0], [0, -.02], [0, 0], [-.1, 0], [.22, 0], [.06, -.06]]
-        if not hasattr(self, 'pop_lab'):
-            self.pop_lab = None
-        plot.pca_biplot(self.bmres.p_merged, comp, ax, varcol=self.suco_colors, varlabels=self.pop_lab,
-                   varlabsh=poplabsh, sampleid=self.bmres.meta_data.samp['donorid'], sampmarkers=sampmarkers)        
-
-    def pca_screeplot(self, ax=None):
-        plot.pca_screeplot(self.bmres.p, ax)
-
-    def scatter(self, dim, j, ax=None):
-        '''
-            Plots the scatter plot of the data over dim.
-            Clusters are plotted with their canonical colors (see BMPlot).
-        '''
-        if ax is None:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-                
-        samp_clust = self.bmres.clusts[j]
-        data = samp_clust.data[:, dim]
-        x = samp_clust.x_sample
-
-        if len(dim) == 2:
-            for k in range(self.bmres.K):
-                ax.plot(data[x==k, 0], data[x==k, 1], '+', label='k = %d'%(k+1), color=self.comp_colors[k])
-            ax.plot(data[x==self.bmres.K, 0], data[x==self.bmres.K, 1], '+', label='outliers', color='black')
-        
-        elif len(dim) == 3:
-            for k in range(self.bmres.K):
-                ax.plot(data[x==k, 0], data[x==k, 1], data[x==k, 2], '+', label='k = %d'%(k+1), color=self.comp_colors[k])
-            ax.plot(data[x==self.bmres.K, 0], data[x==self.bmres.K, 1], data[x==self.bmres.K, 2], '+', label='outliers', color='black')
-                            
-        return ax
-
-    def component_fit(self, plotdim, name='pooled', lim=[-.2, 1.2], bins=100, fig=None):
-        if fig is None:
-            fig = plt.figure()
-        #labels = self.bmres.meta_data.marker_lab
-        if name == 'pooled':
-            names = self.sampnames
-        else:
-            names = [name]
-        D = len(plotdim)
-
-        if name in self.mcsp:
-            loadsyn = True
-        else:
-            loadsyn = False
-            print "no mimic found, generating new data"
-            j = self.sampnames.index(name)
-            realdata = self.bmres.data[j]
-            N = self.bmres.data[j].shape[0]
-            syndata = self.bmres.generate_from_mix(j, N)
-
-        for m, dim in enumerate(plotdim):
-            ax = plt.subplot2grid((D, 4), (m, 0))
-            _ = self.cop.latent(dim, ax=ax, plotlab=True)
-            #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
-            #ax.set_ylabel(labels[plotdim[m][1]], fontsize=16)
-            ax.set_xlim(*lim)
-            ax.set_ylim(*lim)
-
-            ax = plt.subplot2grid((D, 4), (m, 1))
-            _ = self.cop.allsamp(dim, names=names, ax=ax, plotlabx=True)
-            #ax.set_xlabel(labels[plotdim[m][0]], fontsize=16)
-            ax.set_xlim(*lim)
-            ax.set_ylim(*lim)
-
-            if loadsyn:
-                ax = plt.subplot2grid((D, 4), (m, 2))
-                self.mcsp[name].realplot.hist2d(dim, bins=bins, ax=ax, lims=lim)
-                if m == 0:
-                    ax.set_title(name+'(real)')
-
-                ax = plt.subplot2grid((D, 4), (m, 3))
-                self.mcsp[name].synplot.hist2d(dim, bins=bins, ax=ax, lims=lim)
-                if m == 0:
-                    ax.set_title(name+'(synthetic)')
-            else:
-                ax = plt.subplot2grid((D, 4), (m, 2))
-                plot.hist2d(realdata, dim, bins, ax=ax, lims=lim, labels=self.marker_lab)
-                if m == 0:
-                    ax.set_title(name+'(real)')
-
-                ax = plt.subplot2grid((D, 4), (m, 3))
-                plot.hist2d(syndata, dim, bins, ax=ax, lims=lim, labels=self.marker_lab)
-                if m == 0:
-                    ax.set_title(name+'(synthetic)')
-
-        return fig
-
-    def pdip_summary(self, suco=True, fig=None, colorbar=True):
-        '''
-            Plot p-value of Hartigan's dip test for each cluster.
-            Results are plotted order by cluster size, with largest cluster
-            in top.
-        '''
-        if fig is None:
-            fig = plt.figure()
-        if suco:
-            order = self.suco_ord
-        else:
-            order = self.comp_ord
-        pdipsum = self.bmres.get_pdip_summary(suco)
-        S = ['Median', '25th percentile', 'Minimum']
-        for i, s in enumerate(S):
-            ax = fig.add_subplot(1, 3, i+1)
-            p = ax.pcolormesh(pdipsum[s][order[::-1], :])
-            p.set_clim(0, 1)
-            ax.axes.xaxis.set_ticks([])
-            ax.axes.yaxis.set_ticks([])
-            ax.set_ylim(0, len(order))
-            ax.set_xlabel(s)
-        if colorbar:
-            fig.colorbar(p)
-        return fig
-
-    def pdip(self, suco=True, fig=None, colorbar=True):
-        '''
-            Plot p-value of Hartigan's dip test for each cluster.
-            Results are plotted order by cluster size, with largest cluster
-            in top.
-        '''
-        if fig is None:
-            fig = plt.figure()
-        if suco:
-            order = self.suco_ord
-        else:
-            order = self.comp_ord
-            
-        pdiplist = self.bmres.get_pdip(suco)
-        for i, k in enumerate(order):
-            pdip = pdiplist[k]
-            ax = fig.add_subplot(1, len(pdiplist), i+1)
-            p = ax.pcolormesh(pdip[::-1, :])
-            p.set_clim(0, 1)
-            ax.axes.xaxis.set_ticks([])
-            ax.axes.yaxis.set_ticks([])
-            ax.set_ylim(0, pdip.shape[0])
-            ax.set_xlabel("k = {}".format(k))
-        if colorbar:
-            fig.colorbar(p)
-        return fig

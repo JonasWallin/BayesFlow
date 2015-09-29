@@ -19,3 +19,7 @@ class SimulationError(Exception):
         self.msg = msg
         self.name = name
         self.iteration = it
+
+
+class BadQualityError(Exception):
+    pass

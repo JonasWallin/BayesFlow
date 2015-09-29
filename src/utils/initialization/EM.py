@@ -1,8 +1,10 @@
 from __future__ import division
 import numpy as np
 import scipy.stats as stats
+from sklearn import mixture as skmixture
 import matplotlib.pyplot as plt
 from mpi4py import MPI
+import warnings
 
 try:
     from EarthMover import earth_movers_distance
@@ -150,15 +152,18 @@ def EM_pooled_fixed(comm, data, K, n_iter=10, n_init=5,
     return best_mus, best_Sigmas, best_pis
 
 
-def EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis, N_synsamp, gamma=1, nbins=50):
+def EMD_to_generated_from_model(data_mpi, mus, Sigmas, pis, N_synsamp, gamma=1,
+                                nbins=50, dims=None):
     comm = data_mpi.comm
     d = data_mpi.d
+    if dims is None:
+        dims = [(i, j) for i in range(d) for j in range(i+1, d)]
     real_data = data_mpi.subsample_to_root(N_synsamp)
     if comm.Get_rank() == 0:
         syn_data = mixture.simulate_mixture(mus, Sigmas, pis, N_synsamp)
-        emd = [earth_movers_distance(syn_data, real_data, nbins=nbins, dim=[i, j],
+        emd = [earth_movers_distance(syn_data, real_data, nbins=nbins, dim=dim,
                                      gamma=gamma)
-               for i in range(d) for j in range(i+1, d)]
+               for dim in dims]
     else:
         emd = None
     return comm.bcast(emd)
@@ -319,6 +324,25 @@ def normalize_pi(p, k_fixed=[]):
         if not k in k_fixed:
             p[k] *= (1-p_fixed)/W
     return p
+
+
+def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='full'):
+    data = data[~np.isnan(data[:, 0]), :]
+    data = data[~np.isinf(data[:, 0]), :]
+    bestbic = np.inf
+    for K in Ks:
+        g = skmixture.GMM(n_components=K, covariance_type=covariance_type, n_init=n_init, n_iter=n_iter)
+        g.fit(data)
+        bic = g.bic(data)
+        print "BIC for {} clusters: {}".format(K, bic)
+        if bic < bestbic:
+            means = g.means_
+            bestbic = bic
+    if means.shape[0] == np.max(Ks):
+        warnings.warn("Best BIC obtained for maximum K")
+    if means.shape[0] == np.min(Ks):
+        warnings.warn("Best BIC obtained for minimum K")
+    return means
 
 
 if __name__ == '__main__':

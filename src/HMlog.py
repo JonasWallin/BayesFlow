@@ -135,14 +135,11 @@ class HMlogB(object):
 #            self.names = [''.join(nam.reshape((-1,))) for nam in name_all]
 
     def encode_json(self):
-        jsondict = {'__type__':'HMlogB'}
-        for arg in ['savefrq','nbrsave','sim','K','d','noise_class','names',
-                    'active_komp','lab_sw']:
-            jsondict.update({arg: getattr(self,arg)})
-        #print "jsondict= {}".format(jsondict)
-        #with open('jsondump.pkl','w') as f:
-        #    pickle.dump(jsondict,f,-1)
-        return jsondict    
+        jsondict = {'__type__': 'HMlogB'}
+        for arg in ['savefrq', 'nbrsave', 'sim', 'K', 'd', 'noise_class', 'names',
+                    'active_komp', 'lab_sw']:
+            jsondict.update({arg: getattr(self, arg)})
+        return jsondict
 
     def save(self, savedir, logname='blog'):
         if self.rank == 0:
@@ -181,10 +178,14 @@ class HMlog(HMlogB):
         NB! Does not save classification frequencies. If this is needed, use class HMElog below.
     '''
     
-    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,
-                 savefrq=None,nbrsavey=None,savefrqy=None,comm=MPI.COMM_WORLD):
+    def __init__(self, hGMM, sim, savesamp=None, savesampnames=None, nbrsave=None,
+                 savefrq=None, nbrsavey=None, savefrqy=None, comm=MPI.COMM_WORLD):
         super(HMlog,self).__init__(hGMM,sim,nbrsave,savefrq,comm)
-        
+
+        if self.noise_class:
+            self.noise_mu = hGMM.GMMs[0].noise_mean
+            self.noise_sigma = hGMM.GMMs[0].noise_sigma
+
         if not savefrqy is None:
             self.savefrqy = savefrqy
         else:
@@ -254,18 +255,18 @@ class HMlog(HMlogB):
             self.add_Sigmaexp(Qs, self.get_last_nus())
             self.add_mupers(mus)
             self.add_Sigmapers(Sigmas)
-            self.add_prob(ps)            
+            self.add_prob(ps)
 
     def cat(self):
         print "cat not implemented yet for this object type"
 
-    def postproc(self,high_memory = False):
+    def postproc(self, high_memory=False):
         '''
             Post-processing production iterations
 
             high_memory     - set to True if root can handle data from all workers
         '''
-        super(HMlog,self).postproc()
+        super(HMlog, self).postproc()
         if self.rank == 0:
             self.theta_sim_mean /= self.sim
             self.Sigma_mu_sim_mean /= self.sim
@@ -275,15 +276,15 @@ class HMlog(HMlogB):
             self.prob_sim_mean /= self.sim
 
             if self.noise_class:
-                nonnoise_active_komp = self.active_komp[:,:-1]
+                nonnoise_active_komp = self.active_komp[:, :-1]
             else:
                 nonnoise_active_komp = self.active_komp
             for dd in range(self.mupers_sim_mean.shape[2]):
-                self.mupers_sim_mean[:,:,dd] /= nonnoise_active_komp
-                self.mupers_sim_mean[~nonnoise_active_komp.astype('bool'),dd] = np.nan
+                self.mupers_sim_mean[:, :, dd] /= nonnoise_active_komp
+                self.mupers_sim_mean[~nonnoise_active_komp.astype('bool'), dd] = np.nan
                 for ddd in range(self.mupers_sim_mean.shape[2]):
-                    self.Sigmapers_sim_mean[~nonnoise_active_komp.astype('bool'),dd,ddd] = np.nan
-                    self.Sigmapers_sim_mean[:,:,dd,ddd] /= nonnoise_active_komp
+                    self.Sigmapers_sim_mean[~nonnoise_active_komp.astype('bool'), dd, ddd] = np.nan
+                    self.Sigmapers_sim_mean[:, :, dd, ddd] /= nonnoise_active_komp
             self.prob_sim_mean[~self.active_komp.astype('bool')] = np.nan
             self.prob_sim_mean /= self.active_komp
             self.prob_sim_mean[np.isnan(self.prob_sim_mean)] = 0
@@ -359,7 +360,7 @@ class HMlog(HMlogB):
         jsondict['__type__'] = 'HMlog'
         for arg in ['theta_sim_mean','Sigma_mu_sim_mean', 'Sigmaexp_sim_mean',
                     'mupers_sim_mean','Sigmapers_sim_mean','prob_sim_mean',
-                    'J','savesampnames']:
+                    'J','savesampnames', 'noise_mu', 'noise_sigma']:
             jsondict.update({arg:getattr(self,arg)})
         try:
             jsondict['syndata_dir'] = self.syndata_dir
@@ -406,6 +407,15 @@ class HMlog(HMlogB):
         if comm.Get_rank() == 0:
             with open(os.path.join(syndata_dir, 'pooled_MODEL.pkl'), 'r') as f:
                 hmlog.Y_pooled_sim = pickle.load(f)
+
+        if not hasattr(hmlog, 'noise_mu'):
+            hmlog.noise_mu = 0.5*np.ones(hmlog.d)
+        if not hasattr(hmlog, 'noise_sigma'):
+            hmlog.noise_sigma = 0.5**2*np.eye(hmlog.d)
+
+        #print "np.sum(hmlog.prob_sim_mean, axis=1) = {}".format(np.sum(hmlog.prob_sim_mean, axis=1))
+        #print "hmlog.active_komp = {}".format(hmlog.active_komp)
+
         return hmlog
 
 
@@ -521,10 +531,6 @@ class HMElog(HMlog):
     def encode_json(self):
         jsondict = super(HMElog, self).encode_json()
         jsondict['__type__'] = 'HMElog'
-        try:
-            jsondict['classif_freq_dir'] = self.classif_freq_dir
-        except:
-            pass
         return jsondict
 
     def save(self, savedir):
@@ -547,7 +553,6 @@ class HMElog(HMlog):
 
     @classmethod
     def load(cls, savedir, comm=MPI.COMM_WORLD):
-        print "issubclass(cls, HMElog) = {}".format(issubclass(cls, HMElog))
         hmlog = super(HMElog, cls).load(savedir, comm)
         classif_freq_dir = os.path.join(savedir, 'classif_freq')
 

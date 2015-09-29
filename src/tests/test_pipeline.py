@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from .. import setup_sim, hierarical_mixture_mpi, HMlogB, HMElog, HMres
+from .exceptions import BadQualityError
 from ..utils import load_fcdata
 from ..utils.initialization.EM import (EMD_to_generated_from_model,
                                        data_log_likelihood)
@@ -81,10 +82,6 @@ class SynSample2(SynSamp):
         self.mu = [np.array(mu)+0.1*(j % 3) for mu in self.mu]
         self.C = len(self.mu)  # Number of clusters.
         self.sigma = [np.eye(self.d)*0.05 for k in range(self.C)]
-
-
-class BadQualityError(Exception):
-    pass
 
 
 class Pipeline(object):
