@@ -37,6 +37,7 @@ class Mres(object):
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
                                
         self.mergeind = [[k] for k in range(self.K)]
+        self.merged = False
 
     @property
     def mergeind(self):
@@ -88,14 +89,6 @@ class Mres(object):
         return p_mer
 
     def get_order(self):
-        # for s, suco in enumerate(self.mergeind):
-        #     sc_ord = np.argsort(-np.array(np.sum(self.p, axis=0)[suco]))
-        #     self.mergeind[s] = [suco[i] for i in sc_ord]  # Change order within each super component
-        # prob_mer = [np.sum(self.p[:, scind]) for scind in self.mergeind]
-        # suco_ord = np.argsort(-np.array(prob_mer))
-        # mergeind_sort = [self.mergeind[i] for i in suco_ord]
-        # print "mergeind_sort = {}".format(mergeind_sort)
-        # comp_ord = [ind for suco in mergeind_sort for ind in suco]
         return self._comp_ord, self._suco_ord
 
     def merge(self, method, thr, **mmfArgs):
@@ -379,6 +372,23 @@ class Mres(object):
                 pdipsummary['25th percentile'][k, :] = np.percentile(pdk, 25, 0)
                 pdipsummary['Minimum'][k, :] = np.min(pdk, 0)
         return pdipsummary
+
+    def get_data_kdj(self, min_clf, k, dd, j=None):
+        '''
+            Get data points belonging to a certain cluster
+
+            min_clf    -    min classification frequency for the point into the given cluster
+            k        -    cluster number
+            dd        -    dimonsion for which data should be returned
+            j        -     sample nbr
+        '''
+        if j is None:
+            data = np.vstack(self.data)[:, dd]
+            clf = np.vstack(self.classif_freq)[:, k]
+        else:
+            data = self.data[j][:, dd]
+            clf = self.classif_freq[j][:, k]/sum(self.classif_freq[0][0, :])
+        return data[clf > min_clf]
 
     @staticmethod
     def get_medprop_pers(prop, fixvalind=None, fixval=-1):
@@ -769,6 +779,17 @@ class SampleClustering(object):
             q[j:] = y_sort[-1]
         return q[np.argsort(alpha_ord)]
 
+    def get_data_kd(self, min_clf, k, dd):
+        '''
+            Get data points belonging to a certain cluster
+
+            min_clf    -    min classification frequency for the point into the given cluster
+            k          -    cluster number
+            dd         -    dimonsion for which data should be returned
+        '''
+        clust = self.clusts[k]
+        return self.data[clust.indices[clust.weights > min_clf], dd]
+
     # def get_quantiles(self, alpha, j=None, ks=None, dds=None):
     #     '''
     #         Returns alpha quantile(s) in each dimension of sample j (the pooled data if j = None) for each
@@ -792,23 +813,6 @@ class SampleClustering(object):
     #         for id, dd in enumerate(dds):
     #             quantiles[ik, :, id] = quantile(data[:, dd], weights_all[:, k], alpha)
     #     return quantiles
-
-    # def get_data_kdj(self, min_clf, k, dd, j=None):
-    #     '''
-    #         Get data points belonging to a certain cluster
-
-    #         min_clf    -    min classification frequency for the point into the given cluster
-    #         k        -    cluster number
-    #         dd        -    dimonsion for which data should be returned
-    #         j        -     sample nbr
-    #     '''
-    #     if j is None:
-    #         data = np.vstack(self.data)[:, dd]
-    #         clf = np.vstack(self.classif_freq)[:, k]/sum(self.classif_freq[0][0, :])
-    #     else:
-    #         data = self.data[j][:, dd]
-    #         clf = self.classif_freq[j][:, k]/sum(self.classif_freq[0][0, :])
-    #     return data[clf > min_clf]
 
 
 class DataSetClustering(object):

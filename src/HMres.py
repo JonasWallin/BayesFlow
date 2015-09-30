@@ -70,7 +70,7 @@ class HMres(Mres):
             self.mergeind = self.mergeind  # make all attributes have same mergeind
 
     @classmethod
-    def load(cls, savedir, data_kws, comm=MPI.COMM_SELF):
+    def load(cls, savedir, data_kws, comm=MPI.COMM_SELF, no_postproc=False):
         hmlog_burn = HMlogB.load(savedir, comm=comm)
         hmlog = HMElog.load(savedir, comm=comm)
         hmlog.prob_sim_mean *= hmlog.active_komp  # compensate for reweighting in HMlog.postproc
@@ -81,20 +81,21 @@ class HMres(Mres):
         metadata.update(samp={'names': hmlog.names})
         print "metadata = {}".format(metadata)
         res = cls(hmlog, hmlog_burn, data, metadata, comm=comm)
-        try:
-            print "savedir = {}".format(savedir)
-            with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
-                postproc_res = json.load(f)
-        except IOError:
-            pass
-        else:
-            for attr in ['_earth_movers_distance_to_generated', 'pdiplist']:
-                try:
-                    setattr(res, attr, np.load(os.path.join(savedir, attr+'.npy')))
-                except IOError:
-                    pass
-            for attr in postproc_res:
-                setattr(res, attr, postproc_res[attr])
+        if not no_postproc:
+            try:
+                print "savedir = {}".format(savedir)
+                with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
+                    postproc_res = json.load(f)
+            except IOError:
+                pass
+            else:
+                for attr in ['_earth_movers_distance_to_generated', 'pdiplist']:
+                    try:
+                        setattr(res, attr, np.load(os.path.join(savedir, attr+'.npy')))
+                    except IOError:
+                        pass
+                for attr in postproc_res:
+                    setattr(res, attr, postproc_res[attr])
         return res
 
     def save(self, savedir):
@@ -126,12 +127,12 @@ class HMres(Mres):
         if hasattr(self, 'traces'):
             self.traces.comp_ord = self.comp_ord
 
-    def check_active_komp(self):
-        if ((self.active_komp > 0.05)*(self.active_komp < 0.95)).any():
-            self.quality['ok_active_komp'] = False
-            raise BadQualityError('Active components not in ok range')
-        else:
-            self.quality['ok_active_komp'] = True
+    # def check_active_komp(self):
+    #     if ((self.active_komp > 0.05)*(self.active_komp < 0.95)).any():
+    #         self.quality['ok_active_komp'] = False
+    #         raise BadQualityError('Active components not in ok range')
+    #     else:
+    #         self.quality['ok_active_komp'] = True
 
     def check_convergence(self):
         if 'convergence' in self.quality:
@@ -154,10 +155,10 @@ class HMres(Mres):
                 raise BadQualityError('Trace plots not ok')
             print "Bad answer. Are trace plots ok? (y/n)"
 
-    def check_noise(self):
+    def check_noise(self, noise_lim=0.01):
         if self.noise_class:
             self.quality['max_p_noise'] = np.max(self.p_noise)
-            if (self.p_noise > 0.01).any():
+            if (self.p_noise > noise_lim).any():
                 raise BadQualityError('Too high noise level')
 
     def check_outliers(self):
@@ -200,9 +201,9 @@ class HMres(Mres):
         else:
             plt.show()
 
-    def check_quality(self, savedir=None, N_emd=5):
-        self.check_active_komp()
-        self.check_noise()
+    def check_quality(self, savedir=None, N_emd=5, noise_lim=0.01):
+        #self.check_active_komp()
+        self.check_noise(noise_lim)
         #self.check_convergence()
         self.check_outliers()
         self.check_dip(savedir)
