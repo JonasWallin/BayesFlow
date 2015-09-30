@@ -533,19 +533,19 @@ class CompPlot(object):
 
     @property
     def comp_colors(self):
-        return self.components.comp_colors
+        return self.comp.comp_colors
 
     @property
     def suco_colors(self):
-        return self.components.suco_colors
+        return self.comp.suco_colors
         
     @property
     def comp_ord(self):
-        return self.components.comp_ord
+        return self.comp.comp_ord
         
     @property
     def suco_ord(self):
-        return self.components.suco_ord
+        return self.comp.suco_ord
         
     def set_marker_lab(self, marker_lab):
         self.marker_lab = marker_lab
@@ -828,7 +828,7 @@ class CompPlot(object):
 
 class TracePlot(object):
     
-    def __init__(self, traces, order):
+    def __init__(self, traces):
         self.traces = traces
         self.traces.plot = self
 

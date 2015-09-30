@@ -35,6 +35,8 @@ class Mres(object):
             self.clusts.append(SampleClustering(self.data[j], classif_freq[j],
                                sim, K, self.names[j]))
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
+                               
+        self.mergeind = [[k] for k in range(self.K)]
 
     @property
     def mergeind(self):
@@ -573,9 +575,8 @@ class SampleClustering(object):
         Object containing information about clustering of the data.
     '''
 
-    def __init__(self, data, classif_freq, mergeind, sim, K, name):
+    def __init__(self, data, classif_freq, sim, K, name):
         self.data = data
-        self.mergeind = mergeind
         self.sim = sim
         self.K = K
         self.name = name
