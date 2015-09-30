@@ -373,7 +373,7 @@ class Mres(object):
                 pdipsummary['Minimum'][k, :] = np.min(pdk, 0)
         return pdipsummary
 
-    def get_data_kdj(self, min_clf, k, dd, j=None):
+    def get_data_kdj(self, min_clf, k, dd, j=None, suco=True):
         '''
             Get data points belonging to a certain cluster
 
@@ -382,13 +382,10 @@ class Mres(object):
             dd        -    dimonsion for which data should be returned
             j        -     sample nbr
         '''
-        if j is None:
-            data = np.vstack(self.data)[:, dd]
-            clf = np.vstack(self.classif_freq)[:, k]
+        if not j is None:
+            return self.clusts[j].get_data_kd(min_clf, k, dd, suco)
         else:
-            data = self.data[j][:, dd]
-            clf = self.classif_freq[j][:, k]/sum(self.classif_freq[0][0, :])
-        return data[clf > min_clf]
+            return np.vstack([clust.get_data_kd(min_clf, k, dd, suco) for clust in self.clusts])
 
     @staticmethod
     def get_medprop_pers(prop, fixvalind=None, fixval=-1):
@@ -779,7 +776,7 @@ class SampleClustering(object):
             q[j:] = y_sort[-1]
         return q[np.argsort(alpha_ord)]
 
-    def get_data_kd(self, min_clf, k, dd):
+    def get_data_kd(self, min_clf, k, dd, suco=True):
         '''
             Get data points belonging to a certain cluster
 
@@ -787,8 +784,11 @@ class SampleClustering(object):
             k          -    cluster number
             dd         -    dimonsion for which data should be returned
         '''
-        clust = self.clusts[k]
-        return self.data[clust.indices[clust.weights > min_clf], dd]
+        if suco:
+            clf = self.get_classif_freq(k)
+        else:
+            clf = self.clusters[k].classif_freq
+        return self.data[clf.indices[clf.data > min_clf], dd]
 
     # def get_quantiles(self, alpha, j=None, ks=None, dds=None):
     #     '''
