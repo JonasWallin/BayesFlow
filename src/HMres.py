@@ -118,6 +118,10 @@ class HMres(Mres):
         Mres.mergeind.fset(self, mergeind)
         if hasattr(self, 'components'):
             self.components.mergeind = self._mergeind
+            self.components.suco_ord = self.suco_ord
+            self.components.comp_ord = self.comp_ord
+            self.components.suco_colors = self.suco_colors
+            self.components.comp_colors = self.comp_colors
 
     def check_active_komp(self):
         if ((self.active_komp > 0.05)*(self.active_komp < 0.95)).any():
