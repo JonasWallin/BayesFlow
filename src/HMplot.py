@@ -21,11 +21,11 @@ class HMplot(object):
         self.bmres = bmres
         #self.comp_colors, self.suco_colors, self.comp_ord, self.suco_ord = self.get_colors_and_order()
 
-        self.clp = ClustPlot(bmres.clusts, self.comp_colors, self.comp_ord)
+        #self.clp = ClustPlot(bmres.clusts, self.comp_colors, self.comp_ord)
         #if hasattr(bmres, 'clust_m'):
         #    self.clp_m = ClustPlot(bmres.clust_m, self.suco_colors, self.suco_ord)
-        self.cop = CompPlot(bmres.components, self.comp_colors, self.comp_ord, self.suco_ord)
-        self.trp = TracePlot(bmres.traces, self.comp_ord)
+        self.cop = CompPlot(bmres.components)
+        self.trp = TracePlot(bmres.traces)
 
         self.mcsp = {}
         for mimic_key in bmres.mimics:
@@ -534,6 +534,10 @@ class CompPlot(object):
     @property
     def comp_colors(self):
         return self.components.comp_colors
+
+    @property
+    def suco_colors(self):
+        return self.components.suco_colors
         
     @property
     def comp_ord(self):
@@ -541,7 +545,7 @@ class CompPlot(object):
         
     @property
     def suco_ord(self):
-        return selfsscomponensts.sucos_ord
+        return self.components.suco_ord
         
     def set_marker_lab(self, marker_lab):
         self.marker_lab = marker_lab
@@ -827,7 +831,10 @@ class TracePlot(object):
     def __init__(self, traces, order):
         self.traces = traces
         self.traces.plot = self
-        self.order = order
+
+    @property
+    def order(self):
+        return self.traces.comp_ord
         
     def all(self, fig=None, yscale=True):
         '''

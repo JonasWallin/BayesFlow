@@ -67,6 +67,7 @@ class HMres(Mres):
             self.plot = HMplot(self, self.meta_data.marker_lab)
 
             self.quality = {}
+            self.mergeind = self.mergeind  # make all attributes have same mergeind
 
     @classmethod
     def load(cls, savedir, data_kws, comm=MPI.COMM_SELF):
@@ -112,7 +113,6 @@ class HMres(Mres):
                 except AttributeError:
                     pass
 
-
     @Mres.mergeind.setter
     def mergeind(self, mergeind):
         Mres.mergeind.fset(self, mergeind)
@@ -122,6 +122,8 @@ class HMres(Mres):
             self.components.comp_ord = self.comp_ord
             self.components.suco_colors = self.suco_colors
             self.components.comp_colors = self.comp_colors
+        if hasattr(self, 'traces'):
+            self.traces.comp_ord = self.comp_ord
 
     def check_active_komp(self):
         if ((self.active_komp > 0.05)*(self.active_komp < 0.95)).any():

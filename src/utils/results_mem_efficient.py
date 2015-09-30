@@ -28,16 +28,12 @@ class Mres(object):
         self.p_noise = p_noise
         self.maxnbrsucocol = maxnbrsucocol
 
-        self.merged = False
-        self.mergeMeth = ''
-        self.mergeind = [[k] for k in range(self.K)]
-
         if sim is None:
             sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
         for j in range(self.J):
             self.clusts.append(SampleClustering(self.data[j], classif_freq[j],
-                               self.mergeind, sim, K, self.names[j]))
+                               sim, K, self.names[j]))
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
 
     @property
@@ -57,6 +53,8 @@ class Mres(object):
         self._comp_ord = [ind for sco in self._suco_ord for ind in self._mergeind[sco]]
         self._comp_colors, self._suco_colors = get_colors(
             self._mergeind, self._suco_ord, self._comp_ord, self.maxnbrsucocol)
+        for clust in self.clusts:
+            clust.mergeind = self.mergeind
 
     @property
     def mergeind_sorted(self):
