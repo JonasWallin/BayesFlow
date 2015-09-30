@@ -73,6 +73,7 @@ class HMres(Mres):
     def load(cls, savedir, data_kws, comm=MPI.COMM_SELF):
         hmlog_burn = HMlogB.load(savedir, comm=comm)
         hmlog = HMElog.load(savedir, comm=comm)
+        hmlog.prob_sim_mean *= hmlog.active_komp  # compensate for reweighting in HMlog.postproc
         metadata = data_kws.copy()
         marker_lab = metadata.pop('marker_lab')
         data = load_fcdata(hmlog.names, comm=comm, **metadata)
