@@ -221,7 +221,6 @@ class HMres(Mres):
             mus.append(self.noise_mu)
             Sigmas.append(self.noise_sigma)
             ps.append(self.p_noise[j])
-        print "ps = {}".format(ps)
         print "np.sum(ps) = {}".format(np.sum(ps))
         ps /= np.sum(ps)  # renormalizing
         return mus, Sigmas, np.array(ps)
