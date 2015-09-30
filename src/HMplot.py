@@ -527,12 +527,21 @@ class ClustPlot(object):
         
 class CompPlot(object):
     
-    def __init__(self, components, comp_colors, comp_ord, suco_ord):
+    def __init__(self, components):
         self.comp = components
         self.comp.plot = self
-        self.comp_colors = comp_colors
-        self.comp_ord = comp_ord
-        self.suco_ord = suco_ord
+
+    @property
+    def comp_colors(self):
+        return self.components.comp_colors
+        
+    @property
+    def comp_ord(self):
+        return self.components.comp_ord
+        
+    @property
+    def suco_ord(self):
+        return selfsscomponensts.sucos_ord
         
     def set_marker_lab(self, marker_lab):
         self.marker_lab = marker_lab

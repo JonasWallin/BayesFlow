@@ -55,7 +55,7 @@ class Mres(object):
         self._mergeind = mergeind
         self._suco_ord = np.argsort(-np.sum(self.p_merged, axis=0))
         self._comp_ord = [ind for sco in self._suco_ord for ind in self._mergeind[sco]]
-        self._comp_colors, suco_colors = get_colors(
+        self._comp_colors, self._suco_colors = get_colors(
             self._mergeind, self._suco_ord, self._comp_ord, self.maxnbrsucocol)
 
     @property
