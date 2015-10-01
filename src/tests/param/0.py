@@ -26,6 +26,7 @@ def setup(comm, J, n_J, d, K):
     prior.component_shape(nps=0.1, h=1e3)
     prior.set_noise_class(noise_mu=0.5, noise_Sigma=0.5**2, on=False)  # We do not introduce noise class from start
     prior.pop_size()
+    prior.lamb = 10
 
     AMCMC = True
 

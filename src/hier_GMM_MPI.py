@@ -610,13 +610,13 @@ class hierarical_mixture_mpi(object):
         self.set_GMM_init()
 
     def set_latent_init(self, prior=None, thetas=None, expSigmas=None,
-                        method='random', **kw):
+                        method='random', **initkw):
 
         rank = self.comm.Get_rank()
 
         if method == 'EM_pooled':
             data = [gmm.data for gmm in self.GMMs]
-            thetas, expSigmas, _ = EM_pooled(self.comm, data, self.K, **kw)
+            thetas, expSigmas, _ = EM_pooled(self.comm, data, self.K, **initkw)
 
         if rank == 0:
             for k in range(self.K):

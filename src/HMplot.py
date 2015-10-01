@@ -647,6 +647,22 @@ class CompPlot(object):
             
         return ax
 
+    def eigvectors(self, D=2, axs=None, **figargs):
+        if D is None:
+            D = self.comp.d
+        if axs is None:
+            fig, axs = plt.subplots(self.comp.K, D, **figargs)
+        for i, k in enumerate(self.comp_ord):
+            sigmas = [self.comp.Sigmapers[j, k, :, :] for j in range(self.comp.J)]
+            EVs = [np.linalg.eig(sigma) for sigma in sigmas if not np.isnan(sigma[0, 0])]
+            Vs = [np.sqrt(EV[0]).reshape(1, -1)*EV[1] for EV in EVs]
+            for dd in range(D):
+                Vs_d = [V[:, dd] for V in Vs]
+                s = np.argmax(sum([abs(V_d) for V_d in Vs_d]))
+                Vs_d = [V*np.sign(V[s]) if V[s] != 0 else V for V in Vs_d]
+                axs[i, dd].plot(np.vstack(Vs_d).T, color=self.comp_colors[k])
+                axs[i, dd].set_ylim(-.2, .2)
+
     @staticmethod
     def set_lims(ax, lims, dim):
         try:
