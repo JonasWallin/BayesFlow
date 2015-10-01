@@ -545,6 +545,7 @@ class hierarical_mixture_mpi(object):
     def set_prior(self, prior, init=False, thetas=None, expSigmas=None):
 
         self.set_prior_param0()
+        self.set_prior_actiavation(prior.lamb)
         if prior.noise_class:
             self.add_noise_class(mu=prior.noise_mu, Sigma=prior.noise_Sigma)
 
