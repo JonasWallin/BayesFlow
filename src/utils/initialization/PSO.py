@@ -8,7 +8,9 @@ from __future__ import print_function
 from mpi4py import MPI
 import numpy as np
 import copy as cp
+import warnings
 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def HGMM_pre_burnin(Hier_GMM, init_iter=40, prec=1, iteration=10, mutate_iteration=20,
                     burst_iteration=20, local_iter=5, silent=False):
@@ -106,7 +108,7 @@ def mutate(GMM, prec=0.1, iteration=10, silent=True, rand_class=False):
     if rand_class:
         k = np.random.randint(GMM.K)
     else:
-        k = np.argmin(GMM.p[:, :GMM.K])
+        k = np.argmin(GMM.p[:GMM.K])
     set_mutated(GMM, k, point_)
 
     for i in range(iteration):
