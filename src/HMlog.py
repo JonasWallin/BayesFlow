@@ -185,6 +185,9 @@ class HMlog(HMlogB):
         if self.noise_class:
             self.noise_mu = hGMM.GMMs[0].noise_mean
             self.noise_sigma = hGMM.GMMs[0].noise_sigma
+        else:
+            self.noise_mu = None
+            self.noise_sigma = None
 
         if not savefrqy is None:
             self.savefrqy = savefrqy
