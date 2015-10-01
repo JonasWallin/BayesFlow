@@ -9,10 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from .. import setup_sim, hierarical_mixture_mpi, HMlogB, HMElog, HMres
-from .exceptions import BadQualityError
+from ..exceptions import BadQualityError
 from ..utils import load_fcdata
 from ..utils.initialization.EM import (EMD_to_generated_from_model,
                                        data_log_likelihood)
+from ..utils.initialization.PSO import HGMM_pre_burnin
 from ..utils.initialization.distributed_data import DataMPI
 from ..PurePython.GMM import mixture
 from ..exceptions import NoOtherClusterError
@@ -174,6 +175,12 @@ class Pipeline(object):
         self.logdata['t_init'] = t1-t0
         self.hGMM.toggle_timing()
 
+    def pre_burnin(self):
+        t0 = time.time()
+        HGMM_pre_burnin(self.hGMM)
+        t1 = time.time()
+        print "pre burnin: {} s".format(t1 - t0)
+
     def MCMC(self, plot_sim=False):
         '''
             Burn-in iterations
@@ -279,8 +286,8 @@ class Pipeline(object):
         data_mpi = [DataMPI(MPI.COMM_SELF, [dat]) for dat in self.res.data]
         for j, dat_mpi in enumerate(data_mpi):
             mus, Sigmas, pis = self.res.get_mix(j)
-            emd[j] = EMD_to_generated_from_model(dat_mpi, mus, Sigmas, pis,
-                                                 int(self.N/10))
+            emd[j], e_dim = EMD_to_generated_from_model(dat_mpi, mus, Sigmas, pis,
+                                                        N_synsamp=int(self.N/10))
             log_lik[j] = data_log_likelihood(dat_mpi, mus, Sigmas, pis)
 
         return emd, log_lik
@@ -313,13 +320,15 @@ class Pipeline(object):
 
     def run(self, init_method='EM_pooled', WIS=False, rho=2, init_n_iter=20,
             n_init=10, init_plotting=False, init_selection='likelihood', gamma=2,
-            plot_sim=False):
+            plot_sim=False, pre_burnin=True):
         if 1:
             self.generate_data()
             self.setup_run()
             self.init_hGMM(method=init_method, WIS=WIS, rho=rho, n_iter=init_n_iter,
                            n_init=n_init, plotting=init_plotting, selection=init_selection, gamma=gamma)
             print "prior vals: {}".format(self.hGMM.prior.__dict__)
+            if pre_burnin:
+                self.pre_burnin()
             self.MCMC(plot_sim)
             if self.rank == 0:
                 self.postproc(MPI.COMM_SELF)
@@ -330,8 +339,8 @@ class Pipeline(object):
         #     self.clean_up()
 
 if __name__ == '__main__':
-    pipeline = Pipeline(J=6, K=8, N=1000, d=3, data_class=SynSample, ver='A',
-                        parfile='src/tests/param/0.py',)
+    pipeline = Pipeline(J=6, K=8, N=1000, d=3, C=4, data_class=SynSample, ver='A',
+                        par_file='src/tests/param/0.py')
     pipeline.run(plot_sim=True)
     if pipeline.rank == 0:
         pipeline.quality_check()
