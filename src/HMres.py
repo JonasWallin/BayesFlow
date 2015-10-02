@@ -252,7 +252,7 @@ class HMres(Mres):
     def K_active(self):
         return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
 
-    def earth_movers_distance_to_generated(self):
+    def earth_movers_distance_to_generated(self, rho=1):
         if hasattr(self, '_earth_movers_distance_to_generated'):
             return self._earth_movers_distance_to_generated, self._emd_dims
         emds = []
@@ -263,7 +263,7 @@ class HMres(Mres):
             emds.append(
                 np.array(EMD_to_generated_from_model(
                     DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
-                    gamma=1, nbins=50, dims=dims))
+                    gamma=1, nbins=50, dims=dims, rho=rho))
                 * (1./N_synsamp))
             print "\r EMD computed for {} samples".format(j+1),
         print "\r ",
