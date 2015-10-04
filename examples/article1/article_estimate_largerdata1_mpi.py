@@ -24,7 +24,7 @@ if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable
 	SIM_burnin_2 = 4000
 	N_CELLS = 15*10**4
 	THIN = 1
-	N_PERSONS = 32*4
+	N_PERSONS = 32*6
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
@@ -73,7 +73,7 @@ else:
 hier_gmm = setup_model(y, K)
 #hier_gmm.set_prior(prior, init=False)
 
-
+hier_gmm.add_noise_class()
 HGMM_pre_burnin(hier_gmm)
 burin_1(hier_gmm, sim = SIM_burnin_1 )
 burin_2(hier_gmm, sim = SIM_burnin_2, p_act = [0., 0.] )
