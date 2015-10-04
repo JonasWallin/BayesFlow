@@ -108,7 +108,7 @@ def mutate(GMM, prec = 0.1, iteration = 10, silent = True, rand_class = False):
 	if rand_class:
 		k  = np.random.randint(GMM.K)
 	else:
-		k  = np.argmin(GMM.p)
+		k  = np.argmin(GMM.p[:GMM.K])
 	set_mutated(GMM, k, point_)
 	
 	for i in range(iteration):

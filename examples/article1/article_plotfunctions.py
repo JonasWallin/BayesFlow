@@ -109,11 +109,13 @@ def plotQ(Qs):
 		figs.append(fig)
 	return figs
 
-def plot_theta(theta_percentile):
+def plot_theta(theta_percentile, theta_percentile_true = None):
 	'''
 		To plot one need to add the options:
 		matplotlib.rc('text', usetex=True)
 		matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+  		
+  		*theta_percentile_true* if the true mu is observed we can generate true conf 
 	
 	'''
 	spines_to_remove = []
@@ -122,6 +124,10 @@ def plot_theta(theta_percentile):
 	y_lim = [np.min(theta_percentile[:,:,0]) - 0.1*np.abs(np.min(theta_percentile[:,:,0])),np.max(theta_percentile[:,:,2])+ 0.1*np.abs(np.max(theta_percentile[:,:,2]))]
 	theta_percentile[:,:,0] = np.abs(theta_percentile[:,:,0] - theta_percentile[:,:,1])
 	theta_percentile[:,:,2] = np.abs(theta_percentile[:,:,2] - theta_percentile[:,:,1])
+	
+	if theta_percentile_true is not None:
+		theta_percentile_true[:,:,0] = np.abs(theta_percentile_true[:,:,0] - theta_percentile_true[:,:,1])
+		theta_percentile_true[:,:,2] = np.abs(theta_percentile_true[:,:,2] - theta_percentile_true[:,:,1])
 	xticklabels  =[]
 	
 	fig = plt.figure(figsize=(1.5 * d,1.1 * (int(np.ceil(K/4))+1)))
@@ -136,6 +142,13 @@ def plot_theta(theta_percentile):
 		err =  [theta_percentile[j,:, 0] ,theta_percentile[j,:,2]]
 		ra = 0.1	
 		ax.errorbar(np.array(range(d))*ra,theta_percentile[j,:,1],yerr = err,fmt='.',color='black')
+		if theta_percentile_true is not None:
+			err_true =  [theta_percentile_true[j,:, 0] ,theta_percentile_true[j,:,2]]
+			ax.errorbar(np.array(range(d))*ra + 0.1*ra,
+					    theta_percentile_true[j,:,1],
+					    yerr = err_true,
+					    fmt='.',
+					    color='red')
 		ax.plot(np.array([-.02,(d-1)*ra+.02]),[0,0],color='gray',alpha=0.2)
 		ax.xaxis.set_ticks(np.array(range(d))*ra)
 		ax.set_xlim([-.02,(d-1)*ra+.02])

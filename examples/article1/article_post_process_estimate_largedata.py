@@ -12,20 +12,23 @@ import matplotlib.pyplot as plt
 import matplotlib.pyplot
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.pyplot import cm 
+import scipy.stats
+q_ = scipy.stats.norm.ppf(0.975)
+
 
 matplotlib.rcParams['ps.useafm'] = True
 matplotlib.rcParams['pdf.use14corefonts'] = True
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
-#res=np.load('/Users/jonaswallin/repos/BaysFlow/script/sim_data.npy')
+res=np.load('/Users/jonaswallin/repos/BaysFlow/script/sim_data.npy')
 #res=np.load('/Users/jonaswallin/repos/BaysFlow/examples/article1/sim_data_v1.npy')
-res=np.load('/Users/jonaswallin/repos/BaysFlow/examples/article1/sim_data.npy')
-theta = res[3]
-mus = res[2]
-simulation_result = np.load('simulation_result.npy').item()
-mus_sim = np.load('mus_sim.npy')
-#simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
-#mus_sim =  np.load('/Users/jonaswallin/repos/BaysFlow/script/mus_sim.npy')
+#res=np.load('/Users/jonaswallin/repos/BaysFlow/examples/article1/sim_data.npy')
+theta = res[2]
+mus = res[1]
+#simulation_result = np.load('simulation_result.npy').item()
+#mus_sim = np.load('mus_sim.npy')
+simulation_result=np.load('/Users/jonaswallin/repos/BaysFlow/script/simulation_result.npy').item()
+mus_sim =  np.load('/Users/jonaswallin/repos/BaysFlow/script/mus_sim.npy')
 
 
 K = theta.shape[0]
@@ -36,19 +39,26 @@ col_index = sort_thetas( np.array(simulation_result['theta']), theta)
 
 # get the quantiles of theta
 perc_theta = []
+theta_optim= []
 for k in range(K):
 		k_pos = np.where(np.array(col_index)==k)
 		
 		if(len(k_pos[0]) > 0):
 			k_ = k_pos[0][0]
-			mu_k = mus[:,k_,:].T
-			std_theta = np.max(np.abs(np.array(simulation_result['theta'])[:,col_index[k],:]- theta[k]),0)
+			mu_k = mus[:,k,:].T
+			#std_theta = np.max(np.abs(np.array(simulation_result['theta'])[:,col_index[k],:]- theta[k]),0)
+			std_theta =  np.std(simulation_result['mus'][:,col_index[k],:],0)
 			theta_err = (np.array(simulation_result['theta'])[:,col_index[k],:] - theta[k])/std_theta
-			perc_ = np.percentile(theta_err,[0.005,50,99.5],axis=0)
+			perc_ = np.percentile(theta_err,[2.5,50,97.5],axis=0)
 			perc_theta.append(np.array(perc_).T)
+			temp = [ np.mean(mu_k,0) - theta[k] - q_ * np.std(mu_k,0)/np.sqrt(mu_k.shape[0]),
+				     np.mean(mu_k,0) - theta[k],
+				     np.mean(mu_k,0) - theta[k] + q_ * np.std(mu_k,0)/np.sqrt(mu_k.shape[0])
+			]
+			theta_optim.append((np.array(temp)/std_theta).T)
 
 
-f_theta  = plot_theta(np.array(perc_theta))
+f_theta  = plot_theta(np.array(perc_theta), np.array(theta_optim))
 f_theta.savefig('f_theta.pdf',type='pdf',transparent=True,bbox_inches='tight')
 
 

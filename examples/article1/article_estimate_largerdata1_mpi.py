@@ -91,7 +91,7 @@ hier_gmm.print_timing()
 mus_sim = hier_gmm.get_mus()
 
 if MPI.COMM_WORLD.Get_rank() == 0: 
-	data_ = [y, act_komp, mus, thetas, sigmas, weights]
+	data_ = [act_komp, mus, thetas, sigmas, weights]
 	if save_data:
 		print('saveing data')
 		sys.stdout.flush()
