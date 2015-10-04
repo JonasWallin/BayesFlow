@@ -11,7 +11,6 @@ from article_util import setup_model, burin_1, burin_2, main_run, HGMM_pre_burni
 import numpy as np
 import numpy.random as npr
 import sys
-from BayesFlow import BalancedPrior
 
 
 npr.seed(10)
@@ -19,9 +18,9 @@ K = 11
 d = 8
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
 	save_data = True
-	SIM          = 4000
-	SIM_burnin_1 = 200
-	SIM_burnin_2 = 4000
+	SIM          = 5000
+	SIM_burnin_1 = 20
+	SIM_burnin_2 = 5000
 	N_CELLS = 15*10**4
 	THIN = 1
 	N_PERSONS = 32*6
@@ -73,10 +72,13 @@ else:
 hier_gmm = setup_model(y, K)
 #hier_gmm.set_prior(prior, init=False)
 
-hier_gmm.add_noise_class()
+
 HGMM_pre_burnin(hier_gmm)
+hier_gmm.add_noise_class()
 burin_1(hier_gmm, sim = SIM_burnin_1 )
 burin_2(hier_gmm, sim = SIM_burnin_2, p_act = [0., 0.] )
+
+
 simulation_result = main_run(hier_gmm, sim = SIM, p_act = [0,0.])
 np.set_printoptions(precision=2)
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable

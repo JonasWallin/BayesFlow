@@ -52,7 +52,7 @@ def distance_sort(hGMM):
                 mus = hGMM.comm.recv(source=0)['mus']
             
             for GMM in GMMs:
-                index_k = np.argsort(GMM.p)[::-1] #sort by probabilility
+                index_k = np.argsort(GMM.p[:hGMM.K])[::-1] #sort by probabilility
                 mus_t = np.array([np.mean(mu,axis=0) for mu in  mus])
                 list_temp = [None for k in range(GMM.K)]
                 for index in index_k:
@@ -69,7 +69,7 @@ def distance_sort(hGMM):
                 mus = [np.vstack((mu,GMM.mu[list_temp[i]])) for i,mu in enumerate(mus) ]
                 GMM.mu = [GMM.mu[i] for i in list_temp]
                 GMM.sigma = [GMM.sigma[i] for i in list_temp]
-                GMM.p = np.array([GMM.p[i] for i in list_temp])
+                GMM.p[:hGMM.K] = np.array([GMM.p[i] for i in list_temp])[:]
             if hGMM.comm.Get_rank() != 0:
                 hGMM.comm.send({'mus':mus}, dest=0)
                 
@@ -826,13 +826,13 @@ class hierarical_mixture_mpi(object):
         rank = self.comm.Get_rank()  # @UndefinedVariable
         
         if rank == 0:
-            recv_obj = np.empty((self.n_all, self.K ),dtype='d')
+            recv_obj = np.empty((self.n_all, self.K  + self.noise_class),dtype='d')
         else:
             recv_obj = None
         
         
         send_obj = np.array([GMM.active_komp.flatten()  for GMM in self.GMMs ],dtype='d')
-        self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, (self.counts  , None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
+        self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, (self.counts + self.n_all*self.noise_class  , None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
 
         return recv_obj        
         

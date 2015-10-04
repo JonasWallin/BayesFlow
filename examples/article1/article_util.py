@@ -336,7 +336,7 @@ def main_run(hGMM, sim = 16000, thin = 1, p_label = .4, p_act = [0.4, 0.4], sile
 					
 			count += 1
 			data_out['mus']     += mus_
-			data_out['actkomp'] += active_komp
+			data_out['actkomp'] += active_komp[:,:hGMM.K]
 			
 			data_out['theta'].append(thetas)
 			data_out['Q'].append(Qs/(nus.reshape(nus.shape[0],1,1)- Qs.shape[1]-1)  )
