@@ -260,7 +260,7 @@ class Mres(object):
             be below dip test threshold thr.
         '''
         k, l = ind
-        dims = [None]+self.get_dims_with_low_bhat_overlap(ind)
+        dims = [None]+self.get_dims_with_low_bhat_overlap(ind, tol=tol)
         for dim in dims:
             nbr_computable = self.J
             below = 0
@@ -279,7 +279,7 @@ class Mres(object):
                 self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
-    def get_dims_with_low_bhat_overlap(self, ind):
+    def get_dims_with_low_bhat_overlap(self, ind, tol=1./4):
         k, l = ind
         dims = []
         for dd in range(self.d):
@@ -293,7 +293,7 @@ class Mres(object):
                     W = clust.get_W(k)+clust.get_W(l)
                     if bhat_overlap < self.bhat_overlap_1d_threshold(W):
                         below += 1
-            if below > np.floor(nbr_computable/4):
+            if below > np.floor(nbr_computable*tol):
                 dims.append(dd)
         return dims
 
