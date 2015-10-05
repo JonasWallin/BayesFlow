@@ -73,8 +73,8 @@ hier_gmm = setup_model(y, K)
 #hier_gmm.set_prior(prior, init=False)
 
 
-HGMM_pre_burnin(hier_gmm)
 hier_gmm.add_noise_class()
+HGMM_pre_burnin(hier_gmm)
 burin_1(hier_gmm, sim = SIM_burnin_1 )
 burin_2(hier_gmm, sim = SIM_burnin_2, p_act = [0., 0.] )
 

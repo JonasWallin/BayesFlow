@@ -327,7 +327,6 @@ def main_run(hGMM, sim = 16000, thin = 1, p_label = .4, p_act = [0.4, 0.4], sile
 		thetas = hGMM.get_thetas()
 		Qs = hGMM.get_Qs()
 		nus = hGMM.get_nus()
-		print("prior active_komp {rank}".format(rank = MPI.COMM_WORLD.Get_rank()))  # @UndefinedVariable 
 		active_komp = hGMM.get_activekompontent()
 		Y_sample = hGMM.sampleY()
 	
