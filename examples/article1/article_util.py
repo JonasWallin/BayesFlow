@@ -66,8 +66,10 @@ def draw_outlier_point(GMM, prec = 0.1):
 	GMM.compute_ProbX(norm=False)
 	l  =np.max(GMM.prob_X,1)
 	index  = l < np.percentile(l,0.1)
-	index_p = np.random.randint(0.1*GMM.data.shape[0])
-	point_ = GMM.data[index[index_p],:]
+	
+	points_ = GMM.data[index,:]
+	index_p = np.random.randint(points_.shape[0])
+	point_ = points_[index_p,:]
 	return(point_)
 
 
@@ -325,6 +327,7 @@ def main_run(hGMM, sim = 16000, thin = 1, p_label = .4, p_act = [0.4, 0.4], sile
 		thetas = hGMM.get_thetas()
 		Qs = hGMM.get_Qs()
 		nus = hGMM.get_nus()
+		print("prior active_komp {rank}".format(rank = MPI.COMM_WORLD.Get_rank()))  # @UndefinedVariable 
 		active_komp = hGMM.get_activekompontent()
 		Y_sample = hGMM.sampleY()
 	

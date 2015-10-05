@@ -18,12 +18,12 @@ K = 11
 d = 8
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
 	save_data = True
-	SIM          = 100#5000
+	SIM          = 5000
 	SIM_burnin_1 = 100#20
-	SIM_burnin_2 = 100#5000
-	N_CELLS = 15*10**2#4
+	SIM_burnin_2 = 5000
+	N_CELLS = 15*10**4
 	THIN = 1
-	N_PERSONS = 32*1#6
+	N_PERSONS = 32*6
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
