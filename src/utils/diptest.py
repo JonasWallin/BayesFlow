@@ -221,34 +221,36 @@ def dip_pval_tabinterpol(dip,N):
 
     return 1 - p_interpol
 
-def transform_dip_to_other_nbr_pts(dip_n,n,m):
+
+def transform_dip_to_other_nbr_pts(dip_n, n, m):
     dip_m = np.sqrt(n/m)*dip_n
     return dip_m
 
-def cum_distr(data,w):
-	eps = 1e-10
-	data_ord = np.argsort(data)
-	data_sort = data[data_ord]
-	w_sort = w[data_ord]
-	data_sort,indices = unique(data_sort,return_index=True,eps=eps,is_sorted=True)
-	if len(indices) < len(data_sort):
-		w_unique = np.zeros(len(indices))
-		for i in range(len(indices)-1):
-			w_unique = np.sum(w_sort[indices[i]:indices[i+1]])
-		w_unique[-1] = np.sum(w_sort[indices[-1]:])
-		w_sort = w_unique
-	wcum = np.cumsum(w_sort)
-	wcum /= wcum[-1]
 
-	N = len(data_sort)
-	x = np.empty(2*N)
-	x[2*np.arange(N)] = data_sort
-	x[2*np.arange(N)+1] = data_sort
-	y = np.empty(2*N)
-	y[0] = 0
-	y[2*np.arange(N)+1] = wcum
-	y[2*np.arange(N-1)+2] = wcum[:-1]
-	return x,y
+def cum_distr(data, w):
+    eps = 1e-10
+    data_ord = np.argsort(data)
+    data_sort = data[data_ord]
+    w_sort = w[data_ord]
+    data_sort, indices = unique(data_sort, return_index=True, eps=eps, is_sorted=True)
+    if len(indices) < len(data_ord):
+        w_unique = np.zeros(len(indices))
+        for i in range(len(indices)-1):
+            w_unique[i] = np.sum(w_sort[indices[i]:indices[i+1]])
+        w_unique[-1] = np.sum(w_sort[indices[-1]:])
+        w_sort = w_unique
+    wcum = np.cumsum(w_sort)
+    wcum /= wcum[-1]
+
+    N = len(data_sort)
+    x = np.empty(2*N)
+    x[2*np.arange(N)] = data_sort
+    x[2*np.arange(N)+1] = data_sort
+    y = np.empty(2*N)
+    y[0] = 0
+    y[2*np.arange(N)+1] = wcum
+    y[2*np.arange(N-1)+2] = wcum[:-1]
+    return x, y
 
 
 def lin_interpol(xquery,x,y):
