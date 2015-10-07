@@ -8,37 +8,31 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
-#import matplotlib.colors as colors
-import plot
 import copy
 
+from . import plot
 from .utils.results_mem_efficient import DataSetClustering
 
 
 class HMplot(object):
 
-    def __init__(self, bmres, marker_lab=None):
+    def __init__(self, bmres):
         self.bmres = bmres
-        #self.comp_colors, self.suco_colors, self.comp_ord, self.suco_ord = self.get_colors_and_order()
+        try:
+            self.cop = CompPlot(bmres.components)
+            self.trp = TracePlot(bmres.traces)
 
-        #self.clp = ClustPlot(bmres.clusts, self.comp_colors, self.comp_ord)
-        #if hasattr(bmres, 'clust_m'):
-        #    self.clp_m = ClustPlot(bmres.clust_m, self.suco_colors, self.suco_ord)
-        self.cop = CompPlot(bmres.components)
-        self.trp = TracePlot(bmres.traces)
+            self.mcsp = {}
+            for mimic_key in bmres.mimics:
+                mimic = bmres.mimics[mimic_key]
+                self.mcsp[mimic_key] = MimicPlot(mimic)
+        except AttributeError as e:
+            print e
+            pass
 
-        self.mcsp = {}
-        for mimic_key in bmres.mimics:
-            mimic = bmres.mimics[mimic_key]
-            self.mcsp[mimic_key] = MimicPlot(mimic)
-
-        if marker_lab is None:
-            try:
-                marker_lab = bmres.meta_data.marker_lab
-            except:
-                marker_lab = ['']*bmres.d
-        self.set_marker_lab(marker_lab)
-        self.set_sampnames(bmres.meta_data.samp['names'])
+        if hasattr(bmres, 'meta_data'):
+            self.marker_lab = bmres.meta_data.marker_lab
+            self.sampnames = bmres.meta_data.samp['names']
 
     @property
     def comp_ord(self):
@@ -56,24 +50,45 @@ class HMplot(object):
     def suco_colors(self):
         return self.bmres.suco_colors
 
-    def set_marker_lab(self, marker_lab):
-        self.marker_lab = marker_lab
-        #self.clp_nm.set_marker_lab(marker_lab)
-        #if hasattr(self, 'clp_m'):
-        #    self.clp_m.set_marker_lab(marker_lab)
-        self.cop.set_marker_lab(marker_lab)
-        for mc in self.mcsp:
-            self.mcsp[mc].set_marker_lab(marker_lab)
+    @property
+    def marker_lab(self):
+        if hasattr(self, '_marker_lab'):
+            return self._marker_lab
+        return ['']*self.bmres.d
 
-    def set_population_lab(self, pop_lab):
+    @marker_lab.setter
+    def marker_lab(self, marker_lab):
+        self._marker_lab = marker_lab
+        if hasattr(self, 'cop'):
+            self.cop.marker_lab = marker_lab
+        if hasattr(self, 'mcsp'):
+            for mc in self.mcsp:
+                self.mcsp[mc] = marker_lab
+
+    @property
+    def pop_lab(self):
+        if hasattr(self, '_population_lab'):
+            return self._population_lab
+        return None
+
+    @pop_lab.setter
+    def pop_lab(self, pop_lab):
         order = np.argsort(self.suco_ord)
-        self.pop_lab = [pop_lab[k] for k in order]
-        self.clp_nm.set_population_lab(pop_lab)
-        self.clp_m.set_population_lab(pop_lab)
+        self._pop_lab = [pop_lab[k] for k in order]
+        if hasattr(self, 'cop'):
+            self.cop.pop_lab = pop_lab
 
-    def set_sampnames(self, names):
-        self.sampnames = names
-        self.cop.set_sampnames(names)
+    @property
+    def sampnames(self):
+        if hasattr(self, '_sampnames'):
+            return self._sampnames
+        return None
+
+    @sampnames.setter
+    def sampnames(self, names):
+        self._sampnames = names
+        if hasattr(self, 'cop'):
+            self.cop.sampnames = names
 
     def box(self, axs=None, suco=True, **figargs):
         '''
@@ -177,10 +192,10 @@ class HMplot(object):
         #    sampmarkers = [(4, 0, 45), (3, 0), (0, 3), (4, 2)]
         #if poplabsh is None:
         #    poplabsh = [[0, 0], [0, -.02], [0, 0], [-.1, 0], [.22, 0], [.06, -.06]]
-        if not hasattr(self, 'pop_lab'):
-            self.pop_lab = None
-        plot.pca_biplot(self.bmres.p_merged, comp, ax, varcol=self.suco_colors, varlabels=self.pop_lab,
-                        varlabsh=poplabsh, sampleid=self.bmres.meta_data.samp['donorid'], sampmarkers=sampmarkers)
+        plot.pca_biplot(self.bmres.p_merged, comp, ax, varcol=self.suco_colors,
+                        varlabels=self.pop_lab, varlabsh=poplabsh,
+                        sampleid=self.bmres.meta_data.samp['donorid'],
+                        sampmarkers=sampmarkers)
 
     def pca_screeplot(self, ax=None):
         plot.pca_screeplot(self.bmres.p, ax)
@@ -338,14 +353,7 @@ class ClustPlot(object):
         #self.clust.plot = self
         self.colors = colors
         self.order = order
-        self.pop_lab = None
 
-    def set_marker_lab(self, marker_lab):
-        self.marker_lab = marker_lab
-
-    def set_population_lab(self, pop_lab):
-        self.pop_lab = pop_lab
-    
     def pdip_summary(self, fig=None, colorbar=True):
         '''
             Plot p-value of Hartigan's dip test for each cluster.
@@ -367,7 +375,7 @@ class ClustPlot(object):
         if colorbar:
             fig.colorbar(p)
         return fig
-        
+
     def pdip(self, fig=None, colorbar=True):
         '''
             Plot p-value of Hartigan's dip test for each cluster.
@@ -548,12 +556,6 @@ class CompPlot(object):
     def suco_ord(self):
         return self.comp.suco_ord
 
-    def set_marker_lab(self, marker_lab):
-        self.marker_lab = marker_lab
-
-    def set_sampnames(self, names):
-        self.sampnames = names
-
     def center(self, suco=True, axs=None, yscale=False,
                ks=None, with_outliers=True, alpha=1, **figargs):
         '''
@@ -621,30 +623,33 @@ class CompPlot(object):
     def center3D(self, dim, fig=None):
         '''
             Plots the centers (mu) of the components in three dimensions.
-            
+
             dim     -   dimensions on which to project centers.
         '''
         if fig is None:
             fig = plt.figure()
-            
+
         ax = fig.gca(projection='3d')
-    
+
         for k in range(self.comp.K):
             mus = self.comp.mupers[:, k, :]
             ax.scatter(mus[:, dim[0]], mus[:, dim[1]], mus[:, dim[2]], marker='.', color = self.comp_colors[k], s=50) 
-            
+
         ax.axes.xaxis.set_ticks([.1, .5, .9])
         ax.axes.zaxis.set_ticks([.1, .5, .9])
         ax.axes.yaxis.set_ticks([.1, .5, .9])
         ax.view_init(30, 165)
-        
+
         ax.set_xlabel(self.marker_lab[dim[0]])
         ax.set_ylabel(self.marker_lab[dim[1]])
         ax.set_zlabel(self.marker_lab[dim[2]])
-            
+
         return ax
 
     def eigvectors(self, D=2, axs=None, **figargs):
+        '''
+            Plots the first D eigenvectors for each component.
+        '''
         if D is None:
             D = self.comp.d
         if axs is None:
@@ -675,8 +680,8 @@ class CompPlot(object):
                plot_new_th=True, lw=2, lims=None):
         '''
             Plot visualization with ellipses of the latent components.
-            Canonical colors are used (see BMplot).
-            
+            Canonical colors are used (see HMplot).
+
             dim     -   which two dimensions to project on.
             ax     -   where to plot
             ks      -   which components to plot
@@ -685,25 +690,25 @@ class CompPlot(object):
         '''
         #print "suco_list = {}".format(suco_list)
         if ax is None:
-    		f = plt.figure()
-    		ax = f.add_subplot(111)
+            f = plt.figure()
+            ax = f.add_subplot(111)
         else:
-    		f = None
+            f = None
 
         if ks is None:
             ks = range(self.comp.K)
-        ks = [self.comp_ord[k] for k in ks]            
+        ks = [self.comp_ord[k] for k in ks]
         okcl = set.intersection(set(self.within_plim(plim)), set(ks))
-        
+
         mus = [self.comp.mulat[k, :] for k in okcl]
         Sigmas = [self.comp.Sigmalat[k, :, :] for k in okcl]
         colors = [self.comp_colors[k] for k in okcl]
 
         q = plot.component_plot(mus, Sigmas, dim, ax, colors=colors, lw=lw)
-        
+
         if hasattr(self.comp, 'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:, dim[0]], self.comp.new_thetas[:, dim[1]], s=40, c='k', marker='+')
-        
+
         if plotlab or plotlabx:
             ax.set_xlabel(self.marker_lab[dim[0]], fontsize=16)
         if plotlab or plotlaby:
@@ -720,7 +725,7 @@ class CompPlot(object):
         '''
             Plot visualization of mixture components for all samples.
             Canonical colors are used (see BMplot).
-            
+
             dim     -   which two dimensions to project on.
             ax     -   where to plot
             ks      -   which components to plot
@@ -839,8 +844,9 @@ class CompPlot(object):
         plot.plot_diagnostics(np.log10(distF), -5, 0, -3, self.comp_ord, 'Covariance matrix distance (norm {})'.format(norm), False, fig=fig, totplots=totplots, plotnbr=plotnbr)
         return fig
 
+
 class TracePlot(object):
-    
+
     def __init__(self, traces):
         self.traces = traces
         self.traces.plot = self
@@ -848,7 +854,7 @@ class TracePlot(object):
     @property
     def order(self):
         return self.traces.comp_ord
-        
+
     def all(self, fig=None, yscale=True):
         '''
             Plot trace plots of latent means and nus.
@@ -863,7 +869,7 @@ class TracePlot(object):
         # self.nu(ax)
         # ax.set_title('nu', fontsize=16)
         return fig, ax
-        
+
     def mulat(self, k, ax=None, yscale=True):
         if ax is None:
             fig = plt.figure()
@@ -874,7 +880,7 @@ class TracePlot(object):
             ax.set_ylim(-.2, 1.2)
             ax.axes.yaxis.set_ticks([0.1, 0.9])
         plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
-        
+
     def nu(self, ax=None):
         if ax is None:
             fig = plt.figure()
@@ -895,24 +901,27 @@ class TracePlot(object):
 
 
 class MimicPlot(object):
-    
+
     def __init__(self, mimic):
         self.mimic = mimic
         self.realplot = FCplot(mimic.realsamp)
         self.synplot = FCplot(mimic.synsamp)
-        
-    def set_marker_lab(self, marker_lab):
-        self.realplot.set_marker_lab(marker_lab)
-        self.synplot.set_marker_lab(marker_lab)
-        
+
+    @property
+    def marker_lab(self):
+        return self._marker_lab
+
+    @marker_lab.setter
+    def marker_lab(self, marker_lab):
+        self.realplot.marker_lab = marker_lab
+        self.synplot.marker_lab = marker_lab
+
+
 class FCplot(object):
-    
+
     def __init__(self, fcsample):
         self.fcsample = fcsample
         self.fcsample.plot = self
-        
-    def set_marker_lab(self, marker_lab):
-        self.marker_lab = marker_lab
 
     def hist2d(self, dim, Nsamp=None, bins=50, quan=[0.5, 99.5], quan_plot=[5, 95], ax=None, lims=None):
         '''
@@ -936,8 +945,8 @@ class FCplot(object):
         '''
         if fig is None:
             fig = plt.figure()
-        plot.histnd(self.fcsample.get_data(Nsamp), bins, [0, 100], [5, 95], fig,
-               labels=self.marker_lab)
+        plot.histnd(self.fcsample.get_data(Nsamp), bins, [0, 100], [5, 95],
+                    fig, labels=self.marker_lab)
         if not xlim is None:
             for ax in fig.axes:
                 ax.set_xlim(*xlim)

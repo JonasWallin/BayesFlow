@@ -64,7 +64,7 @@ class HMres(Mres):
 
             self.components = Components(hmlog, self.p)
 
-            self.plot = HMplot(self, self.meta_data.marker_lab)
+            self.plot = HMplot(self)
 
             self.quality = {}
             self.mergeind = self.mergeind  # make all attributes have same mergeind
