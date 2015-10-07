@@ -75,6 +75,42 @@ class HMplot(object):
         self.sampnames = names
         self.cop.set_sampnames(names)
 
+    def box(self, axs=None, suco=True, **figargs):
+        '''
+            Plot boxplots representing quantiles for each cluster.
+            NB! pooled data is used here.
+        '''
+        quantiles = self.bmres.get_quantiles((.01, .25, .5, .75, .99), suco=suco)
+
+        if axs is None:
+            fig, axs = plt.subplots(quantiles.shape[0], **figargs)
+
+        boxloc = (np.array(range(self.bmres.d)) + .5)/(self.bmres.d+1)
+        boxw = (boxloc[1] - boxloc[0])/3.5
+        ms = 10
+
+        if suco:
+            order = self.bmres.suco_ord
+        else:
+            order = self.bmres.comp_ord
+
+        for i, (ax, k) in enumerate(zip(axs, order)):
+            if not np.isnan(quantiles[k, 0, 0]):
+                for dd in range(self.bmres.d):
+                    plot.drawbox(quantiles[k, :, dd], boxloc[dd], boxw, ms, ax)
+                ax.axes.xaxis.set_ticks(boxloc)
+                xlim = ax.get_xlim()
+                ax.plot([xlim[0], xlim[1]], [.5, .5], color='grey')
+                if i < len(order):
+                    ax.set_xticklabels(['']*self.bmres.d)
+                else:
+                    ax.set_xticklabels(self.bmres.marker_lab)
+                ax.set_ylim(-.1, 1.1)
+                ax.axes.yaxis.set_ticks([.2, .8])
+        if hasattr(self, 'pop_lab') and not self.pop_lab is None:
+            ax.set_ylabel(self.pop_lab[self.order[k]])
+        return axs
+
     def component_fit(self, plotdim, name='pooled', lim=[-.2, 1.2], bins=100,
                       axs=None, **figargs):
         if axs is None:
@@ -205,14 +241,10 @@ class HMplot(object):
             fig.colorbar(p)
         return fig
 
-    def prob(self, suco=True, fig=None, totplots=1, plotnbr=1, ks=None):
+    def prob(self, suco=True, axs=None, ks=None, **figargs):
             '''
                 Plot probabilities of belonging to each cluster
             '''
-            if fig is None:
-                fig = plt.figure()
-            nbr_cols = 2*totplots-1
-            col_start = 2*(plotnbr-1)
 
             if suco:
                 order = self.suco_ord
@@ -227,13 +259,14 @@ class HMplot(object):
             else:
                 K = len(ks)
                 if suco:
-                    raise ValueError, "Selection of ks not supported for super components"
+                    raise ValueError("Selection of ks not supported for super components")
+
+            if axs is None:
+                fig, axs = plt.subplots(K, **figargs)
 
             J = prob.shape[0]
-            #K = prob.shape[1]
 
-            for i, k in enumerate(ks):
-                ax = fig.add_subplot(K, nbr_cols, i*nbr_cols + col_start+1)
+            for ax, k in zip(axs, ks):
                 ax.scatter(range(J), prob[:, order[k]])
                 ax.set_yscale('log')
                 ax.set_ylim(1e-3, 1)
@@ -244,7 +277,7 @@ class HMplot(object):
                 ax.axes.xaxis.set_ticks([])
                 ax.set_xlim(-1, J)
 
-            return fig
+            return axs
 
     def prob_bars(self, suco=True, fig=None, js=None):
         if fig is None:
@@ -312,38 +345,6 @@ class ClustPlot(object):
 
     def set_population_lab(self, pop_lab):
         self.pop_lab = pop_lab
-
-    # def box(self, fig=None, totplots=1, plotnbr=1):
-    #     '''
-    #         Plot boxplots reprsenting quantiles for each cluster.
-    #         NB! pooled data is used here.
-    #     '''
-    #     if fig is None:
-    #         fig = plt.figure()
-    #     quantiles = self.clust.get_quantiles((.01, .25, .5, .75, .99))
-    #     #print "quantiles = {}".format(quantiles)
-    #     nbr_cols = 2*totplots - 1
-    #     col_start = 2*(plotnbr-1)
-    #     boxloc = (np.array(range(self.clust.d)) + .5)/(self.clust.d+1)
-    #     boxw = (boxloc[1] - boxloc[0])/3.5
-    #     ms = 10
-    #     for k in range(self.clust.K):
-    #         if not np.isnan(quantiles[self.order[k], 0, 0]):
-    #             ax = fig.add_subplot(self.clust.K, nbr_cols, k*nbr_cols + col_start+1)
-    #             for dd in range(self.clust.d):
-    #                 plot.drawbox(quantiles[self.order[k], :, dd], boxloc[dd], boxw, ms, ax)
-    #             ax.axes.xaxis.set_ticks(boxloc)
-    #             xlim = ax.get_xlim()
-    #             ax.plot([xlim[0], xlim[1]], [.5, .5], color='grey')
-    #             if k < self.clust.K-1:
-    #                 ax.set_xticklabels(['']*self.clust.d)
-    #             else:
-    #                 ax.set_xticklabels(self.marker_lab)
-    #             ax.set_ylim(-.1, 1.1)
-    #             ax.axes.yaxis.set_ticks([.2, .8])
-    #     if not self.pop_lab is None:
-    #         ax.set_ylabel(self.pop_lab[self.order[k]])
-    #     return fig
     
     def pdip_summary(self, fig=None, colorbar=True):
         '''
@@ -526,7 +527,7 @@ class ClustPlot(object):
     #     return fig, ax
         
 class CompPlot(object):
-    
+
     def __init__(self, components):
         self.comp = components
         self.comp.plot = self
@@ -538,34 +539,33 @@ class CompPlot(object):
     @property
     def suco_colors(self):
         return self.comp.suco_colors
-        
+
     @property
     def comp_ord(self):
         return self.comp.comp_ord
-        
+
     @property
     def suco_ord(self):
         return self.comp.suco_ord
-        
+
     def set_marker_lab(self, marker_lab):
         self.marker_lab = marker_lab
 
     def set_sampnames(self, names):
         self.sampnames = names
-        
-    def center(self, suco=True, fig=None, totplots=1, plotnbr=1, yscale=False,
-               ks=None, with_outliers=True, alpha=1):
+
+    def center(self, suco=True, axs=None, yscale=False,
+               ks=None, with_outliers=True, alpha=1, **figargs):
         '''
-            The centers of all components (mu param) are plotted along one dimension.
-            
-            If suco=True, components belonging to the same super component are
-            plotted in the same panel.
+            The centers of all components (mu param) are plotted along
+            one dimension.
+
+            If suco=True, components belonging to the same super
+            component are plotted in the same panel.
         '''
-        if fig is None:
-            fig = plt.figure()
-            
+
         colors = [col[:-1]+(alpha, ) for col in self.comp_colors]
-            
+
         if suco:
             comps_list = copy.deepcopy(self.comp.mergeind)
             order = list(self.suco_ord)[:]
@@ -590,16 +590,13 @@ class CompPlot(object):
 
         if not with_outliers:
             outliers = self.comp.mu_outliers
-    
-        nbr_cols = 2*totplots-1
-        col_start = 2*(plotnbr-1)
-    
-        S = len(order)
-        
-        for s in range(S):
-            comps = comps_list[order[s]]
+
+        if axs is None:
+            fig, axs = plt.subplots(len(order), **figargs)
+
+        for i, (ax, s) in enumerate(zip(axs, order)):
+            comps = comps_list[s]
             #print "comps = {}".format(comps)
-            ax = fig.add_subplot(S, nbr_cols, s*nbr_cols + col_start+1)
             for k in comps:
                 mu_ks = self.comp.mupers[:, k, :]
                 if not with_outliers:
@@ -607,20 +604,20 @@ class CompPlot(object):
                 for j in range(self.comp.J):
                     ax.plot(range(self.comp.d), mu_ks[j, :], color=colors[k])
                 ax.plot([0, self.comp.d-1], [.5, .5], color='grey')
-            if s == S-1:
+            if i == len(order)-1:
                 ax.axes.xaxis.set_ticks(range(self.comp.d))
                 ax.set_xticklabels(self.marker_lab)
             else:
                 ax.axes.xaxis.set_ticks([])
             if not yscale:
-                pass                
+                pass
                 #ax.axes.yaxis.set_ticks([])
                 #ax.set_ylim(0, 1)
             else:
                 ax.axes.yaxis.set_ticks([.2, .8])
-                ax.set_ylim(-.1, 1.1)		
-        return fig
-    
+                ax.set_ylim(-.1, 1.1)
+        return axs
+
     def center3D(self, dim, fig=None):
         '''
             Plots the centers (mu) of the components in three dimensions.

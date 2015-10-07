@@ -28,6 +28,9 @@ class Mres(object):
         self.p_noise = p_noise
         self.maxnbrsucocol = maxnbrsucocol
 
+        self.data = [dat + 0.003*np.random.randn(*dat.shape) for dat in self.data]
+          # adding small amounts of noise to remove artifacts in the data
+
         if sim is None:
             sim = np.sum(classif_freq[0].tocsr().getrow(0))
         self.clusts = []
@@ -35,7 +38,7 @@ class Mres(object):
             self.clusts.append(SampleClustering(self.data[j], classif_freq[j],
                                sim, K, self.names[j]))
         #self.clust_nm = Clustering(self.data, classif_freq, self.p, self.p_noise)
-                               
+
         self.mergeind = [[k] for k in range(self.K)]
         self.merged = False
 
@@ -254,7 +257,7 @@ class Mres(object):
                 self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
-    def okdiptest2(self, ind, thr, tol=1./4):
+    def okdiptest2(self, ind, thr, tol=1./4, min_dip=0.01):
         '''
             tol is the proportion of samples that is allowed to
             be below dip test threshold thr.
@@ -266,6 +269,7 @@ class Mres(object):
             below = 0
             for j, clust in enumerate(self.clusts):
                 try:
+                    dip, pdip = clust.get_dip_discr_jkl(k, l, dim)
                     if clust.get_pdip_discr_jkl(k, l, dim) < thr:
                         below += 1
                 except EmptyClusterError:
@@ -386,6 +390,39 @@ class Mres(object):
             return self.clusts[j].get_data_kd(min_clf, k, dd, suco)
         else:
             return np.vstack([clust.get_data_kd(min_clf, k, dd, suco) for clust in self.clusts])
+
+    def get_quantiles(self, alpha, j=None, ks=None, dds=None, suco=True):
+        '''
+            Returns alpha quantile(s) in each dimension of sample j
+            (the pooled data if j = None) for each of the clusters.
+        '''
+        if not j is None:
+            return self.clusts[j].get_quantiles(alpha, j, ks, dds)
+
+        if dds is None:
+            dds = range(self.d)
+
+        if ks is None:
+            if suco:
+                ks = range(len(self.mergeind))
+            else:
+                ks = range(self.K)
+
+        quantiles = np.zeros((len(ks), len(alpha), len(dds)))
+        for ik, k in enumerate(ks):
+            if suco:
+                clfs = [clust.get_classif_freq(k) for clust in self.clusts]
+                data = np.vstack([clust.data[clf.indices, :] for (clust, clf) in zip(self.clusts, clfs)])
+                weights = np.hstack([clf.data for clf in clfs])
+            else:
+                clusters = [clust.clusters[k] for clust in self.clusts]
+                data = np.vstack([cluster.data[cluster.indices, :] for cluster in clusters])
+                weights = np.vstack([cluster.weights for cluster in clusters])
+            weights = weights*1./np.sum(weights)
+            for idd, dd in enumerate(dds):
+                quantiles[ik, :, idd] = SampleClustering.quantile(
+                    data[:, dd], weights, alpha)
+        return quantiles
 
     @staticmethod
     def get_medprop_pers(prop, fixvalind=None, fixval=-1):
@@ -696,7 +733,7 @@ class SampleClustering(object):
             #print "nbr not nan in bhd[j]: {}".format(np.sum(~np.isnan(bhd[j])))
         return bhd
 
-    def get_pdip_discr_jkl(self, k, l, dim=None):
+    def get_dip_discr_jkl(self, k, l, dim=None):
         '''
             p-value of diptest of unimodality for the merger of super
             cluster k and l
@@ -725,7 +762,21 @@ class SampleClustering(object):
 
         xcum, ycum = diptest.cum_distr(dataproj[clf.indices], clf.data/W)
         dip = diptest.dip_from_cdf(xcum, ycum)
-        return diptest.dip_pval_tabinterpol(dip, W)
+        return dip, diptest.dip_pval_tabinterpol(dip, W)
+
+    def get_pdip_discr_jkl(self, k, l, dim=None):
+        '''
+            p-value of diptest of unimodality for the merger of super
+            cluster k and l
+
+            Input:
+                dim     - dimension along which the test should be
+                          performed. If dim is None, the test will be
+                          performed on the projection onto Fisher's
+                          discriminant coordinate.
+        '''
+        dip, pdip = self.get_dip_discr_jkl(k, l, dim)
+        return pdip
 
     def discriminant_projection(self, s1, s2):
         '''
@@ -737,6 +788,44 @@ class SampleClustering(object):
         dc = self.discriminant_coordinate(mu1, Sigma1, mu2, Sigma2)
         proj = np.dot(self.data, dc)
         return proj
+
+    def get_data_kd(self, min_clf, k, dd, suco=True):
+        '''
+            Get data points belonging to a certain cluster
+
+            min_clf    -    min classification frequency for the point into the given cluster
+            k          -    cluster number
+            dd         -    dimonsion for which data should be returned
+        '''
+        if suco:
+            clf = self.get_classif_freq(k)
+        else:
+            clf = self.clusters[k].classif_freq
+        return self.data[clf.indices[clf.data > min_clf], dd]
+
+    def get_quantiles(self, alpha, ks=None, dds=None, suco=False):
+        '''
+            Returns alpha quantile(s) in each dimension of sample j
+            (the pooled data if j = None) for each of the clusters.
+        '''
+
+        if ks is None:
+            ks = range(self.K)
+        if dds is None:
+            dds = range(self.d)
+
+        quantiles = np.zeros((len(ks), len(alpha), len(dds)))
+        for ik, k in enumerate(ks):
+            if suco:
+                clf = self.get_classif_freq(k)
+            else:
+                clf = self.clusters[k].classif_freq
+            data = self.data[clf.indices, :]
+            weights = clf.data*1./np.sum(clf.data)
+            for idd, dd in enumerate(dds):
+                quantiles[ik, :, idd] = self.quantile(
+                    data[:, dd], weights, alpha)
+        return quantiles
 
     @staticmethod
     def discriminant_coordinate(mu1, Sigma1, mu2, Sigma2):
@@ -760,7 +849,7 @@ class SampleClustering(object):
         y_sort = y[y_ord]
         cumdistr = np.cumsum(w[y_ord])
         q = np.empty(alpha.shape)
-        if cumdistr[-1] == 0:
+        if len(cumdistr) == 0 or cumdistr[-1] == 0:
             q[:] = float('nan')
             return q
         cumdistr /= cumdistr[-1]
@@ -775,44 +864,6 @@ class SampleClustering(object):
         if j < len(alpha):
             q[j:] = y_sort[-1]
         return q[np.argsort(alpha_ord)]
-
-    def get_data_kd(self, min_clf, k, dd, suco=True):
-        '''
-            Get data points belonging to a certain cluster
-
-            min_clf    -    min classification frequency for the point into the given cluster
-            k          -    cluster number
-            dd         -    dimonsion for which data should be returned
-        '''
-        if suco:
-            clf = self.get_classif_freq(k)
-        else:
-            clf = self.clusters[k].classif_freq
-        return self.data[clf.indices[clf.data > min_clf], dd]
-
-    # def get_quantiles(self, alpha, j=None, ks=None, dds=None):
-    #     '''
-    #         Returns alpha quantile(s) in each dimension of sample j (the pooled data if j = None) for each
-    #         of the clusters.
-    #     '''
-    #     if j is None:
-    #         clf = np.vstack(self.classif_freq)
-    #         data = np.vstack(self.data)
-    #     else:
-    #         clf = self.classif_freq[j]
-    #         data = self.data[j]
-
-    #     if ks is None:
-    #         ks = range(self.K)
-    #     if dds is None:
-    #         dds = range(self.d)
-
-    #     weights_all = clf/sum(clf[0, :])
-    #     quantiles = np.zeros((len(ks), len(alpha), len(dds)))
-    #     for ik, k in enumerate(ks):
-    #         for id, dd in enumerate(dds):
-    #             quantiles[ik, :, id] = quantile(data[:, dd], weights_all[:, k], alpha)
-    #     return quantiles
 
 
 class DataSetClustering(object):
