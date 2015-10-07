@@ -153,13 +153,14 @@ def simulate_data_( thetas, sigma_theta, sigmas, weights, nu = 100, ratio_act = 
 		p_ /= np.sum(p_)
 		mix_obj.p = p_
 		mix_obj.d = dim
-		Y_, x_ =  mix_obj.simulate_data2(np.int(np.floor(0.99*n_cells)))
+		#Y_, x_ =  mix_obj.simulate_data2(np.int(np.floor(0.99*n_cells)))
+		Y_, x_ =  mix_obj.simulate_data2(n_cells)
 		
 		noise_variance = np.eye(mix_obj.d)
 		np.fill_diagonal(noise_variance, np.var(Y_,0))
-		Y_noise = npr.multivariate_normal(np.mean(Y_,0), noise_variance, size = np.int(np.ceil(0.01*n_cells)))
-		Y_ = np.vstack((Y_,Y_noise))
-		np.random.shuffle(Y_)
+		#Y_noise = npr.multivariate_normal(np.mean(Y_,0), noise_variance, size = np.int(np.ceil(0.01*n_cells)))
+		#Y_ = np.vstack((Y_,Y_noise))
+		#np.random.shuffle(Y_)
 		Y.append(Y_)
 		x.append(x_)
 		
