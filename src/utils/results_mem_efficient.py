@@ -28,7 +28,7 @@ class Mres(object):
         self.p_noise = p_noise
         self.maxnbrsucocol = maxnbrsucocol
 
-        self.data = [dat + 0.003*np.random.randn(*dat.shape) for dat in self.data]
+        self.add_noise()
           # adding small amounts of noise to remove artifacts in the data
 
         if sim is None:
@@ -41,6 +41,9 @@ class Mres(object):
 
         self.mergeind = [[k] for k in range(self.K)]
         self.merged = False
+
+    def add_noise(self):
+        self.data = [dat + 0.003*np.random.randn(*dat.shape) for dat in self.data]
 
     @property
     def mergeind(self):

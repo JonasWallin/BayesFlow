@@ -67,8 +67,8 @@ class HMplot(object):
 
     @property
     def pop_lab(self):
-        if hasattr(self, '_population_lab'):
-            return self._population_lab
+        if hasattr(self, '_pop_lab'):
+            return self._pop_lab
         return None
 
     @pop_lab.setter
@@ -122,7 +122,7 @@ class HMplot(object):
                     ax.set_xticklabels(self.bmres.marker_lab)
                 ax.set_ylim(-.1, 1.1)
                 ax.axes.yaxis.set_ticks([.2, .8])
-        if hasattr(self, 'pop_lab') and not self.pop_lab is None:
+        if not self.pop_lab is None:
             ax.set_ylabel(self.pop_lab[self.order[k]])
         return axs
 
