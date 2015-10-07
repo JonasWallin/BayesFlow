@@ -113,15 +113,15 @@ class HMplot(object):
             if not np.isnan(quantiles[k, 0, 0]):
                 for dd in range(self.bmres.d):
                     plot.drawbox(quantiles[k, :, dd], boxloc[dd], boxw, ms, ax)
-                ax.axes.xaxis.set_ticks(boxloc)
-                xlim = ax.get_xlim()
-                ax.plot([xlim[0], xlim[1]], [.5, .5], color='grey')
-                if i < len(order):
-                    ax.set_xticklabels(['']*self.bmres.d)
-                else:
-                    ax.set_xticklabels(self.bmres.marker_lab)
-                ax.set_ylim(-.1, 1.1)
-                ax.axes.yaxis.set_ticks([.2, .8])
+            ax.axes.xaxis.set_ticks(boxloc)
+            xlim = ax.get_xlim()
+            ax.plot([xlim[0], xlim[1]], [.5, .5], color='grey')
+            if i < len(order):
+                ax.set_xticklabels(['']*self.bmres.d)
+            else:
+                ax.set_xticklabels(self.bmres.marker_lab)
+            ax.set_ylim(-.1, 1.1)
+            ax.axes.yaxis.set_ticks([.2, .8])
         if not self.pop_lab is None:
             ax.set_ylabel(self.pop_lab[self.order[k]])
         return axs

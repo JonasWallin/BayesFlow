@@ -420,7 +420,7 @@ class Mres(object):
             else:
                 clusters = [clust.clusters[k] for clust in self.clusts]
                 data = np.vstack([cluster.data[cluster.indices, :] for cluster in clusters])
-                weights = np.vstack([cluster.weights for cluster in clusters])
+                weights = np.hstack([cluster.weights for cluster in clusters])
             weights = weights*1./np.sum(weights)
             for idd, dd in enumerate(dds):
                 quantiles[ik, :, idd] = SampleClustering.quantile(
@@ -848,6 +848,8 @@ class SampleClustering(object):
         alpha = np.array(alpha)
         alpha_ord = np.argsort(alpha)
         alpha_sort = alpha[alpha_ord]
+        y = y[w > 0]
+        w = w[w > 0]
         y_ord = np.argsort(y)
         y_sort = y[y_ord]
         cumdistr = np.cumsum(w[y_ord])
