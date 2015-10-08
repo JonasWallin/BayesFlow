@@ -169,7 +169,7 @@ class HMres(Mres):
             raise BadQualityError('Not closest to own latent component, bhat: {}, eu: {}'.format(
                                   bh_out, eu_out))
 
-    def check_dip(self, savedir=None):
+    def check_dip(self, savedir=None, tol=20):
         self.get_pdip()
         fig_dip = self.plot.pdip()
         fig_dip_summary = self.plot.pdip_summary()
@@ -180,8 +180,8 @@ class HMres(Mres):
                                     type='pdf', transparent=False, bbox_inches='tight')
         else:
             plt.show()
-        if (self.get_pdip_summary(suco=True)['25th percentile'] < 0.28).any():
-            raise BadQualityError('25th percentile of pdip not ok')
+        if (np.sum(np.array(self.get_pdip(suco=True)) < 0.28)) > tol:
+            raise BadQualityError('Too many pdip not ok')
 
     def check_emd(self, N=5, savedir=None):
         emd, emd_dim = self.earth_movers_distance_to_generated()
@@ -252,7 +252,7 @@ class HMres(Mres):
     def K_active(self):
         return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
 
-    def earth_movers_distance_to_generated(self, rho=1):
+    def earth_movers_distance_to_generated(self, gamma=1):
         if hasattr(self, '_earth_movers_distance_to_generated'):
             return self._earth_movers_distance_to_generated, self._emd_dims
         emds = []
@@ -263,7 +263,7 @@ class HMres(Mres):
             emds.append(
                 np.array(EMD_to_generated_from_model(
                     DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
-                    gamma=1, nbins=50, dims=dims, rho=rho))
+                    gamma=gamma, nbins=50, dims=dims))
                 * (1./N_synsamp))
             print "\r EMD computed for {} samples".format(j+1),
         print "\r ",
