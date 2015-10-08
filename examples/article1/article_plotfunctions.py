@@ -109,6 +109,45 @@ def plotQ(Qs):
 		figs.append(fig)
 	return figs
 
+
+def plot_mu_abs(mu_vs_theta):
+	'''
+		figures for displaying the difference between
+		using mus and thetas for cluster centers.
+		using theta corresponds to pooling the data 
+	'''
+	d = mu_vs_theta.shape[1]
+	K = mu_vs_theta.shape[0]
+	y_lim = [0, np.max(mu_vs_theta)+ 0.1 * np.abs(np.max(mu_vs_theta))]
+	fig = plt.figure(figsize=(1.5 * d,1.1 * (int(np.ceil(K/4))+1)))
+	fig.subplots_adjust(hspace=1.25, wspace=0)
+	ra = 0.1	
+	for j in range(K):
+		xticklabels = []
+		ax = plt.subplot2grid((int(np.ceil(K/4))+1, 4), (int(np.round(j/4)) ,j % 4))
+		
+		for i in range(d):
+			xticklabels.append("%d"%(i + 1))
+		
+		ax.plot(np.array(range(d))*ra, mu_vs_theta[j,:],'o',color='black')
+		ax.set_xlim([-.02,(d-1)*ra+.02])
+		plt.setp(ax, xticklabels=xticklabels)
+		ax.xaxis.set_ticks(np.array(range(d))*ra)
+		ax.tick_params(labeltop='off', labelright='off')
+		ax.xaxis.set_ticks_position('none')
+		ax.yaxis.set_ticks_position('none')
+		ax.set_ylim(y_lim)
+		if j < K-1:
+			ax.yaxis.set_ticks([])
+		else:
+			ax.yaxis.tick_right()
+			ax.axes.yaxis.set_ticks(np.linspace(y_lim[0],y_lim[1],2))
+			ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
+		ax.set_xlabel(r"$\boldsymbol{\mu}_{.,%d}$"%(j + 1), fontsize = 14)
+		ax.xaxis.set_label_coords(0.5, -0.65) 
+	
+	return fig
+
 def plot_theta(theta_percentile, theta_percentile_true = None):
 	'''
 		To plot one need to add the options:

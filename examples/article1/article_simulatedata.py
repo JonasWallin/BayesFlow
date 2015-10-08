@@ -41,8 +41,8 @@ def simulate_data_v2(n_cells, n_persons, seed = None, silent = True):
 		sys.stdout.flush()
 	
 	nu = 100
-	ratio_act = np.array([ 1.,  0.95,  0.2,  0.1 ,  0.9,  1,  1,
-		1,  1 ,  1,  0.95,  0.99])
+	ratio_act = np.array([ 1.,  0.5,  0.5,  0.5 ,  0.5,  1,  1,
+		1,  1 ,  1,  1,  1])
 	ratio_act = np.ones(ratio_act.shape) #warning warning test
 	Y, act_Class, mus, x  = simulate_data_( thetas = thetas,
 					 sigma_theta = sigma_theta, 
