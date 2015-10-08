@@ -32,7 +32,7 @@ class Mres(object):
           # adding small amounts of noise to remove artifacts in the data
 
         if sim is None:
-            sim = np.sum(classif_freq[0].tocsr().getrow(0))
+            sim = np.sum(classif_freq[0].tocsr().getrow(0).data)
         self.clusts = []
         for j in range(self.J):
             self.clusts.append(SampleClustering(self.data[j], classif_freq[j],

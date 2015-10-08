@@ -217,8 +217,8 @@ class HMres(Mres):
                 super(HMres, self).self.gclean()
             else:
                 super(HMres, self).merge(method, thr, **mmfArgs)
-            self.components.mergeind = self.mergeind
-            self.plot = HMplot(self, self.meta_data.marker_lab)
+            #self.components.mergeind = self.mergeind
+            #self.plot = HMplot(self, self.meta_data.marker_lab)
             for i in range(self.comm.Get_size()):
                 self.comm.send(self.mergeind, dest=i, tag=2)
         else:
@@ -252,7 +252,7 @@ class HMres(Mres):
     def K_active(self):
         return np.sum(np.sum(self.active_komp > 0.05, axis=0) > 0)
 
-    def earth_movers_distance_to_generated(self, rho=1):
+    def earth_movers_distance_to_generated(self, gamma=1):
         if hasattr(self, '_earth_movers_distance_to_generated'):
             return self._earth_movers_distance_to_generated, self._emd_dims
         emds = []
@@ -263,7 +263,7 @@ class HMres(Mres):
             emds.append(
                 np.array(EMD_to_generated_from_model(
                     DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
-                    gamma=1, nbins=50, dims=dims, rho=rho))
+                    gamma=gamma, nbins=50, dims=dims))
                 * (1./N_synsamp))
             print "\r EMD computed for {} samples".format(j+1),
         print "\r ",

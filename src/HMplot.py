@@ -63,7 +63,7 @@ class HMplot(object):
             self.cop.marker_lab = marker_lab
         if hasattr(self, 'mcsp'):
             for mc in self.mcsp:
-                self.mcsp[mc] = marker_lab
+                self.mcsp[mc].marker_lab = marker_lab
 
     @property
     def pop_lab(self):
@@ -139,6 +139,7 @@ class HMplot(object):
 
         if name in self.mcsp:
             loadsyn = True
+            print "self.mcsp[name] = {}".format(self.mcsp[name])
         else:
             loadsyn = False
             print "no mimic found, generating new data"
