@@ -176,7 +176,7 @@ def dip_from_cdf(xF,yF,plotting=False,verbose=False,eps=1e-12):
 
     return D/2			
 
-def dip_pval_tabinterpol(dip,N):
+def dip_pval_tabinterpol(dip, N):
     '''
         Tablulated values are obtained from R package 'diptest', which is
         installed if it is not done previsously. Alternatively, it can be

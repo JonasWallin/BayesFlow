@@ -18,12 +18,12 @@ K = 11
 d = 8
 if MPI.COMM_WORLD.Get_rank() == 0:  # @UndefinedVariable 
 	save_data = True
-	SIM          = 100#5000
-	SIM_burnin_1 = 100#20
-	SIM_burnin_2 = 100#5000
-	N_CELLS = 15*10**2#4
+	SIM          = 5000
+	SIM_burnin_1 = 400#20
+	SIM_burnin_2 = 5000
+	N_CELLS = 15*10**4
 	THIN = 1
-	N_PERSONS = 32*1#6
+	N_PERSONS = 32*6
 	data = {'SIM': SIM, 
 		    'N_CELLS': N_CELLS, 
 		    'THIN': THIN, 
@@ -73,8 +73,8 @@ hier_gmm = setup_model(y, K)
 #hier_gmm.set_prior(prior, init=False)
 
 
-HGMM_pre_burnin(hier_gmm)
 hier_gmm.add_noise_class()
+HGMM_pre_burnin(hier_gmm, iteration = 20)
 burin_1(hier_gmm, sim = SIM_burnin_1 )
 burin_2(hier_gmm, sim = SIM_burnin_2, p_act = [0., 0.] )
 

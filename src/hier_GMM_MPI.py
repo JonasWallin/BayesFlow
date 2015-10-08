@@ -612,18 +612,25 @@ class hierarical_mixture_mpi(object):
     def set_latent_init(self, prior=None, thetas=None, expSigmas=None,
                         method='random', **initkw):
 
+        if thetas is None:
+            thetas = []
+        if expSigmas is None:
+            expSigmas = []
+
         rank = self.comm.Get_rank()
 
         if method == 'EM_pooled':
             data = [gmm.data for gmm in self.GMMs]
-            thetas, expSigmas, _ = EM_pooled(self.comm, data, self.K, **initkw)
+            thetas_EM, expSigmas_EM, _ = EM_pooled(self.comm, data, self.K-len(thetas), **initkw)
+            thetas += thetas_EM
+            expSigmas += expSigmas_EM
 
         if rank == 0:
             for k in range(self.K):
                 # Prior for mu_jk
                 npw = self.normal_p_wisharts[k]
                 npwparam = {}
-                if thetas is None:
+                if len(thetas) == 0:
                     npwparam['theta'] = npw.theta_class.mu_p
                     if k >= prior.K_inf:
                         npwparam['theta'] = (npwparam['theta']
@@ -827,12 +834,17 @@ class hierarical_mixture_mpi(object):
         
         if rank == 0:
             recv_obj = np.empty((self.n_all, self.K  + self.noise_class),dtype='d')
+            send_size = np.zeros_like(self.counts)
+            send_size[:] = self.counts[:]
+            send_size[send_size>0] += self.noise_class
         else:
             recv_obj = None
+            send_size = 0
+        
         
         
         send_obj = np.array([GMM.active_komp.flatten()  for GMM in self.GMMs ],dtype='d')
-        self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, (self.counts + self.n_all*self.noise_class  , None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
+        self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[recv_obj, (send_size  , None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
 
         return recv_obj        
         

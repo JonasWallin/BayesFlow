@@ -64,7 +64,7 @@ class HMres(Mres):
 
             self.components = Components(hmlog, self.p)
 
-            self.plot = HMplot(self, self.meta_data.marker_lab)
+            self.plot = HMplot(self)
 
             self.quality = {}
             self.mergeind = self.mergeind  # make all attributes have same mergeind
@@ -217,8 +217,8 @@ class HMres(Mres):
                 super(HMres, self).self.gclean()
             else:
                 super(HMres, self).merge(method, thr, **mmfArgs)
-            self.components.mergeind = self.mergeind
-            self.plot = HMplot(self, self.meta_data.marker_lab)
+            #self.components.mergeind = self.mergeind
+            #self.plot = HMplot(self, self.meta_data.marker_lab)
             for i in range(self.comm.Get_size()):
                 self.comm.send(self.mergeind, dest=i, tag=2)
         else:

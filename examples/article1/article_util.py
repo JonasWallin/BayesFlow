@@ -66,8 +66,10 @@ def draw_outlier_point(GMM, prec = 0.1):
 	GMM.compute_ProbX(norm=False)
 	l  =np.max(GMM.prob_X,1)
 	index  = l < np.percentile(l,0.1)
-	index_p = np.random.randint(0.1*GMM.data.shape[0])
-	point_ = GMM.data[index[index_p],:]
+	
+	points_ = GMM.data[index,:]
+	index_p = np.random.randint(points_.shape[0])
+	point_ = points_[index_p,:]
 	return(point_)
 
 
