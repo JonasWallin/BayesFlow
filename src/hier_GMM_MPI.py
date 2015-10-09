@@ -636,9 +636,10 @@ class hierarical_mixture_mpi(object):
                         npwparam['theta'] = (npwparam['theta']
                                              + np.random.normal(0, .3, self.d))
                 else:
-                    npwparam['theta'] = thetas[k]
+                    npwparam['theta'] = thetas[k].reshape(-1)
                 npwparam['Sigma'] = (npw.Sigma_class.Q /
                                      (npw.Sigma_class.nu-self.d-1))
+                print "npwparam = {}".format(npwparam)
                 npw.set_parameter(npwparam)
 
                 # Prior for Sigma_jk

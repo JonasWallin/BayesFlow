@@ -295,36 +295,28 @@ class HMplot(object):
 
             return axs
 
-    def prob_bars(self, suco=True, fig=None, js=None):
-        if fig is None:
-            fig = plt.figure()
+    def qhist(self, j, k, dd, ax=None, **figargs):
+        '''
+            Histogram of quantiles for each cluster. Useful for
+            inspecting dip.
+        '''
+        if ax is None:
+            fig, ax = plt.subplot(**figargs)
 
-        if suco:
-            order = self.suco_ord
-            colors = self.suco_colors
-            prob = self.bmres.p_merged
-        else:
-            order = self.comp_ord
-            colors = self.comp_colors
-            prob = self.bmres.p
+        alpha = np.linspace(0, 1, 500)
+        quantiles = self.bmres.get_quantiles(alpha, j, [k], [dd])
 
-        if js is None:
-            js = range(self.bmres.J)
-
-        prob_list = [prob[j, :] for j in js]
-        J = len(js)
-        ymax = 1.2*np.max(prob_list)
-
-        for i, j in enumerate(js):
-            ax = fig.add_subplot(J, 1, i+1)
-            plot.plot_pbars(prob[i], 0, ymax, order=order, colors=colors, ax=ax)
-
-        return fig
+        rangex = (-.2, 1.2)
+        ax.hist(quantiles.reshape(-1), bins=200, color=self.suco_colors[k],
+                range=rangex)
+        ax.set_xlim(rangex)
+        return ax
 
     def scatter(self, dim, j, ax=None):
         '''
             Plots the scatter plot of the data over dim.
-            Clusters are plotted with their canonical colors (see BMPlot).
+            Clusters are plotted with their canonical
+            colors (see BMPlot).
         '''
         if ax is None:
             fig = plt.figure()
@@ -856,20 +848,18 @@ class TracePlot(object):
     def order(self):
         return self.traces.comp_ord
 
-    def all(self, fig=None, yscale=True):
+    def all(self, axs=None, yscale=True, **figargs):
         '''
             Plot trace plots of latent means and nus.
         '''
-        if fig is None:
-            fig = plt.figure()
-        for k in range(self.traces.K):
-            ax = plt.subplot2grid((1, self.traces.K), (0, k))
+        if axs is None:
+            fig, axs = plt.subplots(1, self.traces.K, **figargs)
+        for k, ax in enumerate(axs):
+            if k >= self.traces.K:
+                return axs
             self.mulat(k, ax, yscale)
-            ax.set_title('theta_'+'{}'.format(k+1))
-        # ax = plt.subplot2grid((1, self.traces.K+1), (0, k+1))
-        # self.nu(ax)
-        # ax.set_title('nu', fontsize=16)
-        return fig, ax
+            ax.set_title(r'$\theta_{%d}$' % (k+1))
+        return axs
 
     def mulat(self, k, ax=None, yscale=True):
         if ax is None:
@@ -880,7 +870,7 @@ class TracePlot(object):
         if yscale:
             ax.set_ylim(-.2, 1.2)
             ax.axes.yaxis.set_ticks([0.1, 0.9])
-        plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+            ax.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
 
     def nu(self, ax=None):
         if ax is None:
@@ -890,7 +880,8 @@ class TracePlot(object):
         ax.set_xlim(0, self.traces.ind[-1])
         ax.set_yscale('log')
         ax.axes.yaxis.set_ticks([100, 1000])
-        plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+        ax.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+        ax.set_title(r'$\nu$')
 
     def nu_sigma(self, ax=None):
         if ax is None:
@@ -898,7 +889,8 @@ class TracePlot(object):
             ax = fig.add_subplot(111)
         ax.plot(self.traces.ind, self.traces.get_nu_sigma())
         ax.set_xlim(0, self.traces.ind[-1])
-        plt.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+        ax.axvspan(0, self.traces.burnind[-1], facecolor='0.5', alpha=0.5)
+        ax.set_title(r'$r$')
 
 
 class MimicPlot(object):

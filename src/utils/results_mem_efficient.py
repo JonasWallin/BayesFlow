@@ -400,7 +400,7 @@ class Mres(object):
             (the pooled data if j = None) for each of the clusters.
         '''
         if not j is None:
-            return self.clusts[j].get_quantiles(alpha, j, ks, dds)
+            return self.clusts[j].get_quantiles(alpha, ks, dds, suco=suco)
 
         if dds is None:
             dds = range(self.d)
@@ -442,6 +442,7 @@ class Mres(object):
         for ind in fixvalind:
             if len(ind) == 1:
                 med_prop[ind, :] = fixval
+                med_prop[:, ind] = fixval
             else:
                 med_prop[ind[0], ind[1]] = fixval
                 med_prop[ind[1], ind[0]] = fixval
@@ -466,6 +467,7 @@ class Mres(object):
         for ind in fixvalind:
             if len(ind) == 1:
                 med_prop[ind, :] = fixval
+                med_prop[:, ind] = fixval
             else:
                 med_prop[ind[0], ind[1]] = fixval
                 med_prop[ind[1], ind[0]] = fixval
@@ -806,7 +808,7 @@ class SampleClustering(object):
             clf = self.clusters[k].classif_freq
         return self.data[clf.indices[clf.data > min_clf], dd]
 
-    def get_quantiles(self, alpha, ks=None, dds=None, suco=False):
+    def get_quantiles(self, alpha, ks=None, dds=None, suco=True):
         '''
             Returns alpha quantile(s) in each dimension of sample j
             (the pooled data if j = None) for each of the clusters.
