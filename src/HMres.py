@@ -27,7 +27,7 @@ class HMres(Mres):
     """
 
     def __init__(self, hmlog, hmlog_burn, data, meta_data,
-                 comm=MPI.COMM_WORLD, maxnbrsucocol=8):
+                 comm=MPI.COMM_WORLD, maxnbrsucocol=7):
         self.comm = comm
         self.rank = comm.Get_rank()
         if self.rank == 0:

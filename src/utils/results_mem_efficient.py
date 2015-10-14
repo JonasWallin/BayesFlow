@@ -19,7 +19,7 @@ from .plot_util import get_colors
 class Mres(object):
 
     def __init__(self, d, K, p, classif_freq, p_noise=None, sim=None,
-                 maxnbrsucocol=8):
+                 maxnbrsucocol=7):
 
         self.d = d
         self.K = K  # NB! Noise cluster not included in this
@@ -61,14 +61,14 @@ class Mres(object):
         self._suco_ord = np.argsort(-np.sum(self.p_merged, axis=0))
         self._comp_ord = [ind for sco in self._suco_ord for ind in self._mergeind[sco]]
         self._comp_colors, self._suco_colors = get_colors(
-            self._mergeind, self._suco_ord, self._comp_ord, self.maxnbrsucocol)
+            self._mergeind, self._suco_ord, self.maxnbrsucocol)
+        self._sucoid = np.array([s for k in range(self.K) for (s, comp) in
+                                 enumerate(self.mergeind) if k in comp])
         for clust in self.clusts:
             clust.mergeind = self.mergeind
 
     @property
     def mergeind_sorted(self):
-        print "self.mergeind = {}".format(self.mergeind)
-        print "self.suco_ord = {}".format(self.suco_ord)
         return [self.mergeind[sco] for sco in self.suco_ord]
 
     @property
@@ -86,6 +86,10 @@ class Mres(object):
     @property
     def suco_colors(self):
         return self._suco_colors
+
+    @property
+    def sucoid(self):
+        return self._sucoid
 
     @property
     def p_merged(self):
