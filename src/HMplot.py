@@ -8,7 +8,6 @@ Created on Fri Jan  2 18:13:22 2015
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
 
 from . import plot
 from .utils.results_mem_efficient import DataSetClustering
@@ -104,10 +103,7 @@ class HMplot(object):
         boxw = (boxloc[1] - boxloc[0])/3.5
         ms = 10
 
-        if suco:
-            order = self.bmres.suco_ord
-        else:
-            order = self.bmres.comp_ord
+        order = self.suco_ord if suco else self.comp_ord
 
         for i, (ax, k) in enumerate(zip(axs, order)):
             if not np.isnan(quantiles[k, 0, 0]):
@@ -116,10 +112,10 @@ class HMplot(object):
             ax.axes.xaxis.set_ticks(boxloc)
             xlim = ax.get_xlim()
             ax.plot([xlim[0], xlim[1]], [.5, .5], color='grey')
-            if i < len(order):
+            if i < min(len(order), len(axs))-1:
                 ax.set_xticklabels(['']*self.bmres.d)
             else:
-                ax.set_xticklabels(self.bmres.marker_lab)
+                ax.set_xticklabels(self.marker_lab)
             ax.set_ylim(-.1, 1.1)
             ax.axes.yaxis.set_ticks([.2, .8])
         if not self.pop_lab is None:
@@ -193,13 +189,17 @@ class HMplot(object):
         #    sampmarkers = [(4, 0, 45), (3, 0), (0, 3), (4, 2)]
         #if poplabsh is None:
         #    poplabsh = [[0, 0], [0, -.02], [0, 0], [-.1, 0], [.22, 0], [.06, -.06]]
-        plot.pca_biplot(self.bmres.p_merged, comp, ax, varcol=self.suco_colors,
+        non_active = np.sum((self.bmres.active_komp > 0.05), axis=0) == 0
+        non_active_suco = np.array([non_active[np.array(suco)].all() for suco in self.bmres.mergeind])
+        plot.pca_biplot(self.bmres.p_merged[:, ~non_active_suco], comp, ax,
+                        varcol=[col for k, col in enumerate(self.suco_colors)
+                                if not non_active_suco[k]],
                         varlabels=self.pop_lab, varlabsh=poplabsh,
                         sampleid=self.bmres.meta_data.samp['donorid'],
                         sampmarkers=sampmarkers)
 
     def pca_screeplot(self, ax=None):
-        plot.pca_screeplot(self.bmres.p, ax)
+        plot.pca_screeplot(self.bmres.p_merged, ax)
 
     def pdip(self, suco=True, fig=None, colorbar=True):
         '''
@@ -407,68 +407,6 @@ class ClustPlot(object):
     #             ax.set_ylim(0, 1)
     #             ax.axes.yaxis.set_ticks([])
     #     return fig
-    
-    # def qhist(self, j=None, ks=None, dds=None, fig=None, totplots=1, plotnbr=1):
-    #     '''
-    #         Histogram of quantiles for each cluster. Useful for inspecting dip.
-    #     '''
-    #     if fig is None:
-    #         fig = plt.figure()
-      
-    #     alpha = np.linspace(0, 1, 500)
-    #     quantiles = self.clust.get_quantiles(alpha, j, ks, dds)
-        
-    #     if ks is None:
-    #         ks = range(self.K)
-    #     ks_ord = [self.order[k] for k in ks]
-    #     ks = ks_ord
-    #     if dds is None:
-    #         dds = range(self.clust.d)
-    #     d = len(dds)
-    #     print "d = {}".format(d)
-    #     nbr_cols = d*totplots + totplots-1
-    #     print "nbr_cols = {}".format(nbr_cols)
-    #     col_start = (d+1)*(plotnbr-1)
-
-    #     for ik, k in enumerate(ks):
-    #         for id, dd in enumerate(dds):
-    #             ax = fig.add_subplot(self.clust.K, nbr_cols, k*nbr_cols + col_start + dd + 1)
-    #             ax.hist(quantiles[ik, :, id], bins = 50, color=self.colors[k])
-    #             ax.axes.xaxis.set_ticks([])
-    #             ax.axes.yaxis.set_ticks([])
-    #     return fig
-        
-        
-    # def qhist_dipcrit(self, q=.25, fig=None, totplots=1, plotnbr=1):
-    #     '''
-    #         Histogram of quantiles for the sample with dip at the qth quantile.
-    #         I.e. q=.25 displays quantiles for the sample which has its dip at the
-    #         0.25th quantile among the samples.
-    #     '''
-    #     if fig is None:
-    #         fig = plt.figure()
-    #     alpha = np.linspace(0, 1, 500)
-    #     K = self.clust.K
-    #     d = self.clust.d
-    #     pdiplist = self.clust.get_pdip() 
-
-    #     nbr_cols = d*totplots + totplots-1
-    #     col_start = (d+1)*(plotnbr-1)  
-    #     #qind = np.int(K*q)-1
-    #     jq = np.zeros((K, d), dtype='i')
-    #     for ik, k in enumerate(self.order):
-    #         pd = pdiplist[k]
-    #         K_loc = sum(~np.isnan(pd[:, 0]))
-    #         for dd in range(d):
-    #             qind = max(np.int(K_loc*q)-1, 0)
-    #             jq[k, dd] = np.argsort(pd[:, dd])[qind]
-    #             quantiles = self.clust.get_quantiles(alpha, jq[k, dd], [k], [dd])[0, :, 0]
-    #             ax = fig.add_subplot(self.clust.K, nbr_cols, ik*nbr_cols + col_start + dd + 1)
-    #             ax.hist(quantiles, bins = 50, color=self.colors[k], range=(-0.1, 1.4))
-    #             ax.set_xlim((-0.1, 1.4))
-    #             ax.axes.xaxis.set_ticks([0, 0.5, 1])
-    #             ax.axes.yaxis.set_ticks([])
-    #     return fig
 
     # def chist_allsamp(self, min_clf, dd, ks, fig=None, ncol=4):
     #     '''
@@ -502,31 +440,7 @@ class ClustPlot(object):
     #             ax.hist(data, bins=50, color=self.colors[self.order[k]], alpha = .7, range = (-0.1, 1.4))
     #     return ax
 
-    # def scatter(self, dim, j, fig=None):
-    #     '''
-    #         Plots the scatter plot of the data over dim.
-    #         Clusters are plotted with their canonical colors (see BMPlot).
-    #     '''
-    #     if fig is None:
-    #         fig = plt.figure()
-    #     ax = fig.add_subplot(111)
-    			
-    #     data = self.clust.data[j][:, dim]
-    #     x = self.clust.sample_x(j)
 
-    #     if len(dim) == 2:
-    #         for k in range(self.clust.K):
-    #             ax.plot(data[x==k, 0], data[x==k, 1], '+', label='k = %d'%(k+1), color=self.colors[k])
-    #         ax.plot(data[x==self.clust.K, 0], data[x==self.clust.K, 1], '+', label='outliers', color='black')
-        
-    #     elif len(dim) == 3:
-    #         ax = fig.gca(projection='3d')
-    #         for k in range(self.clust.K):
-    #             ax.plot(data[x==k, 0], data[x==k, 1], data[x==k, 2], '+', label='k = %d'%(k+1), color=self.colors[k])
-    #         ax.plot(data[x==self.clust.K, 0], data[x==self.clust.K, 1], data[x==self.clust.K, 2], '+', label='outliers', color='black')
-    						
-    #     return fig, ax
-        
 class CompPlot(object):
 
     def __init__(self, components):
@@ -557,31 +471,32 @@ class CompPlot(object):
 
             If suco=True, components belonging to the same super
             component are plotted in the same panel.
+
+            ks can be used to select a subset of components to be
+            plotted. The input ks should be given relative to the
+            canoncial order (i.e. the order that they are plotted).
         '''
 
         colors = [col[:-1]+(alpha, ) for col in self.comp_colors]
 
         if suco:
-            comps_list = copy.deepcopy(self.comp.mergeind)
-            order = list(self.suco_ord)[:]
+            comps_list = self.comp.mergeind
+            order = self.suco_ord
         else:
             comps_list = [[k] for k in range(self.comp.K)]
-            order = list(self.comp_ord)[:]
+            order = self.comp_ord
 
-        if not ks is None:
-            ks = [self.comp_ord[k] for k in ks]
-            s = 0
-            while s < len(comps_list):
-                comp = comps_list[s]
-                for k in comp:
-                    if k not in ks:
-                        comp.remove(k)
-                if len(comp) == 0:
-                    comps_list.pop(s)
-                    order.remove(s)
-                    order = [o-1 if o > s else o for o in order]
-                else:
-                    s += 1
+        non_active = np.sum(self.comp.active_komp > 0.05, axis=0) == 0
+
+        if not ks is None or sum(non_active) > 0:
+            if ks is None:
+                ks = np.nonzero(~non_active)[0]
+            else:
+                ks = [comp for k, comp in enumerate(self.comp_ord[k])
+                      if k in ks and ~non_active[comp]]
+                # Input ks relative to the on canonical order of components
+            comps_list = [[k for k in comp if k in ks] for comp in comps_list]
+            order = [order_ for order_ in order if len(comps_list[order_]) > 0]
 
         if not with_outliers:
             outliers = self.comp.mu_outliers
@@ -591,7 +506,6 @@ class CompPlot(object):
 
         for i, (ax, s) in enumerate(zip(axs, order)):
             comps = comps_list[s]
-            #print "comps = {}".format(comps)
             for k in comps:
                 mu_ks = self.comp.mupers[:, k, :]
                 if not with_outliers:
@@ -599,16 +513,13 @@ class CompPlot(object):
                 for j in range(self.comp.J):
                     ax.plot(range(self.comp.d), mu_ks[j, :], color=colors[k])
                 ax.plot([0, self.comp.d-1], [.5, .5], color='grey')
+
             if i == len(order)-1:
                 ax.axes.xaxis.set_ticks(range(self.comp.d))
                 ax.set_xticklabels(self.marker_lab)
             else:
                 ax.axes.xaxis.set_ticks([])
-            if not yscale:
-                pass
-                #ax.axes.yaxis.set_ticks([])
-                #ax.set_ylim(0, 1)
-            else:
+            if yscale:
                 ax.axes.yaxis.set_ticks([.2, .8])
                 ax.set_ylim(-.1, 1.1)
         return axs
@@ -669,8 +580,9 @@ class CompPlot(object):
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
 
-    def latent(self, dim, ax=None, ks=None, plim=[0, 1], plotlab=False, plotlabx=False, plotlaby=False,
-               plot_new_th=True, lw=2, lims=None):
+    def latent(self, dim, ax=None, ks=None, plim=[0, 1], plotlab=False,
+               plotlabx=False, plotlaby=False, plot_new_th=True,
+               lw=2, lims=None):
         '''
             Plot visualization with ellipses of the latent components.
             Canonical colors are used (see HMplot).
@@ -681,7 +593,6 @@ class CompPlot(object):
             plim    -   only components with size within plim are plotted
             plotlab -   should labels be shown?
         '''
-        #print "suco_list = {}".format(suco_list)
         if ax is None:
             f = plt.figure()
             ax = f.add_subplot(111)
@@ -690,7 +601,12 @@ class CompPlot(object):
 
         if ks is None:
             ks = range(self.comp.K)
-        ks = [self.comp_ord[k] for k in ks]
+
+        non_active = np.sum(self.comp.active_komp > 0.05, axis=0) == 0
+        ks = [comp for k, comp in enumerate(self.comp_ord)
+              if k in ks and ~non_active[comp]]
+            # input ks are given relative to canonical order
+        #[self.comp_ord[k] for k in ks if ~non_active[k]]
         okcl = set.intersection(set(self.within_plim(plim)), set(ks))
 
         mus = [self.comp.mulat[k, :] for k in okcl]
@@ -700,7 +616,8 @@ class CompPlot(object):
         q = plot.component_plot(mus, Sigmas, dim, ax, colors=colors, lw=lw)
 
         if hasattr(self.comp, 'new_thetas') and plot_new_th:
-            ax.scatter(self.comp.new_thetas[:, dim[0]], self.comp.new_thetas[:, dim[1]], s=40, c='k', marker='+')
+            ax.scatter(self.comp.new_thetas[:, dim[0]],
+                       self.comp.new_thetas[:, dim[1]], s=40, c='k', marker='+')
 
         if plotlab or plotlabx:
             ax.set_xlabel(self.marker_lab[dim[0]], fontsize=16)
@@ -712,7 +629,8 @@ class CompPlot(object):
 
         return q
 
-    def allsamp(self, dim, ax=None, ks=None, plim=[0, 1], js=None, names=None, plotlab=False, plotlabx=False, plotlaby=False,
+    def allsamp(self, dim, ax=None, ks=None, plim=[0, 1], js=None, names=None,
+                plotlab=False, plotlabx=False, plotlaby=False,
                 plot_new_th=True, lw=1, lims=None):
 
         '''
@@ -788,9 +706,9 @@ class CompPlot(object):
             fig = plt.figure()
 
         for m in range(len(dimlist)):
-            ax1 = fig.add_subplot(len(dimlist), 2, 2*m+1)#plt.subplot2grid((2, 2), (m, 0))
+            ax1 = fig.add_subplot(len(dimlist), 2, 2*m+1)
             ql = self.latent(dimlist[m], ax1, ks, plim)
-            ax2 = fig.add_subplot(len(dimlist), 2, 2*m+2)#plt.subplot2grid((2, 2), (m, 1))
+            ax2 = fig.add_subplot(len(dimlist), 2, 2*m+2, sharex=ax1, sharey=ax1)
             qa = self.allsamp(dimlist[m], ax2, ks, plim, js)
 
             if m == 0:
