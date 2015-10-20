@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+import numpy.ma as ma
 import scipy.stats as stats
 from sklearn import mixture as skmixture
 import matplotlib.pyplot as plt
@@ -260,27 +261,38 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
 
 #@profile
 def E_step_pooled(comm, data, weights):
+    weights = [ma.masked_array(weight, np.isnan(weight)) if np.isnan(weight).any()
+               else weight for weight in weights]
     weights_mpi = WeightsMPI(comm, weights)
     if weights_mpi.W == 0:
         raise EmptyClusterError
     #print "tot weight of cluster = {}".format(weights_mpi.W)
-    mu_loc = sum([np.sum(dat*weights[j].reshape(-1, 1), axis=0)
-                  for j, dat in enumerate(data)])
+    mu_loc = sum([np.sum(dat*weight.reshape(-1, 1), axis=0)
+                  for weight, dat in zip(weights, data)])
     mu = sum(comm.bcast(comm.gather(mu_loc)))/weights_mpi.W
     if weights_mpi.W < data[0].shape[1]:
         Sigma = np.eye(data[0].shape[1])
     else:
-        wXXT_loc = np.zeros((data[0].shape[1], data[0].shape[1]))
-        for j, dat in enumerate(data):
-            if weights[j].shape == (dat.shape[0], 1):
-                wXXT_loc += (dat*weights[j]).T.dot(dat)
-            elif weights[j].shape == (dat.shape[0],):
-                wXXT_loc += (dat*weights[j][:, np.newaxis]).T.dot(dat)
-            else:
-                raise ValueError("weight has shape {}".format(weights[j].shape))
-            # for i in range(dat.shape[0]):
-            #     x = dat[i, :].reshape(-1, 1)
-            #     wXXT_loc += weights[j][i]*x.dot(x.T)
+        if weights[0].shape == (data[0].shape[0], 1):
+            #wXXT_loc = sum([(dat*weight).T.dot(dat) for (weight, dat) in
+            #               zip(weights, data)])
+            wXXT_loc = sum([np.ma.dot((dat*weight).T, dat) for (weight, dat) in
+                           zip(weights, data)])
+        elif weights[0].shape == (data[0].shape[0], ):
+            #wXXT_loc = sum([(dat*weight[:, np.newaxis]).T.dot(dat)
+            #                for (weight, dat) in zip(weights, data)])
+            wXXT_loc = sum([np.ma.dot((dat*weight[:, np.newaxis]).T, dat)
+                            for (weight, dat) in zip(weights, data)])
+        else:
+            raise ValueError("weight has shape {}".format(weights[0].shape))
+        # wXXT_loc = np.zeros((data[0].shape[1], data[0].shape[1]))
+        # for j, dat in enumerate(data):
+        #     if weights[j].shape == (dat.shape[0], 1):
+        #         wXXT_loc += (dat*weights[j]).T.dot(dat)
+        #     elif weights[j].shape == (dat.shape[0],):
+        #         wXXT_loc += (dat*weights[j][:, np.newaxis]).T.dot(dat)
+        #     else:
+        #         raise ValueError("weight has shape {}".format(weights[j].shape))
         wXXT = sum(comm.bcast(comm.gather(wXXT_loc)))/weights_mpi.W
         Sigma = wXXT - mu.reshape(-1, 1).dot(mu.reshape(1, -1))
 

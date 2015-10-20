@@ -12,6 +12,7 @@ import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+
 def HGMM_pre_burnin(Hier_GMM, init_iter=40, prec=1, iteration=10, mutate_iteration=20,
                     burst_iteration=20, local_iter=5, silent=False):
     """
