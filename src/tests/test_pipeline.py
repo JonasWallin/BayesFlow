@@ -29,7 +29,7 @@ def some_small_clusters_some_empty(K, q):
 
 def one_small_rare_cluster(K):
     p = np.ones(K)
-    if np.random.rand() < 1:#0.2:
+    if np.random.rand() < 1:  # 0.2:
         p[0] = 0.002
     else:
         p[0] = 0
@@ -181,7 +181,7 @@ class Pipeline(object):
         t1 = time.time()
         print "pre burnin: {} s".format(t1 - t0)
 
-    def MCMC(self, plot_sim=False):
+    def MCMC(self, plot_sim=False, save_hGMM=False):
         '''
             Burn-in iterations
         '''
@@ -219,6 +219,9 @@ class Pipeline(object):
         print 'production iterations ({}) and postproc: {} s'.format(
             self.simpar.nbriter*self.simpar.qprod, t2-t1)
 
+        if save_hGMM:
+            self.hGMM.save(self.rundir)
+
         del self.hGMM
 
     def load_res(self, comm=MPI.COMM_SELF):
@@ -246,7 +249,7 @@ class Pipeline(object):
     def quality_check(self):
         print "self.res.active_komp = {}".format(self.res.active_komp)
 
-        self.res.traces.plot.all(fig=plt.figure(figsize=(18, 4)), yscale=True)
+        self.res.traces.plot.all(figsize=(18, 4), yscale=True)
         self.res.traces.plot.nu()
         self.res.traces.plot.nu_sigma()
         plt.show()
@@ -259,17 +262,16 @@ class Pipeline(object):
                 raise BadQualityError('Trace plots not ok')
             print "Bad answer. Are trace plots ok? (y/n)"
 
-        fig = plt.figure(figsize=(9, 4))
+        fig, axs = plt.subplots(self.res.K, 2, figsize=(9, 4))
         try:
-            self.res.components.plot.center_distance_quotient(fig=fig, totplots=2, plotnbr=1)
-            self.res.components.plot.bhattacharyya_overlap_quotient(fig=fig, totplots=2, plotnbr=2)
+            self.res.components.plot.center_distance_quotient(axs=axs[:, 0])
+            self.res.components.plot.bhattacharyya_overlap_quotient(axs=axs[:, 1])
         except NoOtherClusterError:
             print "Only one super component, cannot plot center distance \
                    and bhattacharyya overlap quotients."
             pass
 
-        fig = plt.figure(figsize=(4, 4))
-        self.res.components.plot.cov_dist(fig=fig)
+        self.res.components.plot.cov_dist(figsize=(4, 4))
 
         plt.show()
         print "Are distances to latent components ok? (y/n)"
@@ -281,32 +283,32 @@ class Pipeline(object):
                 raise BadQualityError('Distance to latent components not ok')
             print "Bad answer. Are distance to latent components ok? (y/n)"
 
-        emd = np.empty(self.J)
+        emds, e_dim = self.res.earth_movers_distance_to_generated()
         log_lik = np.empty(self.J)
         data_mpi = [DataMPI(MPI.COMM_SELF, [dat]) for dat in self.res.data]
         for j, dat_mpi in enumerate(data_mpi):
             mus, Sigmas, pis = self.res.get_mix(j)
-            emd[j], e_dim = EMD_to_generated_from_model(dat_mpi, mus, Sigmas, pis,
-                                                        N_synsamp=int(self.N/10))
             log_lik[j] = data_log_likelihood(dat_mpi, mus, Sigmas, pis)
 
-        return emd, log_lik
+        return emds, log_lik
 
     def plot(self):
 
         plotdim = [[i, j] for i in range(self.d) for j in range(i+1, self.d)]
 
-        fig_m = plt.figure(figsize=(9, 6))
-        self.res.components.plot.center(yscale=False, fig=fig_m, totplots=4,
-                                        plotnbr=1, alpha=0.3)
-        self.res.plot.prob(fig=fig_m, totplots=4, plotnbr=2)
-        self.res.components.plot.center(suco=False, yscale=False, fig=fig_m,
-                                        totplots=4, plotnbr=3, alpha=0.3)
-        self.res.plot.prob(suco=False, fig=fig_m, totplots=4, plotnbr=4)
+        fig_m, axs = plt.subplots(len(self.res.mergeind), 3, figsize=(9, 6))
+        self.res.components.plot.center(yscale=False, alpha=0.3, axs=axs[:, 0])
+        self.res.plot.box(axs=axs[:, 1])
+        self.res.plot.prob(axs=axs[:, 2])
+
+        fig, axs = plt.subplots(self.res.K, 3, figsize=(9, 6))
+        self.res.components.plot.center(suco=False, yscale=False, axs=axs[:, 0])
+        self.res.plot.box(suco=False, axs=axs[:, 1])
+        self.res.plot.prob(suco=False, axs=axs[:, 2])
 
         mimicnames = self.res.mimics.keys()
-        self.res.plot.component_fit(plotdim, name=mimicnames[-1], fig=plt.figure(figsize=(18, 25)))
-        self.res.plot.component_fit(plotdim, name='pooled', fig=plt.figure(figsize=(18, 25)))
+        self.res.plot.component_fit(plotdim, name=mimicnames[-1], figsize=(18, 25))
+        self.res.plot.component_fit(plotdim, name='pooled', figsize=(18, 25))
 
     def clean_up(self):
         print "removing savedir {} ...".format(self.savedir)
@@ -320,7 +322,7 @@ class Pipeline(object):
 
     def run(self, init_method='EM_pooled', WIS=False, rho=2, init_n_iter=20,
             n_init=10, init_plotting=False, init_selection='likelihood', gamma=2,
-            plot_sim=False, pre_burnin=True):
+            plot_sim=False, pre_burnin=True, save_hGMM=False):
         if 1:
             self.generate_data()
             self.setup_run()
@@ -329,7 +331,7 @@ class Pipeline(object):
             print "prior vals: {}".format(self.hGMM.prior.__dict__)
             if pre_burnin:
                 self.pre_burnin()
-            self.MCMC(plot_sim)
+            self.MCMC(plot_sim, save_hGMM=save_hGMM)
             if self.rank == 0:
                 self.postproc(MPI.COMM_SELF)
         # except Exception as e:

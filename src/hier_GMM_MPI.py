@@ -13,6 +13,7 @@ import time
 import warnings
 import traceback
 import sys
+import json
 import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import Axes3D
 
@@ -22,6 +23,7 @@ from .GMM import mixture
 from .utils.timer import Timer
 from .utils.initialization.EM import EM_pooled
 from .utils import load_fcdata
+from .utils.jsonutil import ObjJsonEncoder, class_decoder 
 from .exceptions import SimulationError
 from . import HMlog
 
@@ -85,16 +87,16 @@ def distance_sort(hGMM):
     return mus
 
 
-def load_hGMM(dirname):
-    '''
-        Load hGMM from a directory
-    '''
-    if dirname[-1] != '/':
-        dirname += '/'
-    K = len(glob.glob(dirname + 'normal_p_wishart*'))
-    hGMM = hierarical_mixture_mpi(K)
-    hGMM.load_from_file(dirname)
-    return hGMM
+# def load_hGMM(dirname):
+#     '''
+#         Load hGMM from a directory
+#     '''
+#     if dirname[-1] != '/':
+#         dirname += '/'
+#     K = len(glob.glob(dirname + 'normal_p_wishart*'))
+#     hGMM = hierarical_mixture_mpi(K)
+#     hGMM.load_from_file(dirname)
+#     return hGMM
 
 
 class hierarical_mixture_mpi(object):
@@ -118,9 +120,9 @@ class hierarical_mixture_mpi(object):
         self.noise_class = 0
         self.GMMs = []
         self.comm = comm
-        rank = self.comm.Get_rank()  # @UndefinedVariable
+        self.rank = self.comm.Get_rank()  # @UndefinedVariable
         #master
-        if rank == 0:
+        if self.rank == 0:
             self.normal_p_wisharts = [ normal_p_wishart() for k in range(self.K)]  # @UnusedVariable
             self.wishart_p_nus     = [Wishart_p_nu(AMCMC=AMCMC) for k in range(self.K) ]  # @UnusedVariable
 
@@ -128,7 +130,7 @@ class hierarical_mixture_mpi(object):
             self.normal_p_wisharts = None 
             self.wishart_p_nus     = None
             
-        self.set_data(data,sampnames)
+        self.set_data(data, sampnames)
         if not prior is None:
             self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
 
@@ -138,8 +140,40 @@ class hierarical_mixture_mpi(object):
     def mpiexceptabort(self, type_in, value, tb):
         traceback.print_exception(type_in, value, tb)
         self.comm.Abort(1)
-    
-    def save_prior_to_file(self,dirname):
+
+    def encode_json(self):
+        jsondict = {'__type__': 'hierarical_mixture_mpi'}
+        for arg in self.__dict__.keys():
+            if arg in ['GMMs', 'normal_p_wisharts', 'Wishart_p_nu',
+                       'comm', 'rank']:
+                continue
+            jsondict[arg] = getattr(self, arg)
+        return jsondict
+
+    def save(self, dirname):
+        for dname in [dirname, os.path.join(dirname, 'GMMs')]:
+            if not os.path.exists(dname):
+                os.mkdir(dname)
+        if self.rank == 0:
+            with open(os.path.join(dirname, 'hGMM.json'), 'w') as f:
+                json.dump(self, f, cls=ObjJsonEncoder)
+                self.save_prior_to_file(dirname)
+                for gmm in self.GMMs:
+                    gmm.save_param_to_file(os.path.join(dirname, 'GMMs'))
+
+    @classmethod
+    def load(cls, dirname, comm, **data_kws):
+        with open(os.path.join(dirname, 'hGMM.json'), 'r') as f:
+            hgmm = json.load(f, object_hook=lambda obj:
+                             class_decoder(obj, cls, comm=comm))
+        hgmm.load_data(**data_kws)
+        hgmm.load_prior_from_file(dirname)
+        hgmm.update_GMM()
+        for gmm in hgmm.GMMs:
+            gmm.load_param_from_file(os.path.join(dirname, 'GMMs'))
+        return hgmm
+
+    def save_prior_to_file(self, dirname):
         """
             Saves the prior to files
             
@@ -180,8 +214,7 @@ class hierarical_mixture_mpi(object):
                 dirname += "/"
             f = open(dirname+'noise_class.txt', 'w')
             f.write('%d' % self.noise_class)
-            f.close()        
-        
+            f.close()                
 
     def load_from_file(self,dirname):
         """
@@ -208,10 +241,7 @@ class hierarical_mixture_mpi(object):
         self.comm.Bcast([noise_class, MPI.INT],root=0)  # @UndefinedVariable
         self.noise_class = noise_class[0]
         self.comm.Barrier()
-        
-                
 
-    
     def load_GMMS_from_file(self,dirname):
         
         rank = self.comm.Get_rank()  # @UndefinedVariable
@@ -492,8 +522,6 @@ class hierarical_mixture_mpi(object):
             if self.d != Y.shape[1]:
                 raise ValueError('dimension mismatch in the data')
             self.GMMs.append(GMM.mixture(data=Y,K=self.K,name=name,high_memory=self.high_memory))
-            
-
 
     def set_data(self, data, names = None):
         """

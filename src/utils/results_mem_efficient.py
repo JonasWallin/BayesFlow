@@ -16,6 +16,12 @@ from .random_ import rmvn
 from .plot_util import get_colors
 
 
+def lognorm_pdf(Y, mu, Sigma, p):
+
+    Ycent = Y - mu
+    return np.log(p) - np.log(np.linalg.det(Sigma))/2 - np.sum(Ycent*np.linalg.solve(Sigma, Ycent.T).T, axis=1)/2
+
+
 class Mres(object):
 
     def __init__(self, d, K, p, classif_freq, p_noise=None, sim=None,

@@ -426,7 +426,7 @@ class ClustPlot(object):
     #     '''
     #         Histogram of data points with at least min_clf probability of belonging to certain clusters.
     #         The clusters are displayed with their canonical colors.
-            
+
     #         A panel of plots with ncol columns is showing this for all samples.
     #     '''
     #     if fig is None:
@@ -551,7 +551,7 @@ class CompPlot(object):
 
         for k in range(self.comp.K):
             mus = self.comp.mupers[:, k, :]
-            ax.scatter(mus[:, dim[0]], mus[:, dim[1]], mus[:, dim[2]], marker='.', color = self.comp_colors[k], s=50) 
+            ax.scatter(mus[:, dim[0]], mus[:, dim[1]], mus[:, dim[2]], marker='.', color = self.comp_colors[k], s=50)
 
         ax.axes.xaxis.set_ticks([.1, .5, .9])
         ax.axes.zaxis.set_ticks([.1, .5, .9])
@@ -680,7 +680,7 @@ class CompPlot(object):
             ax = f.add_subplot(111)
         else:
             f = None
-            
+
         if ks is None:
             ks = range(self.comp.K)
         ks = [self.comp_ord[k] for k in ks]
@@ -691,13 +691,13 @@ class CompPlot(object):
                 js = range(self.comp.J)
 
         okcl = set.intersection(set(self.within_plim(plim)), set(ks))
-        
+
         muspers = [[self.comp.mupers[j, k, :] for k in okcl] for j in js]
         Sigmaspers = [[self.comp.Sigmapers[j, k, :, :] for k in okcl] for j in js]
         colors = [self.comp_colors[k] for k in okcl]
 
         q = plot.pers_component_plot(muspers, Sigmaspers, dim, ax, colors=colors, lw=lw)
- 
+
         if hasattr(self.comp, 'new_thetas') and plot_new_th:
             ax.scatter(self.comp.new_thetas[:, dim[0]], self.comp.new_thetas[:, dim[1]], s=40, c='k', marker='+')
 
@@ -710,7 +710,7 @@ class CompPlot(object):
             self.set_lims(ax, lims, dim)
 
         return q
-        
+
     def within_plim(self, plim):
         okp = np.array([True]*self.comp.K)
         for suco in self.comp.mergeind:
@@ -722,9 +722,9 @@ class CompPlot(object):
 
     def latent_allsamp(self, dimlist, fig=None, ks=None, plim=[0, 1], js=None, plotlab=True):
         '''
-            Plot a panel of both latent component and mixture components for 
+            Plot a panel of both latent component and mixture components for
             all samples.
-            
+
             dimlist -  list of dimensions which to project on.
             fig     -   where to plot
             ks      -   which components to plot
@@ -752,38 +752,57 @@ class CompPlot(object):
             plot.set_component_plot_tics([ax1, ax2], plot.mergeQ(ql, qa))
         return fig
 
-    def bhattacharyya_overlap_quotient(self, fig=None, totplots=1, plotnbr=1):
+    def bhattacharyya_overlap_quotient(self, axs=None, **figargs):
         '''
             Diagnostic plot showing quotient between distance to correct latent
             center and distance to nearest wrong latent center.
         '''
-        if fig is None:
-            fig = plt.figure()
         distquo = self.comp.get_latent_bhattacharyya_overlap_quotient()
-        fig = plot.plot_diagnostics(distquo, 0, 3, 1, self.comp_ord, 'Bhattacharyya overlap quotient', fig=fig, totplots=totplots, plotnbr=plotnbr)
-        return fig
-    
-    def center_distance_quotient(self, fig=None, totplots=1, plotnbr=1):
+        self.plot_diagnostics(
+            distquo, 0, 3, 1, self.comp_ord, 'Bhattacharyya overlap quotient', axs=axs)
+
+    def center_distance_quotient(self, axs=None, **figargs):
         '''
             Diagnostic plot showing quotient between distance to correct latent
             center and distance to nearest wrong latent center.
         '''
-        if fig is None:
-            fig = plt.figure()
         distquo = self.comp.get_center_distance_quotient()
-        fig = plot.plot_diagnostics(distquo, 0, 3, 1, self.comp_ord, 'Distance to mean quotient', fig=fig, totplots=totplots, plotnbr=plotnbr)
-        return fig
-    
-    def cov_dist(self, norm='F', fig=None, totplots=1, plotnbr=1):
+        self.plot_diagnostics(
+            distquo, 0, 3, 1, self.comp_ord, 'Distance to mean quotient', axs=axs)
+
+    def cov_dist(self, norm='F', axs=None, **figargs):
         '''
             Diagnostic plot showing distance between convariance matrices
             of the mixture components and the corresponding latent components.
-            
+
             norm    -   which norm to use for computing the distance
         '''
         distF = self.comp.get_cov_dist(norm)
-        plot.plot_diagnostics(np.log10(distF), -5, 0, -3, self.comp_ord, 'Covariance matrix distance (norm {})'.format(norm), False, fig=fig, totplots=totplots, plotnbr=plotnbr)
-        return fig
+        self.plot_diagnostics(
+            np.log10(distF), -5, 0, -3, self.comp_ord,
+            'Covariance matrix distance (norm {})'.format(norm), False,
+            axs=axs)
+
+    @staticmethod
+    def plot_diagnostics(diagn, ymin, ymax, ybar=None, order=None, name='',
+                         log=False, axs=None, **figargs):
+        J = diagn.shape[0]
+        K = diagn.shape[1]
+        if axs is None:
+            fig, axs = plt.subplots(K, **figargs)
+        if order is None:
+            order = range(K)
+
+        xloc = np.arange(J) + .5
+        bar_width = .35
+        axs[0].set_title(name)
+        for k, ax in zip(order, axs):
+            ax.bar(xloc, diagn[:, k], bar_width, log=log)
+            ax.set_ylim(ymin, ymax)
+            if not ybar is None:
+                ax.plot([xloc[0], xloc[-1]], [ybar, ybar])
+            ax.axes.yaxis.set_ticks([])
+            ax.axes.xaxis.set_ticks([])
 
 
 class TracePlot(object):
@@ -878,7 +897,7 @@ class FCplot(object):
         #if not xlim is None:
         #    ax.set_xlim(*xlim)
         #if not ylim is None:
-        #    ax.set_ylim(*ylim)     
+        #    ax.set_ylim(*ylim)
 
     def histnd(self, Nsamp=None, bins=50, fig=None, xlim=None, ylim=None):
         '''
@@ -895,4 +914,4 @@ class FCplot(object):
             for ax in fig.axes:
                 if ax.get_ylim()[1] < 5:
                     ax.set_ylim(*ylim)
-        
+
