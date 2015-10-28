@@ -36,7 +36,7 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
 
     if plotting:
         Nplot = 5
-        bfig = plt.figure()
+        bfig = plt.figure(figsize=(12, 3))
         i = 1  # plot index
 
     D = 0  # lower bound for dip*2
@@ -72,7 +72,7 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         # Plot current GCM and LCM.
         if plotting:
             if i > Nplot:
-                bfig = plt.figure()
+                bfig = plt.figure(figsize=(12, 3))
                 i = 1
             bax = bfig.add_subplot(1, Nplot, i)
             bax.plot(xF, yF, color='red')
@@ -84,9 +84,7 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         if d <= D:
             if verbose:
                 print "Difference in modal interval smaller than current dip"
-            if not plotting:
-                # When plotting we might need to find new modal interval
-                break
+            break
 
         # Find new modal interval so that largest difference is at endpoint
         # and set d to largest distance between current GCM and LCM.
@@ -96,35 +94,9 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         else:
             U0 = iH[imaxdiffh]
             L0 = iG[iG <= U0][-1]
-        niGfin = np.hstack([iGfin, iG[(iG <= L0)*(iG > L)]])
-        niHfin = np.hstack([iH[(iH >= U0)*(iH < U)], iHfin])
-
-        if d <= D:
-            # Check if slopes of optimal unimodal funcion will be consistent with new modal interval
-            if xF[U0] - xF[L0] < eps and yF[U0] - yF[L0] < D:
-                #Slopes not consistent, do not use new modal interval
-                if verbose:
-                    print "Proposed modal interval rejected with xF[U0] = xF[L0]"
-                break
-            qM = (yF[U0] - yF[L0] - D)/(xF[U0] - xF[L0])
-            if len(niGfin) >= 2:
-                qG = (yF[niGfin[-1]] - yF[niGfin[-2]])/(xF[niGfin[-1]] - xF[niGfin[-2]])
-            else:
-                qG = -np.inf
-            if len(niHfin) >= 2:
-                qH = (yF[niHfin[1]] - yF[niHfin[0]])/(xF[niHfin[1]] - xF[niHfin[0]])
-            else:
-                qH = np.inf
-            if (qM < 0) or (qM < qG and qM < qH):
-                # Slopes not consistent, do not use new modal interval
-                if verbose:
-                    print "Proposed modal interval rejected, non-consistent slopes"
-                break
-
-        # New modal interval accepted
         # Add points outside the modal interval to the final GCM and LCM.
-        iGfin = np.copy(niGfin)
-        iHfin = np.copy(niHfin)
+        iGfin = np.hstack([iGfin, iG[(iG <= L0)*(iG > L)]])
+        iHfin = np.hstack([iH[(iH >= U0)*(iH < U)], iHfin])
 
         # Plot new modal interval
         if plotting:
@@ -139,6 +111,7 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
             break
 
         # Compute new lower bound for dip*2
+        # i.e. largest difference outside modal interval
         gipl = lin_interpol_sorted(xF[L:(L0+1)], xF[iG], yF[iG])
         D = max(D, np.amax(yF[L:(L0+1)] - gipl))
         hipl = lin_interpol_sorted(xF[U0:(U+1)], xF[iH], yF[iH])
@@ -156,21 +129,50 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         U = U0
 
         if d <= D:
+            if verbose:
+                print "Difference in modal interval smaller than new dip"
             break
 
     if plotting:
 
-        # Plot final modal interval
+        # Add modal interval to figure
         bax.axvline(xF[L0], ymin, ymax, color='green', linestyle='dashed')
         bax.axvline(xF[U0], ymin, ymax, color='green', linestyle='dashed')
 
+        ## Plot unimodal distribution function
         bfig = plt.figure()
         bax = bfig.add_subplot(1, 1, 1)
         bax.plot(xF, yF, color='red')
         bax.plot(xF, yF-D/2, color='black')
         bax.plot(xF, yF+D/2, color='black')
 
-        bax.plot(xF[np.hstack([iGfin, iHfin])], np.hstack([yF[iGfin] + D/2, yF[iHfin] - D/2]), color='blue')
+        # Find string position in modal interval
+        print "iHfin = {}".format(iHfin)
+        print "xF.shape = {}".format(xF.shape)
+        iM = np.arange(iGfin[-1], iHfin[0]+1)
+        yM_lower = yF[iM]-D/2
+        yM_lower[0] = yF[iM[0]]+D/2
+        iMM_concave = least_concave_majorant_sorted(xF[iM], yM_lower)
+        iM_concave = iM[iMM_concave]
+        #bax.plot(xF[iM], yM_lower, color='orange')
+        #bax.plot(xF[iM_concave], yM_lower[iMM_concave], color='red')
+        lcm_ipl = lin_interpol_sorted(xF[iM], xF[iM_concave], yM_lower[iMM_concave])
+        try:
+            mode = iM[np.nonzero(lcm_ipl > yF[iM]+D/2)[0][-1]]
+            #bax.axvline(xF[mode], color='green', linestyle='dashed')
+        except IndexError:
+            iM_convex = np.zeros(0, dtype='i')
+        else:
+            after_mode = iM_concave > mode
+            iM_concave = iM_concave[after_mode]
+            iMM_concave = iMM_concave[after_mode]
+            iM = iM[iM <= mode]
+            iM_convex = iM[greatest_convex_minorant_sorted(xF[iM], yF[iM])]
+
+        bax.plot(xF[np.hstack([iGfin, iM_convex, iM_concave, iHfin])],
+                 np.hstack([yF[iGfin] + D/2, yF[iM_convex] + D/2,
+                            yM_lower[iMM_concave], yF[iHfin] - D/2]), color='blue')
+        #bax.plot(xF[iM], yM_lower, color='orange')
         plt.show()
 
     return D/2
@@ -359,6 +361,18 @@ def least_concave_majorant_sorted(x, y, eps=1e-12):
     return np.array(i)
 
 if __name__ == '__main__':
+    #seed = np.random.randint(1000)
+    for seed in [None, 403, 796]:
+        if seed is None:
+            dat = np.hstack([np.arange(0, 1, .1), np.arange(2, 3, 0.1)])
+        else:
+            print "seed = {}".format(seed)
+            np.random.seed(seed)
+            dat = np.hstack([np.random.randn(10), np.random.randn(10)+2])
+        xcum, ycum = cum_distr(dat, np.ones(len(dat))*1./len(dat))
+        dip = dip_from_cdf(xcum, ycum, verbose=True, plotting=True)
+        print "dip = {}".format(dip)
+
     for (dip, N, M) in [(0.005, 20000, 50000), (0.01, 2000, 5000), (0.001, 70000, 10000), (0.0005, 1000000, 10000)]:
         print "dip_pval_tabinterpol(dip, N) = {}".format(dip_pval_tabinterpol(dip, N))
         print "dip_pval_tabinterpol(transform_dip_to_other_nbr_pts(dip, N, M), M) = {}".format(dip_pval_tabinterpol(transform_dip_to_other_nbr_pts(dip, N, M), M))
