@@ -123,7 +123,7 @@ class HMplot(object):
         return axs
 
     def component_fit(self, plotdim, name='pooled', lim=[-.2, 1.2], bins=100,
-                      axs=None, **figargs):
+                      axs=None, Nsamp=None, **figargs):
         if axs is None:
             fig, axs = plt.subplots(len(plotdim), 4, squeeze=False, **figargs)
 
@@ -133,16 +133,30 @@ class HMplot(object):
         else:
             names = [name]
 
-        if name in self.mcsp:
+        if name in self.mcsp and Nsamp is None:
             loadsyn = True
             print "self.mcsp[name] = {}".format(self.mcsp[name])
         else:
             loadsyn = False
             print "no mimic found, generating new data"
-            j = self.sampnames.index(name)
-            realdata = self.bmres.data[j]
-            N = self.bmres.data[j].shape[0]
-            syndata = self.bmres.generate_from_mix(j, N)
+            if not name is 'pooled':
+                j = self.sampnames.index(name)
+                totdata = self.bmres.data[j]
+                N = totdata.shape[0] if Nsamp is None else Nsamp
+                syndata = self.bmres.generate_from_mix(j, N)
+            else:
+                totdata = np.vstack(self.bmres.data)
+                Ns = np.array([dat.shape[0] for dat in self.bmres.data])
+                if not Nsamp is None:
+                    Ns *= Nsamp*1./sum(Ns)
+                syndata = np.vstack([
+                    self.bmres.generate_from_mix(j, N) for (j, N) in enumerate(Ns)])
+
+            if Nsamp is None:
+                realdata = totdata
+            else:
+                realdata = totdata[
+                    np.random.choice(range(totdata.shape[0]), Nsamp, replace=False), :]
 
         for m, dim in enumerate(plotdim):
             _ = self.cop.latent(dim, ax=axs[m, 0], plotlab=True)
@@ -157,11 +171,11 @@ class HMplot(object):
             axs[m, 1].set_ylim(*lim)
 
             if loadsyn:
-                self.mcsp[name].realplot.hist2d(dim, bins=bins, ax=axs[m, 2], lims=lim)
+                self.mcsp[name].realplot.hist2d(dim, bins=bins, ax=axs[m, 2], lims=lim, Nsamp=Nsamp)
                 if m == 0:
                     axs[m, 2].set_title(name+'(real)')
 
-                self.mcsp[name].synplot.hist2d(dim, bins=bins, ax=axs[m, 3], lims=lim)
+                self.mcsp[name].synplot.hist2d(dim, bins=bins, ax=axs[m, 3], lims=lim, Nsamp=Nsamp)
                 if m == 0:
                     axs[m, 3].set_title(name+'(synthetic)')
             else:
@@ -562,12 +576,28 @@ class CompPlot(object):
             sigmas = [self.comp.Sigmapers[j, k, :, :] for j in range(self.comp.J)]
             EVs = [np.linalg.eig(sigma) for sigma in sigmas if not np.isnan(sigma[0, 0])]
             Vs = [np.sqrt(EV[0]).reshape(1, -1)*EV[1] for EV in EVs]
+            Vs = [V[:, np.argsort(-EV[0])] for (V, EV) in zip(Vs, EVs)]
             for dd in range(D):
                 Vs_d = [V[:, dd] for V in Vs]
                 s = np.argmax(sum([abs(V_d) for V_d in Vs_d]))
                 Vs_d = [V*np.sign(V[s]) if V[s] != 0 else V for V in Vs_d]
                 axs[i, dd].plot(np.vstack(Vs_d).T, color=self.comp_colors[k])
                 axs[i, dd].set_ylim(-.2, .2)
+
+    def eigvector(self, dd, axs=None, **figargs):
+        if axs is None:
+            fig, axs = plt.subplots(19, sharey=True, sharex=True, **figargs)
+        for i, (ax, k) in enumerate(zip(axs.reshape(-1), self.comp_ord)):
+            sigmas = [self.comp.Sigmapers[j, k, :, :] for j in range(self.comp.J)]
+            EVs = [np.linalg.eig(sigma) for sigma in sigmas if not np.isnan(sigma[0, 0])]
+            Vs = [np.sqrt(EV[0]).reshape(1, -1)*EV[1] for EV in EVs]
+            Vs = [V[:, np.argsort(-EV[0])] for (V, EV) in zip(Vs, EVs)]
+
+            Vs_d = [V[:, dd] for V in Vs]
+            s = np.argmax(sum([abs(V_d) for V_d in Vs_d]))
+            Vs_d = [V*np.sign(V[s]) if V[s] != 0 else V for V in Vs_d]
+            if len(Vs_d) > 0:
+                ax.plot(np.vstack(Vs_d).T, color=self.comp_colors[k])
 
     @staticmethod
     def set_lims(ax, lims, dim):
