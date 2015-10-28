@@ -1,37 +1,17 @@
 import matplotlib.pyplot as plt
-import BayesFlow.utils.load_and_save as ls
-from BayesFlow import BMplot
-
-from example_util import set_donorid,load_setup_postproc_HF
-
-if expdir[-1] != '/':
-    expdir += '/'
-loaddirres = expdir+'run'+str(run)+'/'
-
-'''
-    Load results.
-'''
-
-try:
-    res = hmres
-    res.plot = BMplot(res)
-except:
-    _,setup_postproc = load_setup_postproc_HF(loaddirres,setupno)
-    postpar = setup_postproc()  
-    res = ls.load_HMres(loaddirres,postpar.mergemeth)  
 
 
 #print "res.mergeind = {}".format(res.mergeind)
 #print "res.components.p = {}".format(res.components.p)
-#print "res comp suco p sum: {}".format([np.sum(res.components.p[:,suco]) for suco in res.mergeind])
-#print "res clust_m p: {}".format(np.sum(res.clust_m.p,axis=0))
-#print "res clust_m classif_freq sum: {}".format(np.sum(np.vstack(res.clust_m.classif_freq),axis=0))
+#print "res comp suco p sum: {}".format([np.sum(res.components.p[:, suco]) for suco in res.mergeind])
+#print "res clust_m p: {}".format(np.sum(res.clust_m.p, axis=0))
+#print "res clust_m classif_freq sum: {}".format(np.sum(np.vstack(res.clust_m.classif_freq), axis=0))
 
 ''''
     Plotting
 '''
 
-plotdim = [[0,1],[3,2]]
+plotdim = [[0, 1], [3, 2]]
 mimicnames = res.mimics.keys()
 print "mimicnames = {}".format(mimicnames)
 
@@ -40,7 +20,7 @@ print "mimicnames = {}".format(mimicnames)
 if 'conv' in toplot:
     res.traces.plot.all()
     res.traces.plot.nu()
- 
+
 ### Marginals
 
 if 'marg' in toplot:
@@ -59,15 +39,15 @@ if 'marg' in toplot:
 ### Component fit
 
 if 'compfit' in toplot:
-    res.plot.component_fit(plotdim,name=mimicnames[0])
-    res.plot.component_fit(plotdim,name='pooled')
+    res.plot.component_fit(plotdim, name=mimicnames[0])
+    res.plot.component_fit(plotdim, name='pooled')
 
 ### 1D centers
 
 if 'cent' in toplot:
 
     res.components.plot.center(yscale=True)
-    res.components.plot.center(suco=False,yscale=True)
+    res.components.plot.center(suco=False, yscale=True)
 
 ### Quantiles
 
@@ -85,38 +65,37 @@ if 'prob' in toplot:
 ### Mixture components
 
 if 'mix' in toplot:
-    figmix = plt.figure(figsize=(7,2*len(plotdim)))
-    res.components.plot.latent_allsamp(plotdim,figmix)#,ks=range(8))
+    figmix = plt.figure(figsize=(7, 2*len(plotdim)))
+    res.components.plot.latent_allsamp(plotdim, figmix)#, ks=range(8))
     for ax in figmix.axes:
-        ax.set_xlim([-0.2,1.2])
-        ax.set_ylim([-0.2,1.2])
-        
-    figmix2 = plt.figure(figsize=(7,2*len(plotdim)))
-    res.components.plot.latent_allsamp(plotdim,figmix2)#,ks=range(8))
+        ax.set_xlim([-0.2, 1.2])
+        ax.set_ylim([-0.2, 1.2])
+
+    figmix2 = plt.figure(figsize=(7, 2*len(plotdim)))
+    res.components.plot.latent_allsamp(plotdim, figmix2)#, ks=range(8))
     for ax in figmix2.axes:
-        ax.set_xlim([-2,2])
-        ax.set_ylim([-2,2])
-    #res.components.plot.latent(plotdim[1],plim=[0.1,1],plotlab=True)
-    #res.components.plot.allsamp(plotdim[0],ks=[7],plotlab=True)
+        ax.set_xlim([-2, 2])
+        ax.set_ylim([-2, 2])
+    #res.components.plot.latent(plotdim[1], plim=[0.1, 1], plotlab=True)
+    #res.components.plot.allsamp(plotdim[0], ks=[7], plotlab=True)
 
 
 if 'sampmix' in toplot:
     for j in range(res.J):
-        figsampmix = plt.figure(figsize=(7,2*len(plotdim)))
-        res.components.plot.latent_allsamp(plotdim,js=[j],fig=figsampmix)
+        figsampmix = plt.figure(figsize=(7, 2*len(plotdim)))
+        res.components.plot.latent_allsamp(plotdim, js=[j], fig=figsampmix)
         figsampmix.suptitle(res.meta_data.samp['names'][j])
         for ax in figsampmix.axes:
-            ax.set_xlim([-0.2,1.2])
-            ax.set_ylim([-0.2,1.2])
+            ax.set_xlim([-0.2, 1.2])
+            ax.set_ylim([-0.2, 1.2])
 
 # ### PCA biplot
 
 if 'pca' in toplot:
-
-     res.plot.pca_screeplot()
-     res.plot.set_population_lab(['CD4 T cells','CD8 T cells','B cells','','',''])
-     res.plot.pca_biplot([0,1])
-     res.plot.pca_biplot([2,3])
+    res.plot.pca_screeplot()
+    res.plot.set_population_lab(['CD4 T cells', 'CD8 T cells', 'B cells', '', '', ''])
+    res.plot.pca_biplot([0, 1])
+    res.plot.pca_biplot([2, 3])
 
 
 ### Dip test
@@ -132,10 +111,10 @@ if 'dip' in toplot:
 ### Histograms showing overlap between clusters
 
 if 'overlap' in toplot:
-    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=0,ks=[0,1])
-    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=1,ks=[0,1])
-    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=2,ks=[0,1])
-    res.clust_m.plot.chist_allsamp(min_clf=0.3,dd=3,ks=[0,1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3, dd=0, ks=[0, 1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3, dd=1, ks=[0, 1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3, dd=2, ks=[0, 1])
+    res.clust_m.plot.chist_allsamp(min_clf=0.3, dd=3, ks=[0, 1])
 
 ### Diagnostic plots
 
@@ -144,7 +123,7 @@ if 'diagn' in toplot:
     res.components.plot.cov_dist()
 
 if 'scatter' in toplot:
-    res.clust_m.plot.scatter([0,1],0)
+    res.plot.scatter([0, 1], 0)
 
 # ###
 

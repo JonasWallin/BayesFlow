@@ -12,6 +12,7 @@ NB! If you use MKL, in addition to the usual arguments to the compiler, you also
 
 ## Examples
 - demo_HF.py: Demonstration of how to use BayesFlow for healthyFlowData dataset. 
+The file src/tests/test_pipeline.py also gives examples on how to use BayesFlow, including quality control.
 
 ## Dependencies
 
@@ -20,22 +21,7 @@ The package has the following dependencies:
 - OpenMPI
 - Libraries for linear algebra computations with c interfaces, e.g. CBLAS and CLAPACK or MKL. 
 
-The dependence on rpy2 is only needed for computing dip test and loading data from R package healthyFlowData.
-If installation without this dependency is wanted, files
-
-```
-src/__init__   
-src/utils/__init__  
-src/data/__init__
-```
-
-should be replaced by
-```
-src/__init_mindep__  
-src/utils/__init_mindep__  
-src/data/__init_mindep__
-```
-for example do `mv src/__init_mindep__ src/__init__` et.c. 
+The dependence on rpy2 is only needed for computing dip test and loading data from R package healthyFlowData. 
 
 ## How to obtain dependencies
 
