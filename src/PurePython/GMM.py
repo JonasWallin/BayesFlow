@@ -9,6 +9,8 @@ import numpy as np
 import numpy.random as npr
 import copy as cp
 import time
+import os
+import json
 import scipy.special as sps
 import cPickle as pickle
 import scipy.linalg as sla
@@ -18,6 +20,7 @@ from .distribution import wishart
 from ..utils.gammad import ln_gamma_d
 from ..utils.Bhattacharyya import bhattacharyya_distance
 from ..utils import rmvn
+from ..utils.jsonutil import ArrayEncoder, array_decoder
 
 
 def log_betapdf(p, a, b):
@@ -181,6 +184,10 @@ class mixture(object):
 		self.p           = params["p"]
 		self.alpha_vec   = params["alpha_vec"]
 		self.high_memory = params["high_memory"]
+		try:
+			self.AMCMC = params["AMCMC"]
+		except AttributeError:
+			print "No AMCMC setting loaded"
 		
 		
 	def write_param(self):
@@ -202,10 +209,24 @@ class mixture(object):
 		params["p"]     		= cp.deepcopy(self.p        )    
 		params["alpha_vec"] 	= cp.deepcopy(self.alpha_vec )
 		params["high_memory"]	= cp.deepcopy(self.high_memory)
+		params["AMCMC"]			= cp.deepcopy(self.AMCMC)
 		
 		return params
 	
-	
+	def save_param_to_file(self, dirname):
+		class GMMJsonEncoder(ArrayEncoder):
+			def default(self, o):
+				if hasattr(o, 'write_param'):
+					return(o.write_param())
+				return super(GMMJsonEncoder, self).default(o)
+
+		with open(os.path.join(dirname, 'gmm_{}.json'.format(self.name)), 'w') as f:
+			json.dump(self, f, cls=GMMJsonEncoder)
+
+	def load_param_from_file(self, dirname):
+		with open(os.path.join(dirname, 'gmm_{}.json'.format(self.name)), 'r') as f:
+			param = json.loads(f, object_hook=lambda obj: array_decoder(obj))
+		self.load_param(param)
 	
 	def set_name(self,name):
 		"""

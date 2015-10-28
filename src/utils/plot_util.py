@@ -23,6 +23,8 @@ def black_ip(color, n, N):
 
 def major_colors(nbr_colors):
     cm = get_cmap('gist_rainbow')
+    if nbr_colors == 1:
+        return cm(0)
     return [cm(((s+.4) % nbr_colors)*1./(nbr_colors-1)) for s in range(nbr_colors)]
 
 

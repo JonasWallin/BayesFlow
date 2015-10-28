@@ -302,31 +302,6 @@ def mergeQ(q1, q2):
     return {'q_x': q_x, 'q_y': q_y}
 
 
-def plot_diagnostics(diagn, ymin, ymax, ybar=None, order=None, name='',
-                     log=False, fig=None, totplots=1, plotnbr=1):
-    if fig is None:
-        fig = plt.figure()
-    J = diagn.shape[0]
-    K = diagn.shape[1]
-    if order is None:
-        order = range(K)
-    nbr_cols = 2*totplots - 1
-    col_start = 2*(plotnbr - 1)
-    xloc = np.arange(J) + .5
-    bar_width = .35
-    for k in range(K):
-        ax = fig.add_subplot(K, nbr_cols, k*nbr_cols + col_start + 1)
-        if k == 0:
-            plt.title(name)
-        ax.bar(xloc, diagn[:, order[k]], bar_width, log=log)
-        ax.set_ylim(ymin, ymax)
-        if not ybar is None:
-            ax.plot([xloc[0], xloc[-1]], [ybar, ybar])
-        ax.axes.yaxis.set_ticks([])
-        ax.axes.xaxis.set_ticks([])
-    return fig
-
-
 def plot_pbars(data, ymin, ymax, order=None, colors=None, log=False, ax=None):
     if ax is None:
         fig = plt.figure()
