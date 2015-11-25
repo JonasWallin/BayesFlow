@@ -1119,12 +1119,12 @@ class Components(object):
             mean which has not been merged into the component.
         '''
         distquo = np.zeros((self.J, self.K))
+        corrdist = self.get_center_dist()
         for suco in self.mergeind:
             for k in suco:
                 otherind = np.array([not (kk in suco) for kk in range(self.K)])
                 if sum(otherind) == 0:
                     raise NoOtherClusterError
-                corrdist = self.get_center_dist()
                 for j in range(self.J):                
                     wrongdist = min(np.linalg.norm(self.mupers[j, [k]*sum(otherind), :] 
                         - self.mulat[otherind, :], axis=1))
