@@ -17,14 +17,14 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 matplotlib.rcParams['text.usetex'] = True
 
 
-folderFigs = "/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
+folderFigs = u"/Users/jonaswallin/Documents/temp/" #"/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
 if __name__ == "__main__":
 	nPersons  = 80
 	nCells = 15000
 	
 	rand_pers = npr.choice(nPersons,size=nCells)
 	rand_cells = npr.choice(nCells,size=nCells)
-	Y = np.array(article_simulatedata.simulate_data(nCells = nCells, nPersons = nPersons)[0])
+	Y = np.array(article_simulatedata.simulate_data_v1(nCells = nCells, nPersons = nPersons)[0])
 	
 	Y_subsample = np.zeros((nCells,3))
 	for i in range(nCells):
@@ -36,6 +36,7 @@ if __name__ == "__main__":
 	#plt.show()
 	
 	#npr.choice(10,size=100)
+	print folderFigs + "hist2d_simulated_obs.eps"
 	f.savefig(folderFigs + "hist2d_simulated_obs.eps", type="eps",bbox_inches='tight')
 	f.savefig(folderFigs + "hist2d_simulated_obs.pdf", type="pdf",bbox_inches='tight')
 	f_.savefig(folderFigs + "hist2d_indv_simulated_obs.eps", type="eps",bbox_inches='tight')
