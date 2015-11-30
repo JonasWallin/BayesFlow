@@ -31,7 +31,7 @@ def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
     if rank == 0:
         if not os.path.exists(expdir):
             os.mkdir(expdir)
-        
+
         run = 1
         while os.path.exists(expdir+'run'+str(run)+'/'):
             run += 1
@@ -68,7 +68,7 @@ def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
 
     return savedir, run
 
- 
+
 class Prior(object):
 
     def __init__(self, J, n_J, d, K):
@@ -76,20 +76,26 @@ class Prior(object):
             J   -   number of flow cytometry samples
             n_J -   number of events per flow cytometry sample
             d   -   dimension of a sample
-        """      
+        """
         self.J = J
         self.n_J = n_J
         self.d = d
         self.K = K
         self.noise_class = 0
-    
+
+    def encode_json(self):
+        jsondict = {'__type__': 'Prior'}
+        for arg in self.__dict__.keys():
+            jsondict[arg] = getattr(self, arg)
+        return jsondict
+
     def latent_cluster_means(self, t_inf=None, t_ex=np.nan, Sk_inf=None, Sk_ex=np.nan):
         """
             Priors on latent cluster means
 
             t_inf   -   (K_inf x d) matrix. Expected latent location for
                         components with informative priors.
-            t_ex    -   scalar or (1 x d) matrix. Expected latent location 
+            t_ex    -   scalar or (1 x d) matrix. Expected latent location
                         for components with non-informative priors.
             Sk_inf  -   (K_inf x d) matrix. Prior latent location variance
                         in each dimension for components with informative
@@ -139,8 +145,8 @@ class Prior(object):
         if Q is None:
             Q = q*(self.n_theta-self.d-1)*self.J
         self.Q = Q*np.ones(self.K)
-     
-    def component_shape(self, nps=None, min_n_Psi=12, h=None, n_Psi=None, H=None):   
+
+    def component_shape(self, nps=None, min_n_Psi=12, h=None, n_Psi=None, H=None):
         """
             Prior on component covariance shape
 
@@ -161,7 +167,7 @@ class Prior(object):
         if n_Psi is None:
             n_Psi = max([int(nps*self.n_J/self.K), min_n_Psi])
         self.n_Psi = n_Psi*np.ones(self.K, dtype='i')
-   
+
         if H is None:
             H = h*(self.n_Psi-self.d-1)/self.n_Psi/self.J
         self.H = H
@@ -171,17 +177,17 @@ class Prior(object):
             Noise class parameters
 
             noise_mu    -   scalar or (1 x d) matrix. Expected value for noise component.
-            noise_Sigma -   scalar or (1 x d) matrix. Variance for noise component.    
-            on          -   boolean. Should noise class be activated from start?                    
+            noise_Sigma -   scalar or (1 x d) matrix. Variance for noise component.
+            on          -   boolean. Should noise class be activated from start?
         """
         if on:
             self.noise_class = 1
         self.noise_mu = noise_mu*np.ones(self.d)
         self.noise_Sigma = noise_Sigma*np.eye(self.d)
 
-    def pop_size(self, a=None):  
+    def pop_size(self, a=None):
         """
-            Define prior on population sizes. If noise class is used it has to be 
+            Define prior on population sizes. If noise class is used it has to be
             set first.
 
             a   -   (1 x (K+noise_class)) matrix. Dirichlet distribution parameter.
@@ -299,7 +305,7 @@ class BalancedPrior(Prior):
         """
         n_Psi = max([int(nps*self.n_J/self.K), min_n_Psi])
         self.n_Psi = n_Psi*np.ones(self.K, dtype='i')
-        
+
         self.H = h*np.ones(self.K)/self.J
 
     def resize_Sigma_theta_prior(self, c):
@@ -317,7 +323,7 @@ class BalancedPrior(Prior):
             components to same shape.
         """
         self.n_Psi = c*self.n_Psi
-    
+
 
 class PostProcPar(object):
 

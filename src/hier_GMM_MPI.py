@@ -144,7 +144,7 @@ class hierarical_mixture_mpi(object):
     def encode_json(self):
         jsondict = {'__type__': 'hierarical_mixture_mpi'}
         for arg in self.__dict__.keys():
-            if arg in ['GMMs', 'normal_p_wisharts', 'Wishart_p_nu',
+            if arg in ['GMMs', 'normal_p_wisharts', 'wishart_p_nus',
                        'comm', 'rank']:
                 continue
             jsondict[arg] = getattr(self, arg)
