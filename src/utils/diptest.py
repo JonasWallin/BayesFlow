@@ -139,7 +139,7 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         bax.axvline(xF[L0], ymin, ymax, color='green', linestyle='dashed')
         bax.axvline(xF[U0], ymin, ymax, color='green', linestyle='dashed')
 
-        ## Plot unimodal distribution function
+        ## Plot unimodal function (not distribution function)
         bfig = plt.figure()
         bax = bfig.add_subplot(1, 1, 1)
         bax.plot(xF, yF, color='red')
@@ -172,6 +172,42 @@ def dip_from_cdf(xF, yF, plotting=False, verbose=False, eps=1e-12):
         bax.plot(xF[np.hstack([iGfin, iM_convex, iM_concave, iHfin])],
                  np.hstack([yF[iGfin] + D/2, yF[iM_convex] + D/2,
                             yM_lower[iMM_concave], yF[iHfin] - D/2]), color='blue')
+        #bax.plot(xF[iM], yM_lower, color='orange')
+
+        ## Plot unimodal distribution function
+        bfig = plt.figure()
+        bax = bfig.add_subplot(1, 1, 1)
+        bax.plot(xF, yF, color='red')
+        bax.plot(xF, yF-D/2, color='black')
+        bax.plot(xF, yF+D/2, color='black')
+
+        # Find string position in modal interval
+        print "iHfin = {}".format(iHfin)
+        print "xF.shape = {}".format(xF.shape)
+        iM = np.arange(iGfin[-1], iHfin[0]+1)
+        yM_lower = yF[iM]-D/2
+        yM_lower[0] = yF[iM[0]]+D/2
+        iMM_concave = least_concave_majorant_sorted(xF[iM], yM_lower)
+        iM_concave = iM[iMM_concave]
+        #bax.plot(xF[iM], yM_lower, color='orange')
+        #bax.plot(xF[iM_concave], yM_lower[iMM_concave], color='red')
+        lcm_ipl = lin_interpol_sorted(xF[iM], xF[iM_concave], yM_lower[iMM_concave])
+        try:
+            mode = iM[np.nonzero(lcm_ipl > yF[iM]+D/2)[0][-1]]
+            #bax.axvline(xF[mode], color='green', linestyle='dashed')
+        except IndexError:
+            iM_convex = np.zeros(0, dtype='i')
+        else:
+            after_mode = iM_concave > mode
+            iM_concave = iM_concave[after_mode]
+            iMM_concave = iMM_concave[after_mode]
+            iM = iM[iM <= mode]
+            iM_convex = iM[greatest_convex_minorant_sorted(xF[iM], yF[iM])]
+
+        bax.plot(xF[np.hstack([iGfin, iM_convex, iM_concave, iHfin])],
+                 np.hstack([yF[iGfin[0]], yF[iGfin[1:]] + D/2, yF[iM_convex] + D/2,
+                            yM_lower[iMM_concave], yF[iHfin[:-1]] - D/2,
+                            yF[iHfin[-1]]]), color='blue')
         #bax.plot(xF[iM], yM_lower, color='orange')
         plt.show()
 
@@ -209,7 +245,9 @@ def dip_pval_tabinterpol(dip, N):
     iNlow = np.nonzero(Ns < N)[0][-1]
     qN = (N-Ns[iNlow])/(Ns[iNlow+1]-Ns[iNlow])
     dip_sqrtN = np.sqrt(N)*dip
-    dip_interpol_sqrtN = np.sqrt(Ns[iNlow])*diptable[iNlow, :] + qN*(np.sqrt(Ns[iNlow+1])*diptable[iNlow+1, :]-np.sqrt(Ns[iNlow])*diptable[iNlow, :])
+    dip_interpol_sqrtN = (
+        np.sqrt(Ns[iNlow])*diptable[iNlow, :] + qN*(
+            np.sqrt(Ns[iNlow+1])*diptable[iNlow+1, :]-np.sqrt(Ns[iNlow])*diptable[iNlow, :]))
 
     if not (dip_interpol_sqrtN < dip_sqrtN).any():
         return 1
