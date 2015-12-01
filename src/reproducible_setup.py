@@ -169,7 +169,7 @@ class Prior(object):
         self.n_Psi = n_Psi*np.ones(self.K, dtype='i')
 
         if H is None:
-            H = h*(self.n_Psi-self.d-1)/self.n_Psi/self.J
+            H = h*(self.n_Psi-self.d-1)*1./self.n_Psi/self.J
         self.H = H
 
     def set_noise_class(self, noise_mu, noise_Sigma, on=True):

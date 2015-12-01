@@ -17,6 +17,7 @@ timer = Timer()
 retrieve_healthyFlowData(data_kws['datadir'])
 metadata = {'marker_lab': data_kws.pop('marker_lab'),
             'samp': {'names': sampnames_scattered(comm, data_kws['datadir'], data_kws['ext'])}}
+print "metadata['samp']['names'] = {}".format(metadata['samp']['names'])
 timer.timepoint('retrieve data')
 
 
@@ -68,6 +69,7 @@ timer.timepoint('burnin iterations ({}) and postproc'.format(simpar.nbriter*simp
 '''
 prodlog = hGMM.simulate(simpar.phases['P'], 'Production phase', stop_if_cl_off=False)
 hGMM.save_log(savedir)
+hGMM.save(savedir)
 
 timer.timepoint('production iterations ({}) and postproc'.format(simpar.nbriter*simpar.qprod))
 timer.print_timepoints()

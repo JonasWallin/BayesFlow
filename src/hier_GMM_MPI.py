@@ -130,9 +130,13 @@ class hierarical_mixture_mpi(object):
             self.normal_p_wisharts = None 
             self.wishart_p_nus     = None
             
-        self.set_data(data, sampnames)
+        set_data_out = self.set_data(data, sampnames)
+        print "prior = {}".format(prior)
         if not prior is None:
-            self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
+            if set_data_out == 0:
+                self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
+            else:
+                self.prior = prior
 
         self.timing = timing
         self.high_memory = high_memory
@@ -151,23 +155,26 @@ class hierarical_mixture_mpi(object):
         return jsondict
 
     def save(self, dirname):
-        for dname in [dirname, os.path.join(dirname, 'GMMs')]:
-            if not os.path.exists(dname):
-                os.mkdir(dname)
+        if self.rank == 0:
+            for dname in [dirname, os.path.join(dirname, 'GMMs'),
+                          os.path.join(dirname, 'latent')]:
+                if not os.path.exists(dname):
+                    os.mkdir(dname)
+        self.comm.Barrier()
         if self.rank == 0:
             with open(os.path.join(dirname, 'hGMM.json'), 'w') as f:
                 json.dump(self, f, cls=ObjJsonEncoder)
-                self.save_prior_to_file(dirname)
-                for gmm in self.GMMs:
-                    gmm.save_param_to_file(os.path.join(dirname, 'GMMs'))
+            self.save_prior_to_file(os.path.join(dirname, 'latent'))
+        for gmm in self.GMMs:
+            gmm.save_param_to_file(os.path.join(dirname, 'GMMs'))
 
     @classmethod
-    def load(cls, dirname, comm, **data_kws):
+    def load(cls, dirname, comm, names, prior_class=None, **data_kws):
         with open(os.path.join(dirname, 'hGMM.json'), 'r') as f:
             hgmm = json.load(f, object_hook=lambda obj:
-                             class_decoder(obj, cls, comm=comm))
-        hgmm.load_data(**data_kws)
-        hgmm.load_prior_from_file(dirname)
+                             class_decoder(obj, {'hierarical_mixture_mpi': cls, 'Prior': prior_class}, comm=comm))
+        hgmm.load_data(names, **data_kws)
+        hgmm.load_prior_from_file(os.path.join(dirname, 'latent'))
         hgmm.update_GMM()
         for gmm in hgmm.GMMs:
             gmm.load_param_from_file(os.path.join(dirname, 'GMMs'))
@@ -196,7 +203,7 @@ class hierarical_mixture_mpi(object):
             if dirname.endswith("/") == False:
                 dirname += "/"        
             self.normal_p_wisharts = [ normal_p_wishart.unpickle("%snormal_p_wishart_%d.pkl"%(dirname,k)) for k in range(self.K)] 
-            self.Wishart_p_nu      = [ Wishart_p_nu.unpickle("%sWishart_p_nu_%d.pkl"%(dirname,k)) for k in range(self.K)] 
+            self.wishart_p_nus      = [ Wishart_p_nu.unpickle("%sWishart_p_nu_%d.pkl"%(dirname,k)) for k in range(self.K)]
         
     def save_to_file(self,dirname):
         """
@@ -538,7 +545,7 @@ class hierarical_mixture_mpi(object):
             nodata = np.array(0,dtype="i")
         self.comm.Bcast([nodata, MPI.INT],root=0)  # @UndefinedVariable
         if nodata:
-            return                
+            return 1               
         
         if rank == 0:
             d = np.array(data[0].shape[1],dtype="i")
@@ -569,6 +576,7 @@ class hierarical_mixture_mpi(object):
         
         #storing the size of the data used later when sending data
         self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
+        return 0
 
     def set_prior(self, prior, init=False, thetas=None, expSigmas=None):
 

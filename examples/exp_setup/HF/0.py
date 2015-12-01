@@ -8,6 +8,7 @@ Created on Thu Aug 14 20:02:37 2014
 from __future__ import division
 import numpy as np
 from BayesFlow import SimPar, PostProcPar, Prior
+#from BayesFlow import BalancedPrior as Prior
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD

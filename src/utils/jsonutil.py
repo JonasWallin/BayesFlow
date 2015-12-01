@@ -29,11 +29,22 @@ class ObjJsonEncoder(ArrayEncoder):
 
 
 def class_decoder(obj, Cls, **kwargs):
+    '''
+        Cls can be a dictionary of classes or a single class.
+    '''
     if not '__type__'in obj or obj['__type__'] == 'np.ndarray':
         return array_decoder(obj)
+    print "type = {}".format(obj['__type__'])
+    try:
+        objCls = Cls[obj['__type__']]
+    except TypeError:
+        objCls = Cls
     del obj['__type__']
-    obj_decode = construct_from_dict(obj, Cls, **kwargs)
-    print "constructed from dict"
+    print "obj.keys() = {}".format(obj.keys())
+    #attrObjs = {attr: construct_from_dict(obj[attr], attrCls[attr], **kwargs) for attr in attrCls}
+    #kwargs.update(attrObjs)
+    obj_decode = construct_from_dict(obj, objCls, **kwargs)
+    print "{} constructed from dict".format(objCls)
     for arg in obj:
         setattr(obj_decode, arg, obj[arg])
     return obj_decode
@@ -86,4 +97,34 @@ class hier_mixture_mpi_mimic(object):
         self.GMMs = [GMM_mimic(name, noise_mu, noise_sigma) for name in names]
         self.noise_class = noise_class
 
+if __name__ == '__main__':
+    class Foo(object):
+        def __init__(self, a, b=1, bar=None):
+            self.a = a
+            self.b = b
+            self.bar = bar
 
+        def encode_json(self):
+            dic = {"__type__": "Foo"}
+            for arg in self.__dict__:
+                dic[arg] = getattr(self, arg)
+            return dic
+
+        @classmethod
+        def load(cls, json_str):
+            return json.loads(foo_json, object_hook=lambda obj:
+                              class_decoder(obj, {'Foo': cls, 'Bar': Bar}))
+
+    class Bar(object):
+        def __init__(self):
+            self.s = 8
+
+        def encode_json(self):
+            return {'__type__': 'Bar', 's': self.s}
+
+    foo = Foo(5, bar=Bar())
+    foo_json = json.dumps(foo, cls=ObjJsonEncoder)
+    print "foo_json = {}".format(foo_json)
+    foo_load = Foo.load(foo_json)
+    print "foo_load = {}".format(foo_load.__dict__)
+    print "foo_load.bar.__dict__ = {}".format(foo_load.bar.__dict__)
