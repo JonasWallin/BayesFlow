@@ -79,7 +79,7 @@ def simulate_data_v1(nCells = 5*10**4, nPersons = 40, seed = 123456, ratio_P =  
 	
 	nu = 100
 		
-	Y, act_Class, mus = simulate_data_(Thetas, Z_Sigma, Sigmas, P, nu = nu, ratio_act = ratio_P, n_cells = nCells, n_persons = nPersons,
+	Y, act_Class, mus,  x = simulate_data_(Thetas, Z_Sigma, Sigmas, P, nu = nu, ratio_act = ratio_P, n_cells = nCells, n_persons = nPersons,
 				seed = seed)
 	
 	
