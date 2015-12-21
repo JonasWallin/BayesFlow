@@ -106,7 +106,7 @@ class hierarical_mixture_mpi(object):
     """
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
                  thetas=None, expSigmas=None, high_memory=True, timing=False,
-                 AMCMC=False, comm=MPI.COMM_WORLD):
+                 AMCMC=False, comm=MPI.COMM_WORLD, init=True):
         """
             starting up the class and defning number of classes
             
@@ -129,17 +129,18 @@ class hierarical_mixture_mpi(object):
         else:
             self.normal_p_wisharts = None 
             self.wishart_p_nus     = None
-            
+
+        self.high_memory = high_memory
+
         set_data_out = self.set_data(data, sampnames)
         print "prior = {}".format(prior)
         if not prior is None:
             if set_data_out == 0:
-                self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
+                self.set_prior(prior, init=init, thetas=thetas, expSigmas=expSigmas)
             else:
                 self.prior = prior
 
         self.timing = timing
-        self.high_memory = high_memory
 
     def mpiexceptabort(self, type_in, value, tb):
         traceback.print_exception(type_in, value, tb)
@@ -172,7 +173,8 @@ class hierarical_mixture_mpi(object):
     def load(cls, dirname, comm, names, prior_class=None, **data_kws):
         with open(os.path.join(dirname, 'hGMM.json'), 'r') as f:
             hgmm = json.load(f, object_hook=lambda obj:
-                             class_decoder(obj, {'hierarical_mixture_mpi': cls, 'Prior': prior_class}, comm=comm))
+                             class_decoder(obj, {'hierarical_mixture_mpi': cls, 'Prior': prior_class},
+                                           comm=comm, init=False))
         hgmm.load_data(names, **data_kws)
         hgmm.load_prior_from_file(os.path.join(dirname, 'latent'))
         hgmm.update_GMM()
@@ -502,11 +504,13 @@ class hierarical_mixture_mpi(object):
         if self.comm.Get_rank() == 0:
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
-        
+
     def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
         """
             Load data corresponding to sampnames directly onto worker
-        """      
+        """
+        self.data_kws = kw.copy()
+        self.data_kws.update(scale=scale, q=q)
         data = load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
         rank = self.comm.Get_rank()
 
@@ -530,52 +534,70 @@ class hierarical_mixture_mpi(object):
                 raise ValueError('dimension mismatch in the data')
             self.GMMs.append(GMM.mixture(data=Y,K=self.K,name=name,high_memory=self.high_memory))
 
-    def set_data(self, data, names = None):
+    def set_data(self, data, names=None):
         """
             List of np.arrays
-        
+            Three possible inputs:
+                - data is None at all ranks => no data is set
+                - data is None at all ranks except 0 => data is
+                scattered from rank 0.
+                - data is list of np.arrays at all ranks.
         """
-        rank = self.comm.Get_rank()  # @UndefinedVariable
-        if rank == 0:
-            if data is None:
-                nodata = np.array(1,dtype="i")
+
+        nodata = data is None
+        nodata_at_0 = self.comm.bcast(nodata)
+        if nodata_at_0:
+            return 1
+
+        nodata_at_any = self.comm.gather(nodata)
+        if self.rank == 0:
+            nodata_at_any = True in nodata_at_any
+        nodata_at_any = self.comm.bcast(nodata_at_any)
+
+        if not nodata_at_any:
+            dat, names_dat = data, names
+            self.d = data[0].shape[1]
+            self.d = self.comm.bcast(self.d)
+        else:
+            if self.rank == 0:
+                d = np.array(data[0].shape[1],dtype="i")
+                self.n_all = len(data)
+                size = self.comm.Get_size()  # @UndefinedVariable
+                data = np.array(data)
+                send_data = np.array_split(data,size)
+                self.counts = np.empty(size,dtype='i') 
+                if names is None:
+                    names = range(self.n_all)
+                send_name = np.array_split( np.array(names),size)
             else:
-                nodata = np.array(0,dtype="i")
-        else:
-            nodata = np.array(0,dtype="i")
-        self.comm.Bcast([nodata, MPI.INT],root=0)  # @UndefinedVariable
-        if nodata:
-            return 1               
-        
-        if rank == 0:
-            d = np.array(data[0].shape[1],dtype="i")
-            self.n_all = len(data)
-            size = self.comm.Get_size()  # @UndefinedVariable
-            data = np.array(data)
-            send_data = np.array_split(data,size)
-            self.counts = np.empty(size,dtype='i') 
-            if names is None:
-                names = range(self.n_all)
-            send_name = np.array_split( np.array(names),size)
-        else:
-            d  =np.array(0,dtype="i")
-            self.counts = 0
-            send_data = None
-            send_name = None
-            
-        self.comm.Bcast([d, MPI.INT],root=0)  # @UndefinedVariable
-        self.d = d[()]
-        dat = self.comm.scatter(send_data, root= 0)  # @UndefinedVariable
-        names_dat = self.comm.scatter(send_name, root= 0)  # @UndefinedVariable
+                d  =np.array(0,dtype="i")
+                self.counts = 0
+                send_data = None
+                send_name = None
+                
+            self.comm.Bcast([d, MPI.INT],root=0)  # @UndefinedVariable
+            self.d = d[()]
+            dat = self.comm.scatter(send_data, root= 0)  # @UndefinedVariable
+            names_dat = self.comm.scatter(send_name, root= 0)  # @UndefinedVariable
+
         self.n = len(dat)
         for Y, name in zip(dat,names_dat):
             if self.d != Y.shape[1]:
-                raise ValueError('dimension mismatch in the data')
+                raise ValueError('dimension mismatch in the data: self.d = {}, Y.shape[1] = {}'.format(self.d, Y.shape[1]))
             self.GMMs.append(GMM.mixture(data= Y, K = self.K, name = name,high_memory = self.high_memory))
         #print "mpi = %d, len(GMMs) = %d"%(MPI.COMM_WORLD.rank, len(self.GMMs))  # @UndefinedVariable
-        
+
         #storing the size of the data used later when sending data
-        self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
+        if not nodata_at_any:
+            self.n_all = self.comm.gather(len(data))
+            self.counts = np.array(self.comm.gather(self.n*self.K))
+            if self.rank == 0:
+                self.n_all = sum(self.n_all)
+            else:
+                self.n_all = 0
+                self.counts = 0
+        else:
+            self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
         return 0
 
     def set_prior(self, prior, init=False, thetas=None, expSigmas=None):

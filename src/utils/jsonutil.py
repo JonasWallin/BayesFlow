@@ -34,17 +34,15 @@ def class_decoder(obj, Cls, **kwargs):
     '''
     if not '__type__'in obj or obj['__type__'] == 'np.ndarray':
         return array_decoder(obj)
-    print "type = {}".format(obj['__type__'])
+    #print "type = {}".format(obj['__type__'])
     try:
         objCls = Cls[obj['__type__']]
     except TypeError:
         objCls = Cls
     del obj['__type__']
-    print "obj.keys() = {}".format(obj.keys())
-    #attrObjs = {attr: construct_from_dict(obj[attr], attrCls[attr], **kwargs) for attr in attrCls}
-    #kwargs.update(attrObjs)
+    #print "obj.keys() = {}".format(obj.keys())
     obj_decode = construct_from_dict(obj, objCls, **kwargs)
-    print "{} constructed from dict".format(objCls)
+    #print "{} constructed from dict".format(objCls)
     for arg in obj:
         setattr(obj_decode, arg, obj[arg])
     return obj_decode

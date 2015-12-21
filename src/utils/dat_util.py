@@ -40,12 +40,17 @@ def load_fcdata(sampnames=None, scale='percentilescale', q=(1, 99), comm=MPI.COM
 
 def load_fcsample(name, ext, loadfilef, startrow=0, startcol=0, datadir=None,
                   Nevent=None, rm_extreme=True, perturb_extreme=False,
-                  overwrite_eventind=False, i_eventind_load=0):
+                  overwrite_eventind=False, i_eventind_load=0, selectcol=None):
     '''
         Load one fc sample in reproducible way, i.e. so that if
         subsampling is used, the indices (eventind) are saved and will
         be automatically loaded when a new subsampling of the same
         size is requested.
+
+        If rm_extreme=True, data points with exreme values in any
+        dimension will be removed. If preturb_extreme is true, these
+        data points will instead be perturbed slightly (to avoid
+        singularities).
     '''
 
     if datadir is None:
@@ -53,6 +58,8 @@ def load_fcsample(name, ext, loadfilef, startrow=0, startcol=0, datadir=None,
 
     datafile = os.path.join(datadir, name + ext)
     data = loadfilef(datafile)[startrow:, startcol:]
+    if not selectcol is None:
+        data = np.ascontiguousarray(data[:, selectcol])
 
     try:
         eventind = EventInd.load(name, datadir, Nevent, i_eventind_load)
