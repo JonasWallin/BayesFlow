@@ -271,43 +271,52 @@ class HMplot(object):
             fig.colorbar(p)
         return fig
 
-    def prob(self, suco=True, axs=None, ks=None, **figargs):
-            '''
-                Plot probabilities of belonging to each cluster
-            '''
+    def prob(self, suco=True, axs=None, ks=None, colors=None, **figargs):
+        '''
+            Plot probabilities of belonging to each cluster
+        '''
 
+        if suco:
+            order = self.suco_ord
+            prob = self.bmres.p_merged
+        else:
+            order = self.comp_ord
+            prob = self.bmres.p
+
+        if ks is None:
+            K = prob.shape[1]
+            ks = range(K)
+        else:
+            K = len(ks)
             if suco:
-                order = self.suco_ord
-                prob = self.bmres.p_merged
-            else:
-                order = self.comp_ord
-                prob = self.bmres.p
+                raise ValueError("Selection of ks not supported for super components")
 
-            if ks is None:
-                K = prob.shape[1]
-                ks = range(K)
-            else:
-                K = len(ks)
-                if suco:
-                    raise ValueError("Selection of ks not supported for super components")
+        if axs is None:
+            fig, axs = plt.subplots(K, **figargs)
 
-            if axs is None:
-                fig, axs = plt.subplots(K, **figargs)
+        J = prob.shape[0]
 
-            J = prob.shape[0]
+        if not colors is None:
+            color_types = set(colors)
+            colors = np.array(colors)
 
-            for ax, k in zip(axs, ks):
+        for ax, k in zip(axs, ks):
+            if colors is None:
                 ax.scatter(range(J), prob[:, order[k]])
-                ax.set_yscale('log')
-                ax.set_ylim(1e-3, 1)
-                ax.axes.yaxis.set_ticks([1e-2, 1e-1])
-                xlim = ax.get_xlim()
-                ax.plot([xlim[0], xlim[1]], [1e-2, 1e-2], color='grey')
-                ax.plot([xlim[0], xlim[1]], [1e-1, 1e-1], color='grey')
-                ax.axes.xaxis.set_ticks([])
-                ax.set_xlim(-1, J)
+            else:
+                for color_type in color_types:
+                    ind = colors == color_type
+                    ax.scatter(np.arange(J)[ind], prob[ind, order[k]], color=color_type)
+            ax.set_yscale('log')
+            ax.set_ylim(1e-3, 1)
+            ax.axes.yaxis.set_ticks([1e-2, 1e-1])
+            xlim = ax.get_xlim()
+            ax.plot([xlim[0], xlim[1]], [1e-2, 1e-2], color='grey')
+            ax.plot([xlim[0], xlim[1]], [1e-1, 1e-1], color='grey')
+            ax.axes.xaxis.set_ticks([])
+            ax.set_xlim(-1, J)
 
-            return axs
+        return axs
 
     def qhist(self, j, k, dd, ax=None, **figargs):
         '''

@@ -505,34 +505,41 @@ class hierarical_mixture_mpi(object):
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
 
-    def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
+    def load_data(self, sampnames, datadir, ext, loadfilef, **kw):
         """
-            Load data corresponding to sampnames directly onto worker
+            Load data corresponding to sampnames directly onto worker.
+            When called multiple times, new data is appended after the
+            old data.
         """
-        self.data_kws = kw.copy()
-        self.data_kws.update(scale=scale, q=q)
-        data = load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
+        data = load_fcdata(datadir, ext, loadfilef, comm=self.comm,
+                           sampnames=sampnames, **kw)
         rank = self.comm.Get_rank()
 
-        self.n = len(data)
+        if hasattr(self, 'hasdata') and self.hasdata:
+            self.n += len(data)
+        else:
+            self.n = len(data)
         ns = self.comm.gather(self.n)
         if rank == 0:
             self.n_all = np.sum(ns)
-            self.counts = np.array([n*self.K for n in ns],dtype='i')
+            self.counts = np.array([n*self.K for n in ns], dtype='i')
         else:
             self.counts = 0
-        print "self.counts at rank {} = {}".format(rank,self.counts)
-        
-        if rank == 0:
-            self.d = data[0].shape[1]
-        else:
-            self.d = 0
-        self.d = self.comm.bcast(self.d)
+        print "self.counts at rank {} = {}".format(rank, self.counts)
 
-        for Y,name in zip(data,sampnames):
+        if not hasattr(self, 'hasdata') or not self.hasdata:
+            if rank == 0:
+                self.d = data[0].shape[1]
+            else:
+                self.d = 0
+            self.d = self.comm.bcast(self.d)
+
+        for Y, name in zip(data, sampnames):
             if self.d != Y.shape[1]:
                 raise ValueError('dimension mismatch in the data')
-            self.GMMs.append(GMM.mixture(data=Y,K=self.K,name=name,high_memory=self.high_memory))
+            self.GMMs.append(GMM.mixture(data=Y, K=self.K, name=name, 
+                             high_memory=self.high_memory))
+        self.hasdata = True
 
     def set_data(self, data, names=None):
         """

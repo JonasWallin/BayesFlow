@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from .HMplot import HMplot
 from .HMlog import HMlogB, HMElog
 from .PurePython.GMM import mixture
-from .utils.dat_util import load_fcdata
+from .utils.dat_util import load_fcdata, sampnames_scattered
 from .utils.results_mem_efficient import Mres, Traces, MimicSample, Components, MetaData
 from .utils.initialization.distributed_data import DataMPI
 from .utils.initialization.EM import EMD_to_generated_from_model
@@ -54,7 +54,7 @@ class HMres(Mres):
 
             self.traces = Traces(hmlog_burn, hmlog)
             self.mimics = {}
-            print "hmlog.savesampnames = {}".format(hmlog.savesampnames)
+            #print "hmlog.savesampnames = {}".format(hmlog.savesampnames)
             for i, name in enumerate(hmlog.savesampnames):
                 j = hmlog.names.index(name)
                 self.mimics[name] = MimicSample(self.data[j], name, hmlog.Y_sim[i], 'BHM_MCMC')
@@ -70,20 +70,39 @@ class HMres(Mres):
             self.mergeind = self.mergeind  # make all attributes have same mergeind
 
     @classmethod
-    def load(cls, savedir, data_kws, comm=MPI.COMM_SELF, no_postproc=False):
+    def load(cls, savedir, data_kws, comm=MPI.COMM_SELF, no_postproc=False,
+             verbose=True):
         hmlog_burn = HMlogB.load(savedir, comm=comm)
         hmlog = HMElog.load(savedir, comm=comm)
         hmlog.prob_sim_mean *= hmlog.active_komp  # compensate for reweighting in HMlog.postproc
         metadata = data_kws.copy()
         marker_lab = metadata.pop('marker_lab')
-        data = load_fcdata(hmlog.names, comm=comm, **metadata)
-        metadata.update(marker_lab=marker_lab)
-        metadata.update(samp={'names': hmlog.names})
-        print "metadata = {}".format(metadata)
+        ext = metadata.pop('ext')
+        loadfilef = metadata.pop('loadfilef')
+        try:
+            datadir = metadata.pop('datadir')
+            data = load_fcdata(datadir, ext, loadfilef, sampnames=hmlog.names,
+                               comm=comm, **metadata)
+            names = hmlog.names
+        except KeyError:
+            datadirs = metadata.pop('datadirs')
+            data = []
+            names = []
+            for datadir in datadirs:
+                datadir_names = sampnames_scattered(comm, datadir, ext)
+                names_dir = [name for name in hmlog.names if name in datadir_names]
+                data += load_fcdata(datadir, ext, loadfilef, sampnames=names_dir,
+                                    comm=comm, **metadata)
+                names += names_dir
+
+        metadata.update(marker_lab=marker_lab, samp={'names': names})
+        if verbose:
+            print "metadata = {}".format(metadata)
         res = cls(hmlog, hmlog_burn, data, metadata, comm=comm)
         if not no_postproc:
             try:
-                print "savedir = {}".format(savedir)
+                if verbose:
+                    print "savedir = {}".format(savedir)
                 with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
                     postproc_res = json.load(f)
             except IOError:
@@ -231,7 +250,7 @@ class HMres(Mres):
     def get_center_dist(self):
         return self.components.get_center_dist()
 
-    def get_mix(self, j):
+    def get_mix(self, j, debug=False):
         active = self.active_komp[j, :] > 0.05
         mus = [self.components.mupers[j, k, :] for k in range(self.K) if active[k]]
         Sigmas = [self.components.Sigmapers[j, k, :, :] for k in range(self.K) if active[k]]
@@ -240,7 +259,8 @@ class HMres(Mres):
             mus.append(self.noise_mu)
             Sigmas.append(self.noise_sigma)
             ps.append(self.p_noise[j])
-        print "np.sum(ps) = {}".format(np.sum(ps))
+        if debug:
+            print "np.sum(ps) = {}".format(np.sum(ps))
         ps /= np.sum(ps)  # renormalizing
         return mus, Sigmas, np.array(ps)
 

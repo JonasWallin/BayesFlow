@@ -12,24 +12,30 @@ import glob
 from mpi4py import MPI
 import cPickle as pickle
 import os
+from pprint import pformat
 
 from ..exceptions import NoDataError, OldFileError
 from . import mpiutil
 from . import load_and_save as ls
 
 
-def load_fcdata(sampnames=None, scale='percentilescale', q=(1, 99), comm=MPI.COMM_WORLD, **kw):
+def load_fcdata(datadir, ext, loadfilef, comm=MPI.COMM_WORLD, sampnames=None,
+                Nsamp=None, Nevent=None, i_eventind_load=0,
+                scale='percentilescale', q=(1, 99), **kw):
 
     if sampnames is None:
-        sampnames = sampnames_scattered(comm, kw['datadir'], kw['ext'], kw['Nsamp'])
+        sampnames = sampnames_scattered(comm, datadir, ext, Nsamp)
 
     data = []
     for name in sampnames:
-        data.append(load_fcsample(name, **kw))
+        data.append(load_fcsample(name, datadir, ext, loadfilef, Nevent,
+                                  i_eventind_load, **kw))
 
     if scale == 'percentilescale':
-        lower = PercentilesMPI.percentiles_pooled_data(comm, q[0], sampnames, data, **kw)
-        upper = PercentilesMPI.percentiles_pooled_data(comm, q[1], sampnames, data, **kw)
+        perc = PercentilesMPI(datadir, ext, comm, sampnames,
+                              Nevent, i_eventind_load, kw)
+        lower = perc.percentiles_pooled_data(q[0], data)
+        upper = perc.percentiles_pooled_data(q[1], data)
         percentilescale(data, qvalues=(lower, upper))
 
     if scale == 'maxminscale':  # Not recommended in general to use this option
@@ -38,9 +44,9 @@ def load_fcdata(sampnames=None, scale='percentilescale', q=(1, 99), comm=MPI.COM
     return data
 
 
-def load_fcsample(name, ext, loadfilef, startrow=0, startcol=0, datadir=None,
-                  Nevent=None, rm_extreme=True, perturb_extreme=False,
-                  overwrite_eventind=False, i_eventind_load=0, selectcol=None):
+def load_fcsample(name, datadir, ext, loadfilef, Nevent=None, i_eventind_load=0,
+                  startrow=0, startcol=0, rm_extreme=True, perturb_extreme=False,
+                  overwrite_eventind=False, selectcol=None):
     '''
         Load one fc sample in reproducible way, i.e. so that if
         subsampling is used, the indices (eventind) are saved and will
@@ -48,18 +54,13 @@ def load_fcsample(name, ext, loadfilef, startrow=0, startcol=0, datadir=None,
         size is requested.
 
         If rm_extreme=True, data points with exreme values in any
-        dimension will be removed. If preturb_extreme is true, these
-        data points will instead be perturbed slightly (to avoid
-        singularities).
+        dimension will be removed (selectcol does not affect this).
+        If preturb_extreme is true, these data points will instead be
+        perturbed slightly (to avoid singularities).
     '''
-
-    if datadir is None:
-        raise ValueError('No datadir provided')
 
     datafile = os.path.join(datadir, name + ext)
     data = loadfilef(datafile)[startrow:, startcol:]
-    if not selectcol is None:
-        data = np.ascontiguousarray(data[:, selectcol])
 
     try:
         eventind = EventInd.load(name, datadir, Nevent, i_eventind_load)
@@ -83,6 +84,9 @@ def load_fcsample(name, ext, loadfilef, startrow=0, startcol=0, datadir=None,
         if perturb_extreme:
             ok = non_extreme_ind(data)
             data[~ok, :] = add_noise(data[~ok, :])
+
+    if not selectcol is None:
+        data = np.ascontiguousarray(data[:, selectcol])
 
     return data[eventind.indices, :]
 
@@ -168,38 +172,38 @@ def sampnames_scattered(comm, datadir, ext, Nsamp=None, namerule=None):
 
 
 def total_number_samples(comm, sampnames):
-    print "id(comm) = {}".format(id(comm))
     J = np.sum(mpiutil.collect_int(len(sampnames), comm))
     return mpiutil.bcast_int(J, comm)
 
 
-def total_number_events_and_samples(comm, sampnames, data=None, **kw):
-    print "computing tot samples at rank {}".format(comm.Get_rank())
+def total_number_events_and_samples(comm, sampnames, data=None, Nevent=None, debug=False, **kw):
+    if debug:
+        print "computing tot samples at rank {}".format(comm.Get_rank())
     J = total_number_samples(comm, sampnames)
-    print "nbr samples computed"
-    #print "J at rank {} = {}".format(rank, J)
-    try:
-        Nevent = kw['Nevent']
-        if Nevent is None:
-            raise KeyError
-        print "J*Nevent = {}".format(J*Nevent)
-        return J*Nevent
-    except KeyError:
-        pass
+    if debug:
+        print "nbr samples computed"
+        print "J at rank {} = {}".format(comm.Get_rank(), J)
+    if not Nevent is None:
+        if debug:
+            print "J*Nevent = {}".format(J*Nevent)
+        return J*Nevent, J
     if data is None:
         N_loc = 0
         kw_cp = kw.copy()
         if 'scale' in kw_cp:
             del kw_cp['scale']
         for name in sampnames:
-            N_loc += load_fcsample(name, **kw_cp).shape[0]
+            N_loc += load_fcsample(name, Nevent=Nevent, **kw_cp).shape[0]
     else:
         N_loc = np.sum([dat.shape[0] for dat in data])
-    print "N_loc at rank {} = {}".format(comm.Get_rank(), N_loc)
+    if debug:
+        print "N_loc at rank {} = {}".format(comm.Get_rank(), N_loc)
     N = int(np.sum(mpiutil.collect_int(N_loc, comm)))
-    print "N = {}".format(N)
+    if debug:
+        print "N = {}".format(N)
     comm.Barrier()
-    print "N at rank {} = {}".format(comm.Get_rank(), N)
+    if debug:
+        print "N at rank {} = {}".format(comm.Get_rank(), N)
     N = mpiutil.bcast_int(N, comm)
     return N, J
 
@@ -261,8 +265,8 @@ class PercentilesMPI(object):
         multiple workers. Computed percentiles are saved by default and
         if wanted again, previously computed percentiles are loaded.
     """
-    def __init__(self, comm, sampnames, Nevent=None, i_eventind_load=0,
-                 datadir=None, ext=None):
+    def __init__(self, datadir, ext, comm, sampnames, Nevent, i_eventind_load,
+                 loaddata_kw=None):
         self.comm = comm
         self.rank = comm.Get_rank()
 
@@ -279,20 +283,22 @@ class PercentilesMPI(object):
         self.Nevent = Nevent
         self.i_eventind_load = i_eventind_load
         self.savedir_ = self.savedir(datadir)
+        self.loaddata_kw = pformat(loaddata_kw)
         self.key_file_ = self.savedir_+'scale_keys.pkl'
         self.key_dict_ = self.key_dict()  # This dictionary keeps track
           # of previously computed precentiles.
         self.key_ = self.key()
 
     @classmethod
-    def percentiles_pooled_data(cls, comm, q, sampnames, data=None,
-                                Nevent=None, i_eventind_load=0, datadir=None,
-                                ext=None, **kw):
-        percMPI = cls(comm, sampnames, Nevent, i_eventind_load, datadir, ext)
-        return percMPI.percentiles_pooled_data_method(q, data, ext=ext, **kw)
+    def percentiles_pooled_data_clm(cls, datadir, ext, comm, q, sampnames, data=None,
+                                    Nevent=None, i_eventind_load=0, loaddata_kw=None):
+        percMPI = cls(datadir, ext, comm, sampnames, Nevent, i_eventind_load, loaddata_kw)
+        return percMPI.percentiles_pooled_data_method(q, data)
 
-    def percentiles_pooled_data_method(self, q, data=None, load=True,
-                                       save=True, **kw):
+    def percentiles_pooled_data(self, q, data=None, load=True, save=True,
+                                loadfilef=None, loaddata_kw=None):
+        if loaddata_kw is None:
+            loaddata_kw = {}
         if load:
             try:
                 return self.load_values(q)
@@ -300,13 +306,12 @@ class PercentilesMPI(object):
                 pass
         if q > 50:
             if data is None:
-                kw_ = kw.copy()
-                kw_['loadfilef'] = lambda name: -kw['loadfilef'](name)
-                percentile_values = -self.percentiles_pooled_data_method(
-                    100-q, load=False, save=False, **kw_)
+                loadfilef = lambda name: -loadfilef(name)
+                percentile_values = -self.percentiles_pooled_data(
+                    100-q, load=False, save=False, loadfilef=loadfilef, loaddata_kw=loaddata_kw)
             else:
-                percentile_values = -self.percentiles_pooled_data_method(
-                    100-q, [-dat for dat in data], load=False, save=False, **kw)
+                percentile_values = -self.percentiles_pooled_data(
+                    100-q, [-dat for dat in data], load=False, save=False)
             if save:
                 self.save(q, percentile_values)
             return percentile_values
@@ -314,12 +319,15 @@ class PercentilesMPI(object):
         if self.rank == 0:
             print "Computing new percentiles"
         NN, _ = total_number_events_and_samples(
-            self.comm, self.sampnames, data, datadir=self.datadir, **kw)
+            self.comm, self.sampnames, data, datadir=self.datadir,
+            loadfilef=loadfilef, **loaddata_kw)
         N = int(np.round(NN*q/100))
         if data is None:
             data_list = []
             for name in self.sampnames:
-                dat = load_fcsample(name, datadir=self.datadir, **kw)
+                dat = load_fcsample(name, datadir=self.datadir, ext=self.ext,
+                                    Nevent=self.Nevent, i_eventind_load=self.i_eventind_load,
+                                    loadfilef=loadfilef, **loaddata_kw)
                 self.partition_all_columns(dat, N-1)
                 data_list.append(dat[:N, :])
             data_loc = np.vstack(data_list)
@@ -358,7 +366,8 @@ class PercentilesMPI(object):
             #print "curr_dict = {}".format(curr_dict)
             samp_frozen = frozenset(self.sampnames_all)
             key_ = ''
-            for j, dat in enumerate([samp_frozen, self.Nevent, self.i_eventind_load]):
+            for j, dat in enumerate([samp_frozen, self.Nevent, self.i_eventind_load,
+                                     self.loaddata_kw]):
                 try:
                     i, curr_dict = curr_dict[dat]
                 except:
