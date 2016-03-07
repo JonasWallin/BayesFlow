@@ -10,14 +10,14 @@ import BayesFlow.plot as bm_plot
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as npr
-matplotlib.rc('text', usetex=True)
-#matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
-matplotlib.rcParams['ps.useafm'] = True
-matplotlib.rcParams['pdf.use14corefonts'] = True
-matplotlib.rcParams['text.usetex'] = True
+# matplotlib.rc('text', usetex=True)
+# matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+# matplotlib.rcParams['ps.useafm'] = True
+# matplotlib.rcParams['pdf.use14corefonts'] = True
+# matplotlib.rcParams['text.usetex'] = True
 
 
-folderFigs = u"/Users/jonaswallin/Documents/temp/" #"/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
+folderFigs = u"/Users/johnsson/Dropbox/FlowCap (2)/figs/tmp/"#jonaswallin/Documents/temp/" #"/Users/jonaswallin/Dropbox/articles/FlowCap/figs/"
 if __name__ == "__main__":
 	nPersons  = 80
 	nCells = 15000
