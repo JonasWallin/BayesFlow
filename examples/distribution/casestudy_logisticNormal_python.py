@@ -10,7 +10,8 @@ Created on Sun May 24 14:07:19 2015
 from __future__ import division
 
 import numpy as np
-import BayesFlow.PurePython.distribution.logisiticNormal as MMN
+#import BayesFlow.PurePython.distribution.logisticMNormal as MMN
+from BayesFlow.PurePython.distribution import logisticNormal as MMN
 import matplotlib.pyplot as plt
 n = 10000
 sim = 200
@@ -27,7 +28,7 @@ if __name__ == "__main__":
 	p_vec = np.zeros((sim,len(p)))
 	for i in range(sim):
 		MMN_obj.sample()
-		p_vec[i,:] = MMN_obj.get_p()
+		p_vec[i,:] = MMN_obj.get_p().reshape(len(p))
 		
 	print("acc = %d",MMN_obj.accept_mcmc/MMN_obj.count_mcmc)
 	plt.plot(p_vec)
