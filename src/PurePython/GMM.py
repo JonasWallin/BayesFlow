@@ -225,7 +225,7 @@ class mixture(object):
 
 	def load_param_from_file(self, dirname):
 		with open(os.path.join(dirname, 'gmm_{}.json'.format(self.name)), 'r') as f:
-			param = json.loads(f, object_hook=lambda obj: array_decoder(obj))
+			param = json.load(f, object_hook=lambda obj: array_decoder(obj))
 		self.load_param(param)
 	
 	def set_name(self,name):

@@ -106,7 +106,7 @@ class hierarical_mixture_mpi(object):
     """
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
                  thetas=None, expSigmas=None, high_memory=True, timing=False,
-                 AMCMC=False, comm=MPI.COMM_WORLD):
+                 AMCMC=False, comm=MPI.COMM_WORLD, init=True):
         """
             starting up the class and defning number of classes
             
@@ -129,13 +129,18 @@ class hierarical_mixture_mpi(object):
         else:
             self.normal_p_wisharts = None 
             self.wishart_p_nus     = None
-            
-        self.set_data(data, sampnames)
+
+        self.high_memory = high_memory
+
+        set_data_out = self.set_data(data, sampnames)
+        print "prior = {}".format(prior)
         if not prior is None:
-            self.set_prior(prior, init=True, thetas=thetas, expSigmas=expSigmas)
+            if set_data_out == 0:
+                self.set_prior(prior, init=init, thetas=thetas, expSigmas=expSigmas)
+            else:
+                self.prior = prior
 
         self.timing = timing
-        self.high_memory = high_memory
 
     def mpiexceptabort(self, type_in, value, tb):
         traceback.print_exception(type_in, value, tb)
@@ -151,23 +156,27 @@ class hierarical_mixture_mpi(object):
         return jsondict
 
     def save(self, dirname):
-        for dname in [dirname, os.path.join(dirname, 'GMMs')]:
-            if not os.path.exists(dname):
-                os.mkdir(dname)
+        if self.rank == 0:
+            for dname in [dirname, os.path.join(dirname, 'GMMs'),
+                          os.path.join(dirname, 'latent')]:
+                if not os.path.exists(dname):
+                    os.mkdir(dname)
+        self.comm.Barrier()
         if self.rank == 0:
             with open(os.path.join(dirname, 'hGMM.json'), 'w') as f:
                 json.dump(self, f, cls=ObjJsonEncoder)
-                self.save_prior_to_file(dirname)
-                for gmm in self.GMMs:
-                    gmm.save_param_to_file(os.path.join(dirname, 'GMMs'))
+            self.save_prior_to_file(os.path.join(dirname, 'latent'))
+        for gmm in self.GMMs:
+            gmm.save_param_to_file(os.path.join(dirname, 'GMMs'))
 
     @classmethod
-    def load(cls, dirname, comm, **data_kws):
+    def load(cls, dirname, comm, names, prior_class=None, **data_kws):
         with open(os.path.join(dirname, 'hGMM.json'), 'r') as f:
             hgmm = json.load(f, object_hook=lambda obj:
-                             class_decoder(obj, cls, comm=comm))
-        hgmm.load_data(**data_kws)
-        hgmm.load_prior_from_file(dirname)
+                             class_decoder(obj, {'hierarical_mixture_mpi': cls, 'Prior': prior_class},
+                                           comm=comm, init=False))
+        hgmm.load_data(names, **data_kws)
+        hgmm.load_prior_from_file(os.path.join(dirname, 'latent'))
         hgmm.update_GMM()
         for gmm in hgmm.GMMs:
             gmm.load_param_from_file(os.path.join(dirname, 'GMMs'))
@@ -196,7 +205,7 @@ class hierarical_mixture_mpi(object):
             if dirname.endswith("/") == False:
                 dirname += "/"        
             self.normal_p_wisharts = [ normal_p_wishart.unpickle("%snormal_p_wishart_%d.pkl"%(dirname,k)) for k in range(self.K)] 
-            self.Wishart_p_nu      = [ Wishart_p_nu.unpickle("%sWishart_p_nu_%d.pkl"%(dirname,k)) for k in range(self.K)] 
+            self.wishart_p_nus      = [ Wishart_p_nu.unpickle("%sWishart_p_nu_%d.pkl"%(dirname,k)) for k in range(self.K)]
         
     def save_to_file(self,dirname):
         """
@@ -495,80 +504,108 @@ class hierarical_mixture_mpi(object):
         if self.comm.Get_rank() == 0:
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
-        
-    def load_data(self,sampnames=None,scale='percentilescale',q=(1,99),**kw):
+
+    def load_data(self, sampnames, datadir, ext, loadfilef, **kw):
         """
-            Load data corresponding to sampnames directly onto worker
-        """      
-        data = load_fcdata(sampnames,scale,q,comm=self.comm,**kw)
+            Load data corresponding to sampnames directly onto worker.
+            When called multiple times, new data is appended after the
+            old data.
+        """
+        data = load_fcdata(datadir, ext, loadfilef, comm=self.comm,
+                           sampnames=sampnames, **kw)
         rank = self.comm.Get_rank()
 
-        self.n = len(data)
+        if hasattr(self, 'hasdata') and self.hasdata:
+            self.n += len(data)
+        else:
+            self.n = len(data)
         ns = self.comm.gather(self.n)
         if rank == 0:
             self.n_all = np.sum(ns)
-            self.counts = np.array([n*self.K for n in ns],dtype='i')
+            self.counts = np.array([n*self.K for n in ns], dtype='i')
         else:
             self.counts = 0
-        print "self.counts at rank {} = {}".format(rank,self.counts)
-        
-        if rank == 0:
-            self.d = data[0].shape[1]
-        else:
-            self.d = 0
-        self.d = self.comm.bcast(self.d)
+        print "self.counts at rank {} = {}".format(rank, self.counts)
 
-        for Y,name in zip(data,sampnames):
+        if not hasattr(self, 'hasdata') or not self.hasdata:
+            if rank == 0:
+                self.d = data[0].shape[1]
+            else:
+                self.d = 0
+            self.d = self.comm.bcast(self.d)
+
+        for Y, name in zip(data, sampnames):
             if self.d != Y.shape[1]:
                 raise ValueError('dimension mismatch in the data')
-            self.GMMs.append(GMM.mixture(data=Y,K=self.K,name=name,high_memory=self.high_memory))
+            self.GMMs.append(GMM.mixture(data=Y, K=self.K, name=name, 
+                             high_memory=self.high_memory))
+        self.hasdata = True
 
-    def set_data(self, data, names = None):
+    def set_data(self, data, names=None):
         """
             List of np.arrays
-        
+            Three possible inputs:
+                - data is None at all ranks => no data is set
+                - data is None at all ranks except 0 => data is
+                scattered from rank 0.
+                - data is list of np.arrays at all ranks.
         """
-        rank = self.comm.Get_rank()  # @UndefinedVariable
-        if rank == 0:
-            if data is None:
-                nodata = np.array(1,dtype="i")
+
+        nodata = data is None
+        nodata_at_0 = self.comm.bcast(nodata)
+        if nodata_at_0:
+            return 1
+
+        nodata_at_any = self.comm.gather(nodata)
+        if self.rank == 0:
+            nodata_at_any = True in nodata_at_any
+        nodata_at_any = self.comm.bcast(nodata_at_any)
+
+        if not nodata_at_any:
+            dat, names_dat = data, names
+            self.d = data[0].shape[1]
+            self.d = self.comm.bcast(self.d)
+        else:
+            if self.rank == 0:
+                d = np.array(data[0].shape[1],dtype="i")
+                self.n_all = len(data)
+                size = self.comm.Get_size()  # @UndefinedVariable
+                data = np.array(data)
+                send_data = np.array_split(data,size)
+                self.counts = np.empty(size,dtype='i') 
+                if names is None:
+                    names = range(self.n_all)
+                send_name = np.array_split( np.array(names),size)
             else:
-                nodata = np.array(0,dtype="i")
-        else:
-            nodata = np.array(0,dtype="i")
-        self.comm.Bcast([nodata, MPI.INT],root=0)  # @UndefinedVariable
-        if nodata:
-            return                
-        
-        if rank == 0:
-            d = np.array(data[0].shape[1],dtype="i")
-            self.n_all = len(data)
-            size = self.comm.Get_size()  # @UndefinedVariable
-            data = np.array(data)
-            send_data = np.array_split(data,size)
-            self.counts = np.empty(size,dtype='i') 
-            if names is None:
-                names = range(self.n_all)
-            send_name = np.array_split( np.array(names),size)
-        else:
-            d  =np.array(0,dtype="i")
-            self.counts = 0
-            send_data = None
-            send_name = None
-            
-        self.comm.Bcast([d, MPI.INT],root=0)  # @UndefinedVariable
-        self.d = d[()]
-        dat = self.comm.scatter(send_data, root= 0)  # @UndefinedVariable
-        names_dat = self.comm.scatter(send_name, root= 0)  # @UndefinedVariable
+                d  =np.array(0,dtype="i")
+                self.counts = 0
+                send_data = None
+                send_name = None
+                
+            self.comm.Bcast([d, MPI.INT],root=0)  # @UndefinedVariable
+            self.d = d[()]
+            dat = self.comm.scatter(send_data, root= 0)  # @UndefinedVariable
+            names_dat = self.comm.scatter(send_name, root= 0)  # @UndefinedVariable
+
         self.n = len(dat)
         for Y, name in zip(dat,names_dat):
             if self.d != Y.shape[1]:
-                raise ValueError('dimension mismatch in the data')
+                raise ValueError('dimension mismatch in the data: self.d = {}, Y.shape[1] = {}'.format(self.d, Y.shape[1]))
             self.GMMs.append(GMM.mixture(data= Y, K = self.K, name = name,high_memory = self.high_memory))
         #print "mpi = %d, len(GMMs) = %d"%(MPI.COMM_WORLD.rank, len(self.GMMs))  # @UndefinedVariable
-        
+
         #storing the size of the data used later when sending data
-        self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
+        if not nodata_at_any:
+            self.n_all = self.comm.gather(len(data))
+            self.counts = np.array(self.comm.gather(self.n*self.K))
+            if self.rank == 0:
+                self.n_all = sum(self.n_all)
+            else:
+                self.n_all = 0
+                self.counts = 0
+        else:
+            self.comm.Gather(sendbuf=[np.array(self.n * self.K,dtype='i'), MPI.INT], recvbuf=[self.counts, MPI.INT], root=0)  # @UndefinedVariable
+        return 0
 
     def set_prior(self, prior, init=False, thetas=None, expSigmas=None):
 

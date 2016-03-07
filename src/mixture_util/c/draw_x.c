@@ -6,16 +6,29 @@ extern "C" {
 
 #include <math.h>
 #ifdef MKL
+
 #include <mkl.h>
 #include <mkl_cblas.h>
 #define LAPACK_DPOTRF LAPACKE_dpotrf
 #define LAPACK_DPOTRI LAPACKE_dpotri
 #else
+
 #include "clapack.h"
 #include "cblas.h"
+// atlas version of clapack uses other version compared to reg mac
+#ifdef ATL_INT
+
 #define LAPACK_DPOTRF clapack_dpotrf
 #define LAPACK_DPOTRI clapack_dpotri
+
+#else
+
+#define LAPACK_DPOTRF dpotrf
+#define LAPACK_DPOTRI dpotri
+
 #endif
+#endif
+
 #include <stdlib.h> 
 #include <string.h>
 

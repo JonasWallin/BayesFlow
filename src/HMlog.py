@@ -11,14 +11,15 @@ import json
 from .utils import mpiutil
 from .utils.jsonutil import ObjJsonEncoder, class_decoder
 
-warnings.filterwarnings('ignore',message='using a non-integer number.*',category= DeprecationWarning)
+warnings.filterwarnings('ignore', message='using a non-integer number.*', category=DeprecationWarning)
 
 
 class HMlogB(object):
     '''
         Class for saving burn-in iterations from sampling of posterior distribution
     '''
-    def __init__(self, hGMM, sim, nbrsave=None, savefrq=None, comm=MPI.COMM_WORLD):
+    def __init__(self, hGMM, sim, nbrsave=None, savefrq=None, comm=MPI.COMM_WORLD,
+                 verbose=False):
         self.comm = comm
         self.rank = comm.Get_rank()
         if not savefrq is None:
@@ -44,9 +45,10 @@ class HMlogB(object):
             self.theta_sim = np.empty((self.nbrsave, self.K, self.d))
             self.nu_sim = np.empty((self.nbrsave, self.K))
             self.nu_sigma_sim = np.empty((self.nbrsave, self.K))
-            print "log nbrsave = {}".format(self.nbrsave)
-            print "log savefrq = {}".format(self.savefrq)
-            print "log iterations = {}".format(self.sim)
+            if verbose:
+                print "log nbrsave = {}".format(self.nbrsave)
+                print "log savefrq = {}".format(self.savefrq)
+                print "log iterations = {}".format(self.sim)
 
     def savesim(self, hGMM):
         '''
@@ -157,7 +159,7 @@ class HMlogB(object):
         with open(os.path.join(savedir, logname+'.json'), 'r') as f:
             hmlog = json.load(f, object_hook=lambda obj:
                               class_decoder(obj, cls, comm=comm))
-        print "load burnlog json"
+        #print "load burnlog json"
         if comm.Get_rank() == 0:
             with open(os.path.join(savedir, logname+'_theta_sim.npy'), 'r') as f:
                 hmlog.theta_sim = np.load(f)
@@ -179,7 +181,8 @@ class HMlog(HMlogB):
     '''
     
     def __init__(self, hGMM, sim, savesamp=None, savesampnames=None, nbrsave=None,
-                 savefrq=None, nbrsavey=None, savefrqy=None, comm=MPI.COMM_WORLD):
+                 savefrq=None, nbrsavey=None, savefrqy=None, comm=MPI.COMM_WORLD,
+                 verbose=False):
         super(HMlog,self).__init__(hGMM,sim,nbrsave,savefrq,comm)
 
         if self.noise_class:
@@ -208,8 +211,9 @@ class HMlog(HMlogB):
                     for j,GMM in enumerate(hGMM.GMMs):
                         if GMM.name in savesampnames:
                             self.savesamp_loc.append(j)
-            print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,self.rank)
-            print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),self.rank)
+            if verbose:
+                print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,self.rank)
+                print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),self.rank)
             self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
             if self.rank == 0:
                 self.savesampnames = savesampnames
@@ -403,7 +407,7 @@ class HMlog(HMlogB):
                     with open(os.path.join(syndata_dir, name+'_MODEL.pkl'), 'r') as f:
                         hmlog.Y_sim.append(pickle.load(f))
                 except IOError as e:
-                    print e
+                    # print e
                     nofiles.append(name)
             hmlog.savesampnames = [name for name in hmlog.savesampnames
                                    if name not in nofiles]
@@ -429,19 +433,36 @@ class HMElog(HMlog):
         NB! Does save classification frequencies and
         thus makes it possible to create Clustering object.
     '''
-    def __init__(self,hGMM,sim,savesamp=None,savesampnames=None,nbrsave=None,savefrq=None,nbrsavey=None,savefrqy=None,
+    def __init__(self, hGMM, sim, savesamp=None, savesampnames=None,
+                 nbrsave=None, savefrq=None, nbrsavey=None, savefrqy=None,
                  high_memory=False, comm=MPI.COMM_WORLD):
-        super(HMElog,self).__init__(hGMM,sim,savesamp,savesampnames,nbrsave,
-                                    savefrq,nbrsavey,savefrqy,comm)
-        self.batch = 1000
-        self.ii = -1
-        self.init_classif(hGMM)
-        self.set_ns()
-        if self.rank == 0 and high_memory:
-            self.classif_freq_all = np.zeros((sum(self.ns),self.K+self.noise_class))
+        super(HMElog, self).__init__(hGMM, sim, savesamp, savesampnames, nbrsave,
+                                     savefrq, nbrsavey, savefrqy, comm)
+        if hGMM.__class__.__name__ == 'hier_mixture_mpi_mimic':
+            return
 
-    def init_classif(self,hGMM):
-        self.classif = [-np.ones((GMM.data.shape[0],self.batch),dtype = 'i') for GMM in hGMM.GMMs]
+        self.ii = -1
+
+        max_classif_mem = 1e9  # maximum number of bytes that will be used to
+                                 # save classification frequencies.
+        if hGMM.K < 254:  # last value (255=-1) reserved for no observation
+            self.classif_dtype = np.uint8
+        else:
+            self.classif_dtype = np.uint16
+        ns_loc = [GMM.data.shape[0] for GMM in hGMM.GMMs]
+        ns_all = comm.gather(ns_loc)
+        if comm.Get_rank() == 0:
+            self.ns = [n for ns in ns_all for n in ns]
+            n = sum(self.ns)
+            self.batch = min(min(int(max_classif_mem/(n*np.dtype(self.classif_dtype).itemsize)), 1000), sim)
+            print "In HMElog, self.batch = {}".format(self.batch)
+            if self.batch < 1:
+                raise MemoryError('Not enough memory for saving classification frequencies.')
+        else:
+            self.batch = 0
+        self.batch = comm.bcast(self.batch)
+        self.classif = [-np.ones((n_, self.batch), dtype=self.classif_dtype) for n_ in ns_loc]
+        #self.set_ns()
 
     def savesim(self, hGMM):
         '''
@@ -451,86 +472,51 @@ class HMElog(HMlog):
         self.ii += 1
         if self.ii == self.batch:
             self.add_classif_fr()
-            self.init_classif(hGMM)
+            for classif_ in self.classif:
+                classif_[:] = -1
             self.ii = 0
         for j, GMM in enumerate(hGMM.GMMs):
             self.classif[j][:, self.ii] = GMM.x[:]
-
-    def postproc(self, high_memory=False):
-        '''
-            Post-processing production iterations
-        '''
-        super(HMElog,self).postproc(high_memory)
-        if not self.ii == self.batch:
-            self.add_classif_fr()
-        del self.classif
-        if self.rank == 0 and high_memory:
-            self.classif_freq = mpiutil.collect_arrays(self.classif_freq_loc)     
-            
-    # def postproc_old(self):
-    #     '''
-    #         Post-processing production iterations
-    #     '''
-    #     super(HMElog,self).postproc()
-    #     if not self.ii == self.batch:
-    #         self.add_classif_fr()
-    #     del self.classif
-    #     if rank == 0:
-    #         self.classif_freq = np.split(self.classif_freq_all, np.cumsum(self.ns[0:-1]))
-    #         del self.classif_freq_all        
 
     def add_classif_fr(self):
         try:
             classif_freq_loc = self.classif_freq_loc
         except:
-            classif_freq_loc= [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
-        for j,cl in enumerate(self.classif):
+            classif_freq_loc = [np.zeros((cl.shape[0], self.K+self.noise_class), dtype='i') for cl in self.classif]
+        for j, cl in enumerate(self.classif):
             for ii in range(cl.shape[0]):
-                cnt = collections.Counter(cl[ii,:])
-                del cnt[-1]
-                classif_freq_loc[j][ii,cnt.keys()] += cnt.values()
+                cnt = collections.Counter(cl[ii, :])
+                del cnt[self.classif_dtype(-1)]
+                classif_freq_loc[j][ii, cnt.keys()] += cnt.values()
         self.classif_freq_loc = classif_freq_loc
 
-    # def add_classif_fr_old(self):
-    #     classif_freqs_loc = [np.zeros((cl.shape[0],self.K + self.noise_class),dtype = 'i') for cl in self.classif]
-    #     for j,cl in enumerate(self.classif):
-    #         for ii in range(cl.shape[0]):
-    #             cnt = collections.Counter(cl[ii,:])
-    #             del cnt[-1]
-    #             classif_freqs_loc[j][ii,cnt.keys()] = cnt.values()
-    #     classif_freq_loc = np.array(np.vstack(classif_freqs_loc),dtype = 'i')
-    #     #classif_freq_loc = classif_freq_loc[0:100,:]
-    #     if rank == 0:
-    #         counts = np.empty(comm.Get_size(),dtype = 'i')
+    def postproc(self, high_memory=False):
+        '''
+            Post-processing production iterations
+        '''
+        super(HMElog, self).postproc(high_memory)
+        if not self.ii == self.batch:
+            self.add_classif_fr()
+        del self.classif
+        if self.rank == 0 and high_memory:
+            self.classif_freq = mpiutil.collect_arrays(self.classif_freq_loc)
+
+    # def set_ns(self):
+    #     ns_loc = np.array([cl.shape[0] for cl in self.classif],dtype='i')
+    #     if self.rank == 0:
+    #         counts = np.empty(self.comm.Get_size(),dtype = 'i')
     #     else:
     #         counts = 0
-    #     comm.Gather(sendbuf=[np.array(classif_freq_loc.shape[0] * classif_freq_loc.shape[1],dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
+    #     self.comm.Gather(sendbuf=[np.array(self.J_loc,dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
         
-    #     if rank == 0:
-    #         classif_all = np.empty((sum(counts)/(self.K+self.noise_class),self.K+self.noise_class),dtype = 'i')
-    #         #print "classif_all.shape = {}".format(classif_all.shape)
+    #     if self.rank == 0:
+    #         ns = np.empty(self.J,dtype = 'i')
+    #     #print "ns.shape = {}".format(ns.shape)
     #     else:
-    #         classif_all = None
-    #     comm.Gatherv(sendbuf=[classif_freq_loc,MPI.INT],recvbuf=[classif_all,(counts,None),MPI.INT],root=0)
-    #    if rank == 0:
-    #        self.classif_freq_all += classif_all
-
-    def set_ns(self):
-        ns_loc = np.array([cl.shape[0] for cl in self.classif],dtype='i')
-        if self.rank == 0:
-            counts = np.empty(self.comm.Get_size(),dtype = 'i')
-        else:
-            counts = 0
-        self.comm.Gather(sendbuf=[np.array(self.J_loc,dtype='i'), MPI.INT], recvbuf=[counts, MPI.INT], root=0)
-        
-        if self.rank == 0:
-            ns = np.empty(self.J,dtype = 'i')
-        #print "ns.shape = {}".format(ns.shape)
-        else:
-            ns = None
-        self.comm.Gatherv(sendbuf=[ns_loc,MPI.INT],recvbuf=[ns,(counts,None),MPI.INT],root=0)
-        if self.rank == 0:
-            self.ns = ns
+    #         ns = None
+    #     self.comm.Gatherv(sendbuf=[ns_loc,MPI.INT],recvbuf=[ns,(counts,None),MPI.INT],root=0)
+    #     if self.rank == 0:
+    #         self.ns = ns
 
     def encode_json(self):
         jsondict = super(HMElog, self).encode_json()

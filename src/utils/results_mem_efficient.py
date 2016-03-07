@@ -60,6 +60,8 @@ class Mres(object):
         '''
             Sets also canonical ordering and colors for plots.
         '''
+        if hasattr(self, '_forbidden_merging'):
+            forbidden_merging_sucos = [(self._mergeind[i], self._mergeind[j]) for i, j in self._forbidden_merging]
         for s, suco in enumerate(mergeind):
             sc_ord = np.argsort(-np.array(np.sum(self.p, axis=0)[suco]))
             mergeind[s] = [suco[i] for i in sc_ord]  # Change order within each super component
@@ -72,6 +74,16 @@ class Mres(object):
                                  enumerate(self.mergeind) if k in comp])
         for clust in self.clusts:
             clust.mergeind = self.mergeind
+
+        if hasattr(self, '_forbidden_merging'):
+            self._forbidden_merging = []
+            for suco1, suco2 in forbidden_merging_sucos:
+                try:
+                    i = self._mergeind.index(suco1)
+                    j = self._mergeind.index(suco2)
+                except ValueError:
+                    continue
+                self._forbidden_merging.append((i, j))
 
     @property
     def mergeind_sorted(self):
@@ -107,7 +119,12 @@ class Mres(object):
     def get_order(self):
         return self._comp_ord, self._suco_ord
 
-    def merge(self, method, thr, **mmfArgs):
+    def merge(self, method, thr, forbidden_merging=None, verbose=True, **mmfArgs):
+        self.verbose = verbose
+        if forbidden_merging is None:
+            self._forbidden_merging = []
+        else:
+            self._forbidden_merging = forbidden_merging
         self.complist = [[k] for k in range(self.K)]
         if method == 'demp':
             self.hierarchical_merge(self.get_median_overlap, thr, **mmfArgs)
@@ -128,10 +145,12 @@ class Mres(object):
             else:
                 fun_bh = self.get_median_bh_overlap_data
                 fun_dip = self.get_median_bh_dt_overlap_dip2
-            print "Merging components with median/min Bhattacharyya overlap at least {}".format(thr)
+            if self.verbose:
+                print "Merging components with median/min Bhattacharyya overlap at least {}".format(thr)
             self.hierarchical_merge(fun_bh, thr, **mmfArgs)
-            print """Merging components with median/min Bhattacharyya overlap
-                     at least {} and robust dip test at least {}""".format(lowthr, dipthr)
+            if self.verbose:
+                print """Merging components with median/min Bhattacharyya overlap
+                         at least {} and robust dip test at least {}""".format(lowthr, dipthr)
             self.hierarchical_merge(fun_dip, thr=lowthr,
                                     bhatthr=lowthr, dipthr=dipthr, tol=tol, **mmfArgs)
             #self.hclean()
@@ -144,6 +163,7 @@ class Mres(object):
         self.mergeMeth = method
         self.mergeThr = thr
         self.mergeArgs = mmfArgs
+        del self.verbose
 
     def hierarchical_merge(self, mergeMeasureFun, thr, **mmfArgs):
         if (self.p < 0).any():
@@ -151,13 +171,14 @@ class Mres(object):
         mm = mergeMeasureFun(**mmfArgs)
         ind = np.unravel_index(np.argmax(mm), mm.shape)
         if mm[ind] > thr:
-            print "Threshold passed at value {} for {} and {}, merging".format(
-                mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.verbose:
+                print "Threshold passed at value {} for {} and {}, merging".format(
+                    mm[ind], self.mergeind[ind[0]], self.mergeind[ind[1]])
             self.merge_kl(ind)
             self.hierarchical_merge(mergeMeasureFun, thr, **mmfArgs)
 
     def merge_kl(self, ind):
-        mergeind = self.mergeind
+        mergeind = self.mergeind[:]
         mergeind[ind[1]] += mergeind[ind[0]]
         mergeind.pop(ind[0])
         self.mergeind = mergeind
@@ -209,45 +230,46 @@ class Mres(object):
         #print "median bhattacharyya distance overlap = {}".format(get_medprop_pers(bhd, fixvalind, fixval))
         return self.get_minprop_pers(bhd, fixvalind, fixval)
 
-    def get_median_bh_dt_overlap_dip(self, bhatthr, dipthr, fixvalind=None, fixval=-1):
-        if fixvalind is None:
-            fixvalind = []
-        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+    def get_median_bh_dt_overlap_dip(self, bhatthr, dipthr):
+        mbhd = self.get_median_bh_overlap_data(
+            fixvalind=self._forbidden_merging, fixval=-1)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
-            print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.verbose:
+                print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
             if self.okdiptest(ind, dipthr):
                 return mbhd
-            fixvalind.append(ind)
-            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval)
+            self._forbidden_merging.append(ind)
+            mbhd = self.get_median_bh_overlap_data(
+                fixvalind=self._forbidden_merging, fixval=-1)
         return mbhd
 
-    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
-                                      fixvalind=None, fixval=-1, min_weight=0):
-        if fixvalind is None:
-            fixvalind = []
-        mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
+    def get_median_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, min_weight=0):
+        mbhd = self.get_median_bh_overlap_data(
+            fixvalind=self._forbidden_merging, fixval=-1, min_weight=min_weight)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
-            print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.verbose:
+                print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
             if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
-            fixvalind.append(ind)
-            mbhd = self.get_median_bh_overlap_data(fixvalind, fixval, min_weight)
+            self._forbidden_merging.append(ind)
+            mbhd = self.get_median_bh_overlap_data(
+                fixvalind=self._forbidden_merging, fixval=-1, min_weight=min_weight)
         return mbhd
 
-    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4,
-                                   fixvalind=None, fixval=-1, min_weight=0):
-        if fixvalind is None:
-            fixvalind = []
-        mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
+    def get_min_bh_dt_overlap_dip2(self, bhatthr, dipthr, tol=1./4, min_weight=0):
+        mbhd = self.get_min_bh_overlap_data(
+            fixvalind=self._forbidden_merging, fixval=-1, min_weight=min_weight)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd), mbhd.shape)
-            print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
+            if self.verbose:
+                print "Dip test for {} and {}".format(self.mergeind[ind[0]], self.mergeind[ind[1]])
             if self.okdiptest2(ind, dipthr, tol):
                 return mbhd
-            fixvalind.append(ind)
-            mbhd = self.get_min_bh_overlap_data(fixvalind, fixval, min_weight)
+            self._forbidden_merging.append(ind)
+            mbhd = self.get_min_bh_overlap_data(
+                fixvalind=self._forbidden_merging, fixval=-1, min_weight=min_weight)
         return mbhd
 
     def okdiptest(self, ind, thr):
@@ -263,11 +285,13 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable/4):
-                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
-                        self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+                    if self.verbose:
+                        print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
+                            self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
-            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
-                self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+            if self.verbose:
+                print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
+                    self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
     def okdiptest2(self, ind, thr, tol=1./4, min_dip=0.01):
@@ -289,11 +313,13 @@ class Mres(object):
                     nbr_computable -= 1
 
                 if below > np.floor(nbr_computable*tol):
-                    print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
-                        self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+                    if self.verbose:
+                        print "For {} and {}, diptest failed in dim {}: {} below out of {}".format(
+                            self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
                     return False
-            print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
-                self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
+            if self.verbose:
+                print "Diptest ok for {} and {} in dim {}: {} below out of {}".format(
+                    self.mergeind[k], self.mergeind[l], dim, below, nbr_computable)
         return True
 
     def get_dims_with_low_bhat_overlap(self, ind, tol=1./4):
@@ -503,7 +529,7 @@ class Traces(object):
         Object containing information for traceplots.
     '''
 
-    def __init__(self, bmlog_burn, bmlog_prod):
+    def __init__(self, bmlog_burn, bmlog_prod, verbose=False):
         self.saveburn = bmlog_burn.theta_sim.shape[0]
         self.saveprod = bmlog_prod.theta_sim.shape[0]
         self.savefrqburn = bmlog_burn.savefrq
@@ -520,8 +546,9 @@ class Traces(object):
         try:
             self.nu_sigma_burn = bmlog_burn.nu_sigma_sim
             self.nu_sigma_prod = bmlog_prod.nu_sigma_sim
-            print "self.nu_sigma_burn.shape = {}".format(self.nu_sigma_burn.shape)
-            print "self.nu_sigma_prod.shape = {}".format(self.nu_sigma_prod.shape)
+            if verbose:
+                print "self.nu_sigma_burn.shape = {}".format(self.nu_sigma_burn.shape)
+                print "self.nu_sigma_prod.shape = {}".format(self.nu_sigma_prod.shape)
         except AttributeError:
             print "No nu_sigma in log."
             pass

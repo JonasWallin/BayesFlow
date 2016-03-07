@@ -14,5 +14,5 @@ from .seed import get_seed
 from .lazy_property import LazyProperty
 from .dat_util import load_fcdata
 
-__all__ = ['gammad','Hellinger','Bhattacharyya','diptest','discriminant',
-           'Timer','dat_util','get_seed', 'rmvn', 'LazyProperty', 'load_fcdata']
+__all__ = ['gammad', 'Hellinger', 'Bhattacharyya', 'diptest', 'discriminant',
+           'Timer', 'dat_util', 'get_seed', 'rmvn', 'LazyProperty', 'load_fcdata']
