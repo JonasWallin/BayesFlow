@@ -31,6 +31,167 @@ def rebuild_multivariatenormal(param, prior, data_obj):
 	return obj
 
 
+
+cdef class  multivariatenormal_regression:
+	'''
+		Class for sampling posterior distribution of covariates of coeffients in regression.
+		The model has the form
+		X \sim N( \mu, \Sigma)
+		Y_i   \sim N( B_i X, \Sigma_{Y,i}) 
+	'''
+	
+	@cython.boundscheck(False)
+	@cython.wraparound(False) 
+	def __init__(self, prior = None):
+		'''
+			prior:
+			prior['mu'] = np.array(dim=1)
+			prior['Sigma'] = np.array(dim=2)
+		'''
+		self.n = 0
+		if not prior is None:
+			self.set_prior(prior)
+
+	def set_prior(self, prior):
+		
+		self.mu_p = np.empty_like(prior['mu'])
+		self.mu_p[:] = prior['mu'][:]
+		self.Sigma_p = np.empty_like(prior['Sigma'])
+		self.Sigma_p[:] = prior['Sigma'][:]
+		
+		
+		self.Q_p = np.linalg.inv(self.Sigma_p)
+		self.Q_pmu_p = np.dot(self.Q_p,self.mu_p)
+		self.d = self.Sigma_p.shape[0]
+		self.sumY = np.zeros(self.d)
+		self.mu_sample = np.empty(self.d)
+		self.Q_sample = np.empty((self.d , self.d))		
+			
+			
+			
+	@cython.boundscheck(False)
+	@cython.wraparound(False)	
+	def set_prior0(self, d ):# @DuplicatedSignature
+		"""
+			Deafult values non informative values
+		"""
+
+		prior = {}
+		prior['mu'] = np.zeros(d)
+		prior['Sigma'] = 10.**6 * np.eye(d)
+		self.set_prior(prior)
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def set_B(self, np.ndarray[np.double_t, ndim=3, mode='c']  B):
+		"""
+			sets the regression coeff, typically fixed in regression models
+			B       - (d x k x n) numpy vector, the covariates k - dimension of beta 
+		"""
+		self.B = np.empty_like(B)
+		self.B[:] = B[:]
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def set_QY(self, np.ndarray[np.double_t, ndim=3, mode='c']  QY):
+		"""
+			sets the regression coeff, typically fixed in regression models
+			QY       - (d x d x n) inverse of the covariance matrix
+		"""
+		self.QY = np.empty_like(QY)
+		self.QY[:] = QY[:]	
+		self.SigmaY = None
+		
+	def compute_QY(self):
+		"""
+			Computes the inverses of SimgaY
+		"""
+		
+		if self.SigmaY is None:
+			raise Exception('SigmaY must exists if QY is tobe used')
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def set_SigmaY(self, np.ndarray[np.double_t, ndim=3, mode='c']  SigmaY):
+		"""
+			sets the covaraince of the residuals
+			sigmaY       - (d x d x n) numpy vector, the covariance of residuals (y-B * X)
+		"""
+		self.SigmaY = np.empty_like(SigmaY)
+		self.SigmaY[:] = SigmaY[:]		
+		self.QY = None
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def set_Y(self, np.ndarray[np.double_t, ndim=2, mode='c']  Y):
+		"""
+			Y     - (nxd) numpy vector , the data where n number of observation, d - dimension of data
+		"""
+		self.Y = np.empty_like(Y)
+		self.Y[:] = Y[:]
+		self.n  = Y.shape[0]
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)		 
+	def set_data(self, np.ndarray[np.double_t, ndim=2, mode='c']  Y = None,
+				np.ndarray[np.double_t, ndim=3, mode='c']  SigmaY = None,
+				np.ndarray[np.double_t, ndim=3, mode='c']  B = None,
+				np.ndarray[np.double_t, ndim=3, mode='c']  QY = None):
+		"""
+			if QY is given SigmaY is not used
+			Y       - (nxd) numpy vector , the data where n number of observation, d - dimension of data
+			SigmaY  - (d x d x n) numpy vector, the covariance of residuals (y-B * X)
+			B       - (d x k x n) numpy vector, the covariates k - dimension of beta 
+			QY      - (d x d x n) the inverses of SimgaY
+		"""
+		if B is not None:
+			self.set_B(B)
+		if Y is not None:
+			self.set_Y(Y)
+			
+		
+		if (SigmaY is not None) and (QY is None):
+			self.set_SigmaY(SigmaY)
+		
+		if QY is not None:
+			self.set_QY(QY)
+	
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False)  
+	cdef np.ndarray[np.double_t, ndim=1] _sample(self):
+		"""
+			internal function sampling X
+			return X
+		"""
+		pass
+		
+# 		if self.n != 0:
+# 			update_mu_Q_sample(<double *>  self.mu_sample.data,
+# 							   <double *>  self.Q_sample.data,
+# 							   <double *>  self.Q_pmu_p.data,
+# 							   <double *>  self.Q.data,
+# 							   <double *>  self.Q_p.data, 
+# 							   <double*>   self.sumY.data, 
+# 							   self.n, 
+# 							   self.d)
+# 		else:
+# 			self.Q_sample = np.linalg.cholesky(self.Q_p)
+# 			self.mu_sample =  np.linalg.solve(self.Q_sample, self.Q_pmu_p)
+		#cdef np.ndarray[np.double_t, ndim=1] X = np.random.randn(self.d)
+		#Lt_XpZ(<double *>  self.Q_sample.data,<double *>  X.data,<double *>  self.mu_sample.data, self.d)
+		#return X
+	
+	@cython.boundscheck(False)
+	@cython.wraparound(False)		 
+	def sample(self):
+		"""
+			Sampling from the poserior distribution
+			return X
+		"""
+
+		return self._sample()
+			
+			
 cdef class  multivariatenormal:
 	'''
 		Class for sampling from a Multivariate normal distribution on the form
@@ -88,7 +249,9 @@ cdef class  multivariatenormal:
 	@cython.boundscheck(False)
 	@cython.wraparound(False)			 
 	def set_parameter(self, parameter):
-		
+		"""
+			Setting the parameter in the likelihood
+		"""
 		
 		self.Sigma = np.empty_like(parameter['Sigma'])
 		self.Sigma[:] = parameter['Sigma'][:]
@@ -130,11 +293,11 @@ cdef class  multivariatenormal:
 		"""
 			Y - (nxd) numpy vector
 		"""
-		
+	
 		self.n  = Y.shape[0]
 		sum_Y( <double *> self.sumY.data, &Y[0,0], self.n, self.d)
 		#self.sumY = self._set_data(Y)
-
+	
 
 	@cython.boundscheck(False)
 	@cython.wraparound(False)  
@@ -145,13 +308,16 @@ cdef class  multivariatenormal:
 		
 		
 		if self.n != 0:
-			update_mu_Q_sample(  <double *> self.mu_sample.data,<double *>  self.Q_sample.data,
-							   <double *> self.Q_pmu_p.data,<double *>  self.Q.data,<double *>  self.Q_p.data, <double*> self.sumY.data ,self.n, self.d)
+			update_mu_Q_sample(<double *> self.mu_sample.data,<double *>  self.Q_sample.data,
+							   <double *> self.Q_pmu_p.data,<double *>  self.Q.data,<double *>  self.Q_p.data, 
+							   <double*> self.sumY.data ,
+							   self.n, 
+							   self.d)
 		else:
 			self.Q_sample = np.linalg.cholesky(self.Q_p)
 			self.mu_sample =  np.linalg.solve(self.Q_sample, self.Q_pmu_p)
 		cdef np.ndarray[np.double_t, ndim=1] X = np.random.randn(self.d)
-		Lt_XpZ(<double *>  self.Q_sample.data,<double *>  X.data,<double *>  self.mu_sample.data, self.d)
+		Lt_XpZ(<double *> self.Q_sample.data, <double *> X.data,<double *> self.mu_sample.data, self.d)
 		return X
 	
 	@cython.boundscheck(False)

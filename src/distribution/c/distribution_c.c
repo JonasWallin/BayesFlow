@@ -65,9 +65,38 @@ void sum_Y(double* sumY,const double* Y, const int n, const int d) {
     }
 }
 
+
+
+void update_mu_Q_sample2(double* mu_sample, double *Q_sample, const double* Q_pmu_p, const double* Q_i,
+        const double* Q_p, const double* Y_i, const double* B_i, const long int n, const int d, const int m)
+
+{	/*
+	* Internal function for improving speed in sampling posterior distribution
+	* computes the Cholesky factor L = (Q_p + \sum B_i^T Q_i B_i)
+	* also computes  L\ ( Q_pmu_p + \sum B_i^T Q_i * Y_i )
+	*
+	*	Q_j ( n * d * d x 1) -  the data matrix   from a (d x d x n) numpy vector c ordering
+	*	Y_j ( n * m     x 1) -  the observations, from a (n x m x 1) numpy vector c ordering
+	*	B_j ( n * m * d x 1) -  the covariates,   from a (m x d x n) numpy vector c ordering
+	*/
+
+	// loop over n
+	// compute B_i^T Q_i
+	// compute Q as in update_mu_Q_sample using (B_i^T Q_i) B_i
+	// compute (B_i^T Q_i) Y_i
+
+}
+
+
 void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu_p, const double* Q,
 		                const double* Q_p, const double* sumY, const long int n, const int d)
 {
+	/*
+	* Internal function for improving speed in sampling posterior distribution
+	* computes the Cholesky factor L = (Q_p + n * Q)
+	* also computes  L\ ( Q_pmu_p + Q * sumY)
+	*
+	*/
 	int i,ii;
 	double Q_ii;
 	for( i = 0; i < d; i++)
@@ -98,6 +127,12 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 
 void Lt_XpZ(const double* L, double* X, const double* Z, const int d)
 {
+	/*
+	 * Computes L'\(X + Z)
+	 * L - (d x d) RowMajor lower triangular cholesky decomp
+	 * X - (d x 1) vector
+	 * Z - (d x 1) vector
+	 */
 	int i;
 	for( i = 0; i < d; i++)
 		X[i] += Z[i];
