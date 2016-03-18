@@ -10,6 +10,7 @@ import BayesFlow.plot as bm_plot
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.random as npr
+
 import os
 #matplotlib.rc('text', usetex=True)
 #matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
@@ -20,6 +21,7 @@ import os
 #matplotlib.rcParams.update(pgf_with_rc_fonts)
 
 folderFigs = "/Users/jonaswallin/Dropbox/articles/FlowCap/figs/tmp/"
+
 if __name__ == "__main__":
 	nPersons  = 40
 	nCells = 10000

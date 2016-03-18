@@ -1,6 +1,9 @@
-from rpy2.robjects.packages import importr
-from rpy2.rinterface import RRuntimeError
-from rpy2 import robjects
+try:
+    from rpy2.robjects.packages import importr
+    from rpy2.rinterface import RRuntimeError
+    from rpy2 import robjects
+except:
+    pass
 import numpy as np
 
 

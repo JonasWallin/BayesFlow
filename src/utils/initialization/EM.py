@@ -10,7 +10,8 @@ import warnings
 try:
     from EarthMover import earth_movers_distance
 except ImportError as e:
-    print "Option 'selection=EMD' will not be available: {}".format(e)
+    pass
+    #print "Option 'selection=EMD' will not be available: {}".format(e)
 
 from . import DataMPI, WeightsMPI
 from ...PurePython.GMM import mixture
