@@ -20,14 +20,15 @@ extern "C" {
 #define LAPACK_DPOTRI clapack_dpotri
 
 #else
-
-#define LAPACK_DPOTRF dpotrf
-#define LAPACK_DPOTRI dpotri
+// http://blue.for.msu.edu/comp-notes/
+#define LAPACK_DPOTRF dpotrf_
+#define LAPACK_DPOTRI dpotri_
 
 #endif
 #endif
 #include <stdlib.h> 
 #include <string.h>
+#include <stdio.h>
 
 
 /*
@@ -187,27 +188,46 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
  * Inverse of symmetric pos def matrix
  *
  */
-void inv_c( double *X_inv, const double *X, const int d)
+void inv_c( double *X_inv, const double *X,const int d)
 {
     int i,j;
+
+
+
     for( i=0; i < d ;i++){
-	for( j=0; j < (i + 1) ;j++)
+    	for( j=0; j < (i + 1) ;j++)
 			X_inv[d * i + j] = X[d * i + j];
 
 	}
+
+
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
     LAPACK_DPOTRI(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
+#elif ATL_INT
+    LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv, d);
+    LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv, d);
 #else
-    LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv,d);
-    LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv,d);
+    char *lower = "L";
+    int d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+    LAPACK_DPOTRF( lower, &d_, X_inv, &d_, &info_);
+    LAPACK_DPOTRI( lower, &d_, X_inv, &d_, &info_);
 #endif
-
+    /*
 	for( i = 0; i < d; i++)
 	{
 		for( j = 0; j < i ; j++)
 			X_inv[d * j + i] = X_inv[d * i + j];
 	}
+	*/
 	/*
 	printf("X = [\n");
 		for( i = 0; i < d; i++)
