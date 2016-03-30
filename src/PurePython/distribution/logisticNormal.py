@@ -95,7 +95,7 @@ class logisticMNormal(object):
 		self.Sigma	  = np.zeros_like(prior['Sigma'])
 		self.Sigma[:] = prior['Sigma'][:]
 		self.Q		  = np.linalg.inv(self.Sigma)
-		self.Q_mu	  = np.dot(self.Q,self.mu)
+		self.Q_mu	  = np.dot(self.Q, self.mu)
 		self.d		  = self.Q_mu.shape[0] + 1
 
 

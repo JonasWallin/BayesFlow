@@ -20,14 +20,15 @@ extern "C" {
 #define LAPACK_DPOTRI clapack_dpotri
 
 #else
-
-#define LAPACK_DPOTRF dpotrf
-#define LAPACK_DPOTRI dpotri
+// http://blue.for.msu.edu/comp-notes/
+#define LAPACK_DPOTRF dpotrf_
+#define LAPACK_DPOTRI dpotri_
 
 #endif
 #endif
 #include <stdlib.h> 
 #include <string.h>
+#include <stdio.h>
 
 
 /*
@@ -65,9 +66,38 @@ void sum_Y(double* sumY,const double* Y, const int n, const int d) {
     }
 }
 
+
+
+void update_mu_Q_sample2(double* mu_sample, double *Q_sample, const double* Q_pmu_p, const double* Q_i,
+        const double* Q_p, const double* Y_i, const double* B_i, const long int n, const int d, const int m)
+
+{	/*
+	* Internal function for improving speed in sampling posterior distribution
+	* computes the Cholesky factor L = (Q_p + \sum B_i^T Q_i B_i)
+	* also computes  L\ ( Q_pmu_p + \sum B_i^T Q_i * Y_i )
+	*
+	*	Q_j ( n * d * d x 1) -  the data matrix   from a (d x d x n) numpy vector c ordering
+	*	Y_j ( n * m     x 1) -  the observations, from a (n x m x 1) numpy vector c ordering
+	*	B_j ( n * m * d x 1) -  the covariates,   from a (m x d x n) numpy vector c ordering
+	*/
+
+	// loop over n
+	// compute B_i^T Q_i
+	// compute Q as in update_mu_Q_sample using (B_i^T Q_i) B_i
+	// compute (B_i^T Q_i) Y_i
+
+}
+
+
 void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu_p, const double* Q,
 		                const double* Q_p, const double* sumY, const long int n, const int d)
 {
+	/*
+	* Internal function for improving speed in sampling posterior distribution
+	* computes the Cholesky factor L = (Q_p + n * Q)
+	* also computes  L\ ( Q_pmu_p + Q * sumY)
+	*
+	*/
 	int i,ii;
 	double Q_ii;
 	for( i = 0; i < d; i++)
@@ -86,8 +116,21 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, Q_sample,d);
-#else
+#elif ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
+#else
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+    LAPACK_DPOTRF( lower, &d_, Q_sample, &lda, &info_);
+
 #endif
 	// ..., d (order of Q), Q, d (lda leading dimension), X , increment X
 	cblas_dtrsv(CblasRowMajor,CblasLower,CblasNoTrans,CblasNonUnit, d,Q_sample,d,mu_sample,1);
@@ -98,6 +141,12 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 
 void Lt_XpZ(const double* L, double* X, const double* Z, const int d)
 {
+	/*
+	 * Computes L'\(X + Z)
+	 * L - (d x d) RowMajor lower triangular cholesky decomp
+	 * X - (d x 1) vector
+	 * Z - (d x 1) vector
+	 */
 	int i;
 	for( i = 0; i < d; i++)
 		X[i] += Z[i];
@@ -113,22 +162,26 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
 	*/
 
 	int i,ii;
-	/*
-	printf("Q  = [\n");
-	for(i = 0; i < d; i++)
-	{
-		for(ii = 0; ii <d ; ii++)
-			printf(" %.6f ",phi[ d * i + ii ]);
-		printf("\n");
-	}
-	printf("]\n");
-	*/
+
 	//choleksy
 	//triu(R)
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, phi,d);
-#else
+#elif ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, phi,d);
+#else
+	// using Lower since this corresponds to Upper with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+    LAPACK_DPOTRF( lower, &d_, phi, &lda, &info_);
 #endif
 		// R = chol(phi)
 	// R'* X_rand
@@ -152,39 +205,52 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
  * Inverse of symmetric pos def matrix
  *
  */
-void inv_c( double *X_inv, const double *X, const int d)
+void inv_c( double *X_inv, const double *X,const int d)
 {
     int i,j;
+
+
+
     for( i=0; i < d ;i++){
-	for( j=0; j < (i + 1) ;j++)
+    	for( j=0; j < (i+1) ;j++)
 			X_inv[d * i + j] = X[d * i + j];
 
 	}
+
+
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
     LAPACK_DPOTRI(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
+#elif ATL_INT
+    LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv, d);
+    LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv, d);
 #else
-    LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv,d);
-    LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv,d);
+
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "U";
+    int  lda = d, d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+	dpotrf_( lower, &d_, X_inv, &lda, &info_);
+    dpotri_( lower, &d_, X_inv, &lda, &info_);
+
 #endif
+
+
 
 	for( i = 0; i < d; i++)
 	{
 		for( j = 0; j < i ; j++)
 			X_inv[d * j + i] = X_inv[d * i + j];
 	}
-	/*
-	printf("X = [\n");
-		for( i = 0; i < d; i++)
-		{
-			for( j = 0; j < d ; j++)
-			{
-				printf(" %.4f ",X_inv[i*d + j]);
-			}
-			printf("\n");
-		}
-		printf("]\n");
-		*/
+
+
 }
 
 

@@ -7,9 +7,9 @@ Created on Jul 7, 2014
 import unittest
 import numpy as np
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution import Wishart as Wis_python
-from bayesianmixture.PurePython.distribution.wishart import  wishart_var, invwishartrand
-from bayesianmixture.distribution import Wishart
+from BayesFlow.PurePython.distribution import Wishart as Wis_python
+from BayesFlow.PurePython.distribution.wishart import  wishart_var, invwishartrand
+from BayesFlow.distribution import Wishart
 import os
 
 
@@ -71,7 +71,7 @@ class Wishart_base(object):
 		self.test_startup()
 		self.compare_mean_var()
 		
-	def test_data(self):
+	def stest_data(self):
 		#self.test_startup()
 		#self.sample_data()
 		#self.compare_mean_var()
