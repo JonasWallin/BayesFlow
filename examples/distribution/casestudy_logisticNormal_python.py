@@ -32,3 +32,5 @@ if __name__ == "__main__":
 		
 	print("acc = %d",MMN_obj.accept_mcmc/MMN_obj.count_mcmc)
 	plt.plot(p_vec)
+
+plt.show()
