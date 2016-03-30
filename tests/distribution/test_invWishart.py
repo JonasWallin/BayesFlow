@@ -7,8 +7,8 @@ import unittest
 import numpy as np
 import numpy.random as npr
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution import invWishart as invWis_python
-from bayesianmixture.distribution import invWishart as invWis
+from BayesFlow.PurePython.distribution import invWishart as invWis_python
+from BayesFlow.distribution import invWishart as invWis
 import os
 
 
@@ -85,9 +85,12 @@ class invWishart_base(object):
 			for i in range(self.sim):  # @UnusedVariable
 				Sigma_mean += self.dist.sample()
 			Sigma_mean /= self.sim
+			#print(self.dist.sample())
+			#print(self.Sigma)
 			np.testing.assert_array_almost_equal(Sigma_mean, self.Sigma, decimal=0)
 	
 	def test_big_prior(self):
+	
 		d = 4
 		prior = {'nu':10**7,'Q':np.eye(d)*10.**7 }
 		param = {'theta': np.zeros(d)}   
@@ -109,32 +112,34 @@ class invWishart_base(object):
 		np.testing.assert_array_almost_equal(Sigma_mean, prior['Q']/prior['nu'], decimal=1)
 
 	def test_prior_effect(self):
-			d = 4
-			prior = {'nu':10**3,'Q':np.eye(d)*10.**3 }
-			param = {'theta': np.zeros(d)}   
-			row = np.zeros(d)	 
-			self.dist = self.invWishart(prior = prior,param  =param)
-			if d > 1:
-				row[0] = 4.
-			if d >2:
-				row[1] = -2
-			self.Sigma = spl.toeplitz(row)
-			self.sample_Y()
+	
+		d = 4
+		prior = {'nu':10**3,'Q':np.eye(d)*10.**3 }
+		param = {'theta': np.zeros(d)}   
+		row = np.zeros(d)	 
+		self.dist = self.invWishart(prior = prior,param  =param)
+		if d > 1:
+			row[0] = 4.
+		if d >2:
+			row[1] = -2
+		self.Sigma = spl.toeplitz(row)
+		self.sample_Y()
+		
+		self.dist.set_data(self.Y)
 			
-			self.dist.set_data(self.Y)
-				
-			Sigma_mean= np.zeros(self.dist.Q.shape)
-			for i in range(self.sim):  # @UnusedVariable
-				Sigma_mean += self.dist.sample()
-			Sigma_mean /= self.sim
-			
-			np.testing.assert_array_less(np.diag(Sigma_mean),np.diag(self.Sigma)) 
- 
+		Sigma_mean= np.zeros(self.dist.Q.shape)
+		for i in range(self.sim):  # @UnusedVariable
+			Sigma_mean += self.dist.sample()
+		Sigma_mean /= self.sim
+		
+		np.testing.assert_array_less(np.diag(Sigma_mean),np.diag(self.Sigma)) 
+
 		
 class Test_invWis_python(unittest.TestCase,invWishart_base):
 
 
 	def setUp(self):
+		print('python')
 		self.invWishart = invWis_python
 
 
@@ -149,6 +154,7 @@ class Test_invWis(unittest.TestCase,invWishart_base):
 
 
 	def setUp(self):
+		print('cython')
 		self.invWishart = invWis
 
 

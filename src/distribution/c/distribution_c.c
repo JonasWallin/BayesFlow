@@ -116,8 +116,21 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, Q_sample,d);
-#else
+#elif ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
+#else
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+    LAPACK_DPOTRF( lower, &d_, Q_sample, &lda, &info_);
+
 #endif
 	// ..., d (order of Q), Q, d (lda leading dimension), X , increment X
 	cblas_dtrsv(CblasRowMajor,CblasLower,CblasNoTrans,CblasNonUnit, d,Q_sample,d,mu_sample,1);
@@ -149,22 +162,26 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
 	*/
 
 	int i,ii;
-	/*
-	printf("Q  = [\n");
-	for(i = 0; i < d; i++)
-	{
-		for(ii = 0; ii <d ; ii++)
-			printf(" %.6f ",phi[ d * i + ii ]);
-		printf("\n");
-	}
-	printf("]\n");
-	*/
+
 	//choleksy
 	//triu(R)
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, phi,d);
-#else
+#elif ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, phi,d);
+#else
+	// using Lower since this corresponds to Upper with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+    /* arguments:
+	 storing upper lower
+	 order of matrix (?)
+	 d x d matrix
+	 leading dimension (?)
+	 info
+    */
+    LAPACK_DPOTRF( lower, &d_, phi, &lda, &info_);
 #endif
 		// R = chol(phi)
 	// R'* X_rand
@@ -195,7 +212,7 @@ void inv_c( double *X_inv, const double *X,const int d)
 
 
     for( i=0; i < d ;i++){
-    	for( j=0; j < (i + 1) ;j++)
+    	for( j=0; j < (i+1) ;j++)
 			X_inv[d * i + j] = X[d * i + j];
 
 	}
@@ -208,8 +225,10 @@ void inv_c( double *X_inv, const double *X,const int d)
     LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv, d);
     LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv, d);
 #else
-    char *lower = "L";
-    int d_ = d;
+
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "U";
+    int  lda = d, d_ = d;
     int info_;
     /* arguments:
 	 storing upper lower
@@ -218,28 +237,20 @@ void inv_c( double *X_inv, const double *X,const int d)
 	 leading dimension (?)
 	 info
     */
-    LAPACK_DPOTRF( lower, &d_, X_inv, &d_, &info_);
-    LAPACK_DPOTRI( lower, &d_, X_inv, &d_, &info_);
+	dpotrf_( lower, &d_, X_inv, &lda, &info_);
+    dpotri_( lower, &d_, X_inv, &lda, &info_);
+
 #endif
-    /*
+
+
+
 	for( i = 0; i < d; i++)
 	{
 		for( j = 0; j < i ; j++)
 			X_inv[d * j + i] = X_inv[d * i + j];
 	}
-	*/
-	/*
-	printf("X = [\n");
-		for( i = 0; i < d; i++)
-		{
-			for( j = 0; j < d ; j++)
-			{
-				printf(" %.4f ",X_inv[i*d + j]);
-			}
-			printf("\n");
-		}
-		printf("]\n");
-		*/
+
+
 }
 
 

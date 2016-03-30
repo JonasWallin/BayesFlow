@@ -37,6 +37,211 @@ def rebuild_multivariatenormal(param, prior, data_obj):
 
 
 
+cdef class multivariatenormal_scaling:
+	"""
+		Class for sampling posterior distribution of scaling of covaraince matrix for multivariate normal
+		The model is:
+		
+		X \sim N( \mu, \Sigma)
+		Y_i   \sim N( 0, D(exp(B_i * X)) \Sigma_{Y,i} D(exp(B_i * X))) 
+	"""
+
+	cdef public np.ndarray SigmaY, Q_p, mu_p, Sigma_p, X, QY, Y, B
+	cdef public np.ndarray grad
+	cdef public long int d, n, k
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False) 
+	def __init__(self, prior = None):
+		'''
+			prior:
+			prior['mu'] = np.array(dim=1)
+			prior['Sigma'] = np.array(dim=2)
+		'''
+		self.n = 0
+		if not prior is None:
+			self.setprior(prior)
+
+	def setprior(self, prior):
+		
+		self.mu_p = np.empty_like(prior['mu'])
+		self.mu_p[:] = prior['mu'][:]
+		self.Sigma_p = np.empty_like(prior['Sigma'])
+		self.Sigma_p[:] = prior['Sigma'][:]
+		
+		
+		self.Q_p       = np.linalg.inv(self.Sigma_p)
+		self.k         = self.Sigma_p.shape[0]	
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False)	
+	def setprior0(self, d ):# @DuplicatedSignature
+		"""
+			Deafult values non informative values
+		"""
+
+		prior = {}
+		prior['mu'] = np.zeros(d)
+		prior['Sigma'] = 10.**6 * np.eye(d)
+		self.set_prior(prior)
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def setB(self, np.ndarray[np.double_t, ndim=3, mode='c']  B):
+		"""
+			sets the regression coeff, typically fixed in regression models
+			B       - (n x d x k) numpy vector, the covariates k - dimension of beta 
+		"""
+		self.B = np.empty_like(B)
+		self.B[:] = B[:]
+	
+			
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def setSigmaY(self, np.ndarray[np.double_t, ndim=2, mode='c']  SigmaY):
+		"""
+			sets the unscaled covaraince matrix of the residuals
+			sigmaY       - (n x d x d) numpy vector, the covariance of residuals (y-B * X)
+		"""
+		self.SigmaY = np.empty_like(SigmaY)
+		self.SigmaY[:] = SigmaY[:]		
+		self.QY = None
+				
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def setQY(self, np.ndarray[np.double_t, ndim=2, mode='c']  QY):
+		"""
+			sets the unscaled inverse percision matrix for the residauls
+			QY       - (n x d x d) inverse of the covariance matrix
+		"""
+		self.QY = np.empty_like(QY)
+		self.QY[:] = QY[:]	
+		self.SigmaY = None
+		
+	def setQYaSigmaY(self,  
+					 np.ndarray[np.double_t, ndim=2, mode='c']  SigmaY, 
+					 np.ndarray[np.double_t, ndim=2, mode='c']  QY):
+		"""
+			
+			sets the unscaled inverse percision matrix for the residauls and covariance jointly
+		
+		"""
+		self.SigmaY = np.empty_like(SigmaY)
+		self.SigmaY[:] = SigmaY[:]			
+		self.QY = np.empty_like(QY)
+		self.QY[:] = QY[:]
+
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	cdef computeQY(self):
+		"""
+			Computes the inverses of SimgaY
+		"""
+		if self.SigmaY is None:
+			raise Exception('SigmaY must exists if QY is tobe used')
+		
+		m = self.SigmaY.shape[0]
+		self.QY = np.zeros_like(self.SigmaY)
+		inv_c(<double *>  self.QY.data, <double *>  self.SigmaY.data, m)
+
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)
+	def setY(self, np.ndarray[np.double_t, ndim=2, mode='c']  Y):
+		"""
+			Y     - (nxd) numpy vector , the data where n number of observation, d - dimension of data
+		"""
+		self.Y = np.empty_like(Y)
+		self.Y[:] = Y[:]
+		self.n  = Y.shape[0]
+		
+	@cython.boundscheck(False)
+	@cython.wraparound(False)		 
+	def setData(self, np.ndarray[np.double_t, ndim=2, mode='c']  Y = None,
+				np.ndarray[np.double_t, ndim=2, mode='c']  SigmaY = None,
+				np.ndarray[np.double_t, ndim=3, mode='c']  B = None,
+				np.ndarray[np.double_t, ndim=2, mode='c']  QY = None):
+		"""
+			if QY is given SigmaY is not used
+			Y       - (nxd) numpy vector , the data where n number of observation, d - dimension of data
+			SigmaY  - (n x d x d ) numpy vector, the covariance of residuals (y-B * X)
+			B       - (n x d x k ) numpy vector, the covariates k - dimension of beta 
+			QY      - (n x d x d ) the inverses of SimgaY
+		"""
+		if B is not None:
+			self.setB(B)
+		if Y is not None:
+			self.setY(Y)
+			
+		
+		if (SigmaY is not None) and (QY is None):
+			self.setSigmaY(SigmaY)
+		
+		if QY is not None and (SigmaY is None):
+			self.setQY(QY)
+			
+		if QY is not None and (SigmaY is not None):
+			self.setQYaSigmaY(QY)
+
+	
+
+	@cython.boundscheck(False)
+	@cython.wraparound(False) 	
+	def loglik(self,  np.ndarray[np.double_t, ndim=1, mode='c']  X):
+		"""
+			computing the loglikelihood for model defined in description
+			X - (d x 1) the covariates
+		"""
+		
+		return self._loglik(X)
+	
+	@cython.boundscheck(False)
+	@cython.wraparound(False) 	
+	def gradlik(self,  np.ndarray[np.double_t, ndim=1, mode='c']  X):
+		"""
+			computing the gradient of the loglikelihood for model defined in description
+			X - (d x 1) the covariates
+		"""
+		self._loglik(X, 1)
+		cdef np.ndarray[np.double_t, ndim=1, mode='c'] grad = np.empty_like(self.grad)
+		grad[:] = self.grad[:]
+		return grad
+	
+	@cython.boundscheck(False)
+	@cython.wraparound(False) 	
+	cdef _loglik(self, np.ndarray[np.double_t, ndim=1, mode='c']  X, int compute_gradient = 0 ):
+		"""
+			Computes function propotional to the likelihood X in the model defined at the top
+		"""
+		cdef np.ndarray[np.double_t, ndim=1, mode='c'] B_iX
+		cdef np.ndarray[np.double_t, ndim=1, mode='c'] D_Y
+		cdef double llik = -0.5  * np.dot( (X - self.mu_p).transpose(),
+											np.dot(self.Q_p,
+											X - self.mu_p ))
+		
+		if compute_gradient != 0:
+			self.grad = -np.dot(self.Q_p,X - self.mu_p )
+			
+		if self.n != 0:
+			
+			if self.QY is None:
+				self.computeQY()
+			B_iX = np.zeros(self.QY.shape[0])
+			D_Y  = np.zeros(self.QY.shape[0])
+			QDY  = np.zeros(self.QY.shape[0])
+			for i in range(self.n):
+				B_iX[:] = np.dot(self.B[i, :, :], X)
+				
+				D_Y[:]  = np.exp(-B_iX) * self.Y[i, :] 
+				llik   -= np.sum(B_iX)
+				QDY     = np.dot(self.QY, D_Y) 
+				llik   -= 0.5 * np.dot(D_Y.transpose(), QDY ) 
+				if compute_gradient != 0:
+					self.grad += np.dot(self.B[i,:,:].transpose(), -1. + D_Y * QDY )
+				#TODO add a set Q and Sigma
+		return llik
+
 cdef class  multivariatenormal_regression:
 	'''
 		Class for sampling posterior distribution of covariates of coeffients in regression.
@@ -503,6 +708,7 @@ cdef class invWishart:
 		nu_sample = self.n + self.nu 
 		cdef np.ndarray[np.double_t, ndim=2, mode='c'] R  =  np.empty((self.d,self.d))
 		inv_c(<double *> &R[0,0], <double *>  self.Q_sample.data ,self.d)
+
 		cdef np.ndarray[np.double_t, ndim=2] X = np.zeros((self.d, self.d))
 		
 		cdef int i,j
@@ -648,8 +854,10 @@ cdef class Wishart:
 			for j in range(i):
 				X[i,j] = np.random.randn(1)
 			X[i,i] =  np.sqrt(np.random.chisquare(nu -i ))
+			
 		cdef  np.ndarray[np.double_t, ndim=2]  iQ_Q_inv = inv(Q_Q_inv)
 
 		wishartrand(<double *> &iQ_Q_inv[0,0], self.d, <double *>  &X[0,0],<double *>  &Xout[0,0])
+
 
 		return Xout
