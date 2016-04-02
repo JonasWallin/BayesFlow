@@ -73,7 +73,6 @@ int sigma_update(double *Qstar,const double* Q,const double* X,const long *z_ind
 void mult_c(double *res,  const double *sigma_inv,const double* theta,const int d, const double beta)
 {
 /*
-
 void cblas_ssymv(const enum CBLAS_ORDER Order, const enum CBLAS_UPLO Uplo,
                  const int N, const float alpha, const float *A,
                  const int lda, const float *X, const int incX,
@@ -99,7 +98,7 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
 #else
 	// using Upper since this corresponds to Lower with colum mayor!!
-    char lower[] = "L";
+    char lower[] = "U";
     int  lda = d, d_ = d;
     int info_;
 	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
@@ -124,12 +123,17 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
     LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
 #else
 	// using Upper since this corresponds to Lower with colum mayor!!
-    char lower[] = "L";
+    char lower[] = "U";
     int  lda = d, d_ = d;
     int info_;
 	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
 	dpotri_( lower, &d_, sigma_inv, &lda, &info_);
 #endif
+	for( i = 0; i < d; i++)
+	{
+		for( j = 0; j < i ; j++)
+			sigma_inv[d * j + i] = sigma_inv[d * i + j];
+	}
 
 
 }
@@ -238,16 +242,27 @@ void chol_c( double *R, const double *X, const int d)
     char lower[] = "L";
     int  lda = d, d_ = d;
     int info_;
-	dpotrf_( lower, &d_, R, &d_, &info_);
+	dpotrf_( lower, &d_, R, &lda, &info_);
 #endif
 
+/*
+	 	printf("X = [\n");
+	 		for( i = 0; i < d; i++)
+	 		{
+	 			for( j = 0; j < d ; j++)
+	 			{
+	 				printf(" %.4f ",R[i*d + j]);
+	 			}
+	 			printf("\n");
+	 		}
+	 		printf("]\n");
+*/
 }
 
 /*
 	solving an Y = A^-1 X
 	R - (dxd) cholesky of A
 	X - (dxn) stores Y in X
-
 
 */
 void solve_R_c(const double *R, double *X, const int d, const int n)

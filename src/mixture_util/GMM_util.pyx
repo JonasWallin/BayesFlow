@@ -103,6 +103,8 @@ def likelihood_prior(np.ndarray[np.double_t, ndim=2] mu, np.ndarray[np.double_t,
 	return lik
 
 
+
+
 cdef inv(np.ndarray[np.double_t, ndim=2] X):
 	"""
 		inverse through cholesky of X
@@ -112,6 +114,22 @@ cdef inv(np.ndarray[np.double_t, ndim=2] X):
 	inv_c(<double *> &Xout[0,0], <double *> &X[0,0], d)
 	return Xout 
 
+
+def inv_sigma_c_cython(np.ndarray[np.double_t, ndim=2] Sigma):
+	"""
+		for debuging inv_sigma_c
+	"""
+	cdef int d = Sigma.shape[0]  # @DuplicatedSignature
+	cdef np.ndarray[np.double_t, ndim=2] SigmaInvOut = np.zeros((d, d))
+	
+	inv_sigma_c( <double *> &SigmaInvOut[0,0], <double *> &Sigma[0,0], d)
+	return SigmaInvOut
+
+def inv_cython(np.ndarray[np.double_t, ndim=2] X):
+	"""
+		For debuging inv and inv_c
+	""" 
+	return(inv(X))
 
 # declare the interface to the C code
 cdef extern void draw_x_c(long* x,long* x_index, long* x_count,const double* P,const double* U,const int N, const int K)  nogil
@@ -161,7 +179,6 @@ def calc_lik(np.ndarray[double, ndim=1, mode="c"] lik not None,np.ndarray[double
 		for j in range(i+1,d):
 			Rp[count] = L[ i,j]
 			count += 1
-			
 	calc_lik_c(&lik[0] , &X[0,0], Rp, N, d, log_detQ_div)
 	free(Rp)
 
@@ -211,9 +228,6 @@ def sample_mu(np.ndarray[np.double_t, ndim=2] X, np.ndarray[long, ndim=2] z_inde
 		for j in range(d):
 			x_sum[j] += X[index, j]
 			
-
-
-	
 	cdef double *inv_sigma = <double*>malloc(d*d * sizeof(double))
 	cdef double *inv_sigma_mu = <double*>malloc(d * d* sizeof(double))
 	inv_sigma_c(inv_sigma, &Sigma[0,0],d)
@@ -223,26 +237,18 @@ def sample_mu(np.ndarray[np.double_t, ndim=2] X, np.ndarray[long, ndim=2] z_inde
 	cdef double *mu_sc = <double*>calloc(d, sizeof(double))
 	mult_c(mu_sc,  inv_sigma_mu, &theta[0], d, 0)
 	mult_c(mu_sc,  inv_sigma, &x_sum[0], d, 1.)
-	
 	free(x_sum)
 
-	
-
-		
-	cdef np.ndarray[double, ndim=1, mode="c"]  n_01 = np.random.rand(d)
+	cdef np.ndarray[double, ndim=1, mode="c"]  n_01 = np.random.randn(d)
 	sample_muc(inv_sigma, inv_sigma_mu, mu_sc,&n_01[0], n_d, d)
 	cdef np.ndarray[np.double_t, ndim=1] res = np.empty(d)	   
 	for i in range(d):
 		res[i] = mu_sc[i]
 	
-
-	
-	
 	free(mu_sc)   
 	free(inv_sigma)
 	free(inv_sigma_mu)
 	#del Q
-	
 	return res
 
 
@@ -283,6 +289,8 @@ def sample_mix_sigma_zero_mean(np.ndarray[np.double_t, ndim=2]  X,
 		rand_mat[i,i] =  np.sqrt(np.random.chisquare(nu_star -i ))
 	cdef np.ndarray[np.double_t, ndim=2] Xout = np.zeros((d,d))
 	cdef np.ndarray[np.double_t, ndim=2] Xout2 = np.zeros((d,d))
+	#print('inv_Q_star = {}'.format(inv_Q_star))
 	wishartrand( &inv_Q_star[0,0], d, &rand_mat[0,0], &Xout[0,0])
 	inv_c( &Xout2[0,0],   &Xout[0,0] ,d)
+	#print(Xout2)
 	return Xout2
