@@ -31,6 +31,19 @@ class Test(unittest.TestCase):
 		invA_mu = GMM_util.solve_R(mu, R)
 		np.testing.assert_almost_equal(invA_mu, np.linalg.solve(A, mu), 8)
 		
+		
+	def testcInv(self):
+		A = spl.toeplitz([1.,.3,.3])
+		Ainv = np.linalg.inv(A)
+		Ainv_cython = GMM_util.inv_cython(A)
+		np.testing.assert_almost_equal(Ainv, Ainv_cython, 8)
+		
+	def testinvSigmaCCython(selfS):
+		A = spl.toeplitz([1.,.3,.3])
+		Ainv = np.linalg.inv(A)
+		Ainv_cython = GMM_util.inv_sigma_c_cython(A)
+		np.testing.assert_almost_equal(Ainv, Ainv_cython, 8)
+		
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
 	unittest.main()

@@ -32,7 +32,7 @@ import time
 
 def main():
     sim = 1000
-    data = np.ascontiguousarray(np.loadtxt('../data/faithful.dat',skiprows=1,usecols=(0,1)))
+    data = np.ascontiguousarray(np.loadtxt('../../data/faithful.dat',skiprows=1,usecols=(0,1)))
     mix = mixture(data, 2)
     mus = np.zeros((sim,4))
     t0 = time.time()
@@ -47,8 +47,8 @@ def main():
 
     
 if __name__ == '__main__':
-    sim = 1000
-    data = np.loadtxt('../data/faithful.dat',skiprows=1,usecols=(0,1))
+    sim = 2
+    data = np.loadtxt('../../data/faithful.dat',skiprows=1,usecols=(0,1))
     mix = mixture(data, 2)
     mus = np.zeros((sim,4))
     t0 = time.time()
@@ -56,25 +56,25 @@ if __name__ == '__main__':
     for i in range(sim):
         mix.sample()
         mus[i,:2] = mix.mu[0]
-        mus[i,2:] = mix.mu[1]
-    t1 = time.time()
-    if 0:
-        for k in range(mix.K):
-            plt.plot(mix.data[mix.x==k,0],mix.data[mix.x==k,1],'o')
-        
-        plt.figure()
-        for k in range(mix.K):
-            plt.plot(mus[:,(2*k):(2*(k+1))])
-            
-        plt.show()
-    
-    print("mixture took %.4f sec"%(t1-t0))
-    mix2 = GMM.mixture(data,2)
-    mus = np.zeros((sim,4))
-    t0 = time.time()
-    for i in range(sim):
-        mix2.sample()
-        mus[i,:2] = mix2.mu[0]
-        mus[i,2:] = mix2.mu[1]
-    t1 = time.time()
-    print("Python mixture took %.4f sec"%(t1-t0))
+#         mus[i,2:] = mix.mu[1]
+#     t1 = time.time()
+#     if 0:
+#         for k in range(mix.K):
+#             plt.plot(mix.data[mix.x==k,0],mix.data[mix.x==k,1],'o')
+#         
+#         plt.figure()
+#         for k in range(mix.K):
+#             plt.plot(mus[:,(2*k):(2*(k+1))])
+#             
+#         plt.show()
+#     
+#     print("mixture took %.4f sec"%(t1-t0))
+#     mix2 = GMM.mixture(data,2)
+#     mus = np.zeros((sim,4))
+#     t0 = time.time()
+#     for i in range(sim):
+#         mix2.sample()
+#         mus[i,:2] = mix2.mu[0]
+#         mus[i,2:] = mix2.mu[1]
+#     t1 = time.time()
+#     print("Python mixture took %.4f sec"%(t1-t0))

@@ -119,7 +119,7 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 #elif ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
 #else
-    char lower[] = "L";
+    char lower[] = "U";
     int  lda = d, d_ = d;
     int info_;
     /* arguments:
