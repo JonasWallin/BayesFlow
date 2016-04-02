@@ -95,8 +95,14 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
     }
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
 #endif
 
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
@@ -113,10 +119,18 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
     LAPACK_DPOTRI(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
     LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
+	dpotri_( lower, &d_, sigma_inv, &lda, &info_);
 #endif
+
 
 }
 
@@ -217,8 +231,14 @@ void chol_c( double *R, const double *X, const int d)
 	}
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, R,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, R,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, R, &d_, &info_);
 #endif
 
 }

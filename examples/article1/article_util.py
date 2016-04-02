@@ -16,7 +16,7 @@ import copy as cp
 def HGMM_pre_burnin(Hier_GMM, init_iter = 40, prec = 1, iteration = 10, mutate_iteration = 20, burst_iteration = 20, local_iter = 5, silent = False):
 	"""	
 		A mutation type algorithm to find good starting lcoation for MCMC
-		*prec* precentage of data counting as outlier
+		*prec* 				precentage of data counting as outlier
 		*iteration*         number of iteration of mutation burst mutation
 		*mutate_iteration*  number of gibbs samples to run before testing if the mutation improved
 		*burst_iteration*  number of gibbs samples to run before testing if the mutation improved
@@ -80,10 +80,10 @@ def store_param(GMM, lik = None):
 	if lik is None:
 		lik = GMM.calc_lik()
 	
-	res = {'lik':    lik,
-		   'p':      cp.deepcopy(GMM.p),
-		    'mu':    cp.deepcopy(GMM.mu), 
-		    'sigma': cp.deepcopy(GMM.sigma)}
+	res = {'lik':   lik,
+		   'p':     cp.deepcopy(GMM.p),
+		   'mu':    cp.deepcopy(GMM.mu), 
+		   'sigma': cp.deepcopy(GMM.sigma)}
 	return(res)
 
 def restore_param(GMM, param):
@@ -100,9 +100,9 @@ def restore_param(GMM, param):
 def mutate(GMM, prec = 0.1, iteration = 10, silent = True, rand_class = False):
 	'''
 		mutate by setting a random class to outiler class
-		*prec*      - [0,100] lower quantile what is defined as outlier (precentage)
-		*iter*      - number of iteration in the Gibbs sampler 
-  *rand_class* - draw the class at random (else always take the smallest) 
+		*prec*       - [0,100] lower quantile what is defined as outlier (precentage)
+		*iter*       - number of iteration in the Gibbs sampler 
+  		*rand_class* - draw the class at random (else always take the smallest) 
 	'''
 	
 	param0 = store_param(GMM)
