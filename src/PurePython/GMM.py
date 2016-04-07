@@ -470,13 +470,11 @@ class mixture(object):
 			self.simulation_times['sample_x']       -= time.time()
 		
 		self.sample_x()
-		
 		if self.timing:
 			self.simulation_times['sample_x']  += time.time()	
 			self.simulation_times['sample_mu'] -= time.time()	
 		
 		self.sample_mu()
-		
 		if self.timing:
 			self.simulation_times['sample_mu']    += time.time()	
 			self.simulation_times['sample_sigma'] -= time.time()	

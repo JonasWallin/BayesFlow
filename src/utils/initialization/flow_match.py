@@ -1,10 +1,9 @@
-import numpy as np
 try:
     from rpy2.robjects.packages import importr
     from rpy2.rinterface import RRuntimeError
     from rpy2 import robjects
-except ImportError as e:
-    print "flow_match cannot be used: {}".format(e)
+except:
+    pass
 
 
 def flow_match(dist_matrix, lambd):

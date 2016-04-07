@@ -15,6 +15,7 @@ from .reproducible_setup import Prior, BalancedPrior, SimPar, PostProcPar, setup
 from .exceptions import SimulationError
 from .utils.hGMM_operations import extract_from_hGMM
 __all__ = ['mixture', 'hierarical_mixture', 'hierarical_mixture_mpi',
-           'HMlogB', 'HMlog', 'HMElog', 'HMres', 'Prior',
+           'HMlogB', 'HMlog', 'HMElog', 'Prior',
            'BalancedPrior', 'SimPar', 'PostProcPar', 'setup_sim',
-           'extract_from_hGMM', 'SimulationError', 'distance_sort_MPI']
+           'extract_from_hGMM', 'SimulationError', 'distance_sort_MPI',
+           'HMres']

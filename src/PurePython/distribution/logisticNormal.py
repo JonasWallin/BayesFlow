@@ -12,7 +12,7 @@ import cPickle as pickle
 
 #DONE: simulerings test som visar att samplingen funkar (Done)
 #DONE: AMCMC version (Done)
-#TODO: cython version (Not needed)
+#DONE: cython version (Not needed)
 #TODO: make adjustment so n can contain NaN in which case
 #	   we sample alpha with missing value!
 
@@ -21,7 +21,7 @@ class logisticMNormal(object):
 		Class for sampling and storing multilogit normal distirbution:
 
 		\alpha \sim N(\mu, \Sigma)
-		p = [1 \alpha]/(1 + sum(exp(\alpha))
+		p = exp([1 \alpha])/(1 + sum(exp(\alpha))
 		n \sim \Multinomial(p)
 
 		The sampling is using Adjusted MALA adaptive
@@ -53,6 +53,7 @@ class logisticMNormal(object):
 		'''
 		self.prior = None
 		self.n_count = 0
+		self.d = None
 		self.n = None
 		self.alpha = None
 		self.mu  = None
@@ -72,8 +73,11 @@ class logisticMNormal(object):
 		"""
 			Setting the mean prior
 		"""
-		self.mu	      = np.zeros_like(mu)
-		self.mu[:]	  = mu[:]
+		if self.d is not None:
+			if np.prod( np.shape(mu)) !=  self.d:
+				raise ValueError('mu is not correct shape does not match self.d')
+		self.mu	      = np.zeros((np.prod( np.shape(mu)), 1))
+		self.mu[:]	  = mu.reshape((np.prod( np.shape(mu)), 1))[:]
 		
 		
 	def set_prior(self, prior):
@@ -84,10 +88,14 @@ class logisticMNormal(object):
 					prior['Sigma'] = np.array(dim=2) (d-1) x (d-1)
 		"""
 		self.set_mu(prior['mu'])
+		if self.d is not None:
+			if np.shape(prior('Sigma')) != (self.d, self.d):
+				raise ValueError('prior(Sigma) is not correct shape')
+		
 		self.Sigma	  = np.zeros_like(prior['Sigma'])
 		self.Sigma[:] = prior['Sigma'][:]
 		self.Q		  = np.linalg.inv(self.Sigma)
-		self.Q_mu	  = np.dot(self.Q,self.mu)
+		self.Q_mu	  = np.dot(self.Q, self.mu)
 		self.d		  = self.Q_mu.shape[0] + 1
 
 
@@ -100,7 +108,7 @@ class logisticMNormal(object):
 		self.n[:]  = n.reshape(shape)[:]
 		self.sum_n = np.sum(n)
 		
-		if self.alpha != None and self.mu != None:
+		if self.alpha is not None and self.mu is not None:
 			self.update_llik()
 
 	def get_llik_grad_hess(self, alpha = None):
@@ -109,7 +117,7 @@ class logisticMNormal(object):
 			
 			alpha - (d-1 , ) vector of probability components 
 		"""
-		if alpha == None:
+		if alpha is None:
 			alpha = self.alpha
 
 
@@ -131,7 +139,7 @@ class logisticMNormal(object):
 		
 	def get_lprior_grad_hess(self, alpha = None):
 	
-		if alpha == None:
+		if alpha is None:
 			alpha = self.alpha
 		
 		alpha_mu = alpha - self.mu
@@ -163,7 +171,7 @@ class logisticMNormal(object):
 		"""
 			get the probabilities from the object 
 		"""
-		if alpha == None:
+		if alpha is None:
 			alpha = self.alpha
 			
 		p = np.vstack((1.,np.exp(alpha)))
@@ -178,7 +186,7 @@ class logisticMNormal(object):
 		"""
 		self.alpha    = np.zeros((np.prod(alpha.shape),1))
 		self.alpha[:] = alpha.reshape((np.prod(alpha.shape),1))[:]
-		if self.n != None and self.mu != None:
+		if self.n is not None and self.mu is not None:
 			self.update_llik()
 			
 			
@@ -189,7 +197,7 @@ class logisticMNormal(object):
 			p - (dx1) simplex vector
 		"""
 		
-		alpha   = np.zeros(len(p)-1)
+		alpha   = np.zeros((len(p)-1, 1))
 		sum_exp = 1./ p[0]
 		for i in range(1,len(p)):
 			alpha[i-1] = np.log(p[i] * sum_exp)
@@ -202,7 +210,7 @@ class logisticMNormal(object):
 		"""
 		
 		store = False
-		if alpha == None:
+		if alpha is None:
 			store = True
 			alpha = self.alpha
 			

@@ -6,16 +6,29 @@ extern "C" {
 
 #include <math.h>
 #ifdef MKL
+
 #include <mkl.h>
 #include <mkl_cblas.h>
 #define LAPACK_DPOTRF LAPACKE_dpotrf
 #define LAPACK_DPOTRI LAPACKE_dpotri
 #else
+
 #include "clapack.h"
 #include "cblas.h"
+// atlas version of clapack uses other version compared to reg mac
+#ifdef ATL_INT
+
 #define LAPACK_DPOTRF clapack_dpotrf
 #define LAPACK_DPOTRI clapack_dpotri
+
+#else
+
+#define LAPACK_DPOTRF dpotrf
+#define LAPACK_DPOTRI dpotri
+
 #endif
+#endif
+
 #include <stdlib.h> 
 #include <string.h>
 
@@ -60,7 +73,6 @@ int sigma_update(double *Qstar,const double* Q,const double* X,const long *z_ind
 void mult_c(double *res,  const double *sigma_inv,const double* theta,const int d, const double beta)
 {
 /*
-
 void cblas_ssymv(const enum CBLAS_ORDER Order, const enum CBLAS_UPLO Uplo,
                  const int N, const float alpha, const float *A,
                  const int lda, const float *X, const int incX,
@@ -82,8 +94,14 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
     }
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "U";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
 #endif
 
     cblas_dtrsm(CblasColMajor,CblasLeft,CblasUpper,CblasTrans,CblasNonUnit, d,1, 1. ,sigma_inv,d,mu_c,d);
@@ -100,10 +118,23 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
     LAPACK_DPOTRI(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
     LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "U";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, sigma_inv, &lda, &info_);
+	dpotri_( lower, &d_, sigma_inv, &lda, &info_);
 #endif
+	for( i = 0; i < d; i++)
+	{
+		for( j = 0; j < i ; j++)
+			sigma_inv[d * j + i] = sigma_inv[d * i + j];
+	}
+
 
 }
 
@@ -204,17 +235,34 @@ void chol_c( double *R, const double *X, const int d)
 	}
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, R,d);
-#else
+#elif ATL_INT
     LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, R,d);
+#else
+	// using Upper since this corresponds to Lower with colum mayor!!
+    char lower[] = "L";
+    int  lda = d, d_ = d;
+    int info_;
+	dpotrf_( lower, &d_, R, &lda, &info_);
 #endif
 
+/*
+	 	printf("X = [\n");
+	 		for( i = 0; i < d; i++)
+	 		{
+	 			for( j = 0; j < d ; j++)
+	 			{
+	 				printf(" %.4f ",R[i*d + j]);
+	 			}
+	 			printf("\n");
+	 		}
+	 		printf("]\n");
+*/
 }
 
 /*
 	solving an Y = A^-1 X
 	R - (dxd) cholesky of A
 	X - (dxn) stores Y in X
-
 
 */
 void solve_R_c(const double *R, double *X, const int d, const int n)
