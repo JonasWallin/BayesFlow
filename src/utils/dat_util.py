@@ -16,23 +16,32 @@ from pprint import pformat
 
 from ..exceptions import NoDataError, OldFileError
 from . import mpiutil
-from . import load_and_save as ls
 
 
-def load_fcdata(datadir, ext, loadfilef, comm=MPI.COMM_WORLD, sampnames=None,
+def meta_data(sampnames, marker_lab):
+    metasamp = {'names': sampnames}
+    metadata = {'samp': metasamp, 'marker_lab': marker_lab}
+    return metadata
+
+
+def load_fcdata(datadirs, ext, loadfilef, comm=MPI.COMM_WORLD, sampnames=None,
                 Nsamp=None, Nevent=None, i_eventind_load=0,
                 scale='percentilescale', q=(1, 99), **kw):
 
-    if sampnames is None:
-        sampnames = sampnames_scattered(comm, datadir, ext, Nsamp)
-
     data = []
-    for name in sampnames:
-        data.append(load_fcsample(name, datadir, ext, loadfilef, Nevent,
-                                  i_eventind_load, **kw))
+    sampnames_in_dir = sampnames_scattered(comm, datadirs, ext, Nsamp)
+    if not sampnames is None:
+        sampnames_in_dir = [name for name in sampnames_in_dir if name in sampnames]
+
+    for datadir in datadirs:
+        dirfiles = os.listdir(datadir)
+        for name in sampnames_in_dir:
+            if name+ext in dirfiles:
+                data.append(load_fcsample(name, datadir, ext, loadfilef, Nevent,
+                                          i_eventind_load, **kw))
 
     if scale == 'percentilescale':
-        perc = PercentilesMPI(datadir, ext, comm, sampnames,
+        perc = PercentilesMPI(datadirs, ext, comm, sampnames_in_dir,
                               Nevent, i_eventind_load, kw)
         lower = perc.percentiles_pooled_data(q[0], data)
         upper = perc.percentiles_pooled_data(q[1], data)
@@ -78,7 +87,7 @@ def load_fcsample(name, datadir, ext, loadfilef, Nevent=None, i_eventind_load=0,
         else:
             indices = npr.choice(ok_inds, Nevent, replace=False)
 
-        eventind = EventInd(name, Nevent, indices, i_eventind_load)
+        eventind = EventInd(name, Nevent, indices, i_eventind_load, rm_extreme)
         eventind.save(datadir, overwrite_eventind)
     else:
         if perturb_extreme:
@@ -106,12 +115,6 @@ def maxminscale(data):
     for j in range(len(data)):
         for m in range(d):
             data[j][:, m] = (data[j][:, m]-np.min(data[j][:, m]))/(np.max(data[j][:, m])-np.min(data[j][:, m]))
-
-
-def meta_data(sampnames, marker_lab):
-    metasamp = {'names': sampnames}
-    metadata = {'samp': metasamp, 'marker_lab': marker_lab}
-    return metadata
 
 
 def non_extreme_ind(data):
@@ -149,15 +152,21 @@ def percentilescale(data, q=(1., 99.), qvalues=None):
     return lower, upper
 
 
-def sampnames_scattered(comm, datadir, ext, Nsamp=None, namerule=None):
+def sampnames_scattered(comm, datadirs, ext, Nsamp=None, namerule=None):
     """
         Finds all files (or the first Nsamp files)
-        with extension 'ext' in directory 'datadir',
+        with extension 'ext' in directories 'datadirs',
         and splits the names of the files to the workers.
+
+        'namerule' can be specified to select only sample
+        names for which namerule(name) is True.
     """
     rank = comm.Get_rank()
     if rank == 0:
-        datafiles = glob.glob(os.path.join(datadir, '*'+ext))
+        datafiles = []
+        for datadir in datadirs:
+            datafiles += glob.glob(os.path.join(datadir, '*'+ext))
+
         sampnames_all = [os.path.basename(datafile).replace(' ', '').
                          replace(ext, '') for datafile in datafiles]
         if not namerule is None:
@@ -172,39 +181,25 @@ def sampnames_scattered(comm, datadir, ext, Nsamp=None, namerule=None):
 
 
 def total_number_samples(comm, sampnames):
-    J = np.sum(mpiutil.collect_int(len(sampnames), comm))
-    return mpiutil.bcast_int(J, comm)
+    J_loc = comm.gather(len(sampnames))
+    J = sum(J_loc) if comm.Get_rank() == 0 else None
+    J = comm.bcast(J)
+    return J
 
 
-def total_number_events_and_samples(comm, sampnames, data=None, Nevent=None, debug=False, **kw):
-    if debug:
-        print "computing tot samples at rank {}".format(comm.Get_rank())
+def total_number_events_and_samples(comm, sampnames, data=None, Nevent=None, **kw):
     J = total_number_samples(comm, sampnames)
-    if debug:
-        print "nbr samples computed"
-        print "J at rank {} = {}".format(comm.Get_rank(), J)
     if not Nevent is None:
-        if debug:
-            print "J*Nevent = {}".format(J*Nevent)
         return J*Nevent, J
     if data is None:
-        N_loc = 0
         kw_cp = kw.copy()
-        if 'scale' in kw_cp:
-            del kw_cp['scale']
-        for name in sampnames:
-            N_loc += load_fcsample(name, Nevent=Nevent, **kw_cp).shape[0]
-    else:
-        N_loc = np.sum([dat.shape[0] for dat in data])
-    if debug:
-        print "N_loc at rank {} = {}".format(comm.Get_rank(), N_loc)
-    N = int(np.sum(mpiutil.collect_int(N_loc, comm)))
-    if debug:
-        print "N = {}".format(N)
-    comm.Barrier()
-    if debug:
-        print "N at rank {} = {}".format(comm.Get_rank(), N)
-    N = mpiutil.bcast_int(N, comm)
+        kw_cp['scale'] = None
+        kw_cp['rm_extreme'] = False
+        data = load_fcdata(comm=comm, sampnames=sampnames, **kw_cp)
+    N_loc = sum([dat.shape[0] for dat in data])
+    Ns = comm.gather(N_loc)
+    N = sum(Ns) if comm.Get_rank() == 0 else None
+    N = comm.bcast(N)
     return N, J
 
 
@@ -212,49 +207,56 @@ class EventInd(object):
     """
         Storing indices for subsampled data.
     """
-    def __init__(self, sampname, Nevent, indices, i=0):
+    def __init__(self, sampname, Nevent, indices, i=0, rm_extreme=True):
         self.sampname = sampname
         self.indices = indices
         self.Nevent = Nevent
         self.i = i
+        self.rm_extreme = rm_extreme
 
     def __str__(self):
-        return self.name(self.sampname, self.Nevent, self.i)
+        return self.name(self.sampname, self.Nevent, self.i, self.rm_extreme)
 
     @staticmethod
-    def name(sampname, Nevent, i):
+    def name(sampname, Nevent, i, rm_extreme):
         s = 'eventind_'+sampname
         if not Nevent is None:
             s += '_' + str(Nevent)
         s += '_' + str(i)
+        if not rm_extreme:
+            s += '_no_rm_extreme'
         return s
 
     @classmethod
-    def load(cls, sampname, datadir, Nevent, i=0):
+    def load(cls, sampname, datadir, Nevent, i=0, rm_extreme=True):
         fname = os.path.join(os.path.join(datadir, 'eventinds'),
-                             cls.name(sampname, Nevent, i)+'.npy')
+                             cls.name(sampname, Nevent, i, rm_extreme)+'.npy')
         data_fname = glob.glob(os.path.join(datadir, sampname+'.*'))[0]
         if not os.path.exists(fname):
             raise IOError("{} does not exist".format(fname))
         if os.path.getmtime(fname) < os.path.getmtime(data_fname):
-            # Data file was modified after eventind file
-            raise OldFileError
+            raise OldFileError('Data file was modified after eventind file')
         with open(fname, 'r') as f:
             indices = np.load(f)
-        return cls(sampname, Nevent, indices)
+        return cls(sampname, Nevent, indices, rm_extreme)
 
     def save(self, datadir, overwrite):
         if not datadir[-1] == '/':
             datadir += '/'
         savedir = datadir + 'eventinds/'
         if not os.path.exists(savedir):
-            os.mkdir(savedir)
+            try:
+                os.mkdir(savedir)
+            except OSError as e:
+                if not 'File exists' in str(e):
+                    raise
         fpath = savedir+str(self)+'.npy'
         if not overwrite:
             while os.path.exists(fpath):
                 print fpath+' already exists, increasing i'
                 self.i += 1
                 fpath = savedir+str(self)+'.npy'
+        print "Saving new eventind at {}".format(fpath)
         with open(fpath, 'w') as f:
             np.save(f, self.indices)
 
@@ -265,7 +267,7 @@ class PercentilesMPI(object):
         multiple workers. Computed percentiles are saved by default and
         if wanted again, previously computed percentiles are loaded.
     """
-    def __init__(self, datadir, ext, comm, sampnames, Nevent, i_eventind_load,
+    def __init__(self, datadirs, ext, comm, sampnames, Nevent, i_eventind_load,
                  loaddata_kw=None):
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -276,13 +278,13 @@ class PercentilesMPI(object):
             self.sampnames_all = list(np.hstack(self.sampnames_all))
         self.sampnames_all = self.comm.bcast(self.sampnames_all)
 
-        self.datadir = datadir
-        self.mtime_data = max([os.path.getmtime(os.path.join(self.datadir, name+ext))
-                               for name in self.sampnames_all])
+        self.datadirs = datadirs
+        self.mtime_data = max([max([os.path.getmtime(os.path.join(datadir, name+ext))
+                               for name in self.sampnames_all if name+ext in os.listdir(datadir)]) for datadir in self.datadirs])
 
         self.Nevent = Nevent
         self.i_eventind_load = i_eventind_load
-        self.savedir_ = self.savedir(datadir)
+        self.savedir_ = self.savedir(datadirs[0])
         self.loaddata_kw = pformat(loaddata_kw)
         self.key_file_ = self.savedir_+'scale_keys.pkl'
         self.key_dict_ = self.key_dict()  # This dictionary keeps track
@@ -290,9 +292,9 @@ class PercentilesMPI(object):
         self.key_ = self.key()
 
     @classmethod
-    def percentiles_pooled_data_clm(cls, datadir, ext, comm, q, sampnames, data=None,
+    def percentiles_pooled_data_clm(cls, datadirs, ext, comm, q, sampnames, data=None,
                                     Nevent=None, i_eventind_load=0, loaddata_kw=None):
-        percMPI = cls(datadir, ext, comm, sampnames, Nevent, i_eventind_load, loaddata_kw)
+        percMPI = cls(datadirs, ext, comm, sampnames, Nevent, i_eventind_load, loaddata_kw)
         return percMPI.percentiles_pooled_data_method(q, data)
 
     def percentiles_pooled_data(self, q, data=None, load=True, save=True,
@@ -316,10 +318,8 @@ class PercentilesMPI(object):
                 self.save(q, percentile_values)
             return percentile_values
 
-        if self.rank == 0:
-            print "Computing new percentiles"
         NN, _ = total_number_events_and_samples(
-            self.comm, self.sampnames, data, datadir=self.datadir,
+            self.comm, self.sampnames, data, datadirs=self.datadirs,
             loadfilef=loadfilef, **loaddata_kw)
         N = int(np.round(NN*q/100))
         if data is None:
@@ -339,7 +339,6 @@ class PercentilesMPI(object):
         if self.rank == 0:
             self.partition_all_columns(data_all, N-1)
             percentile_values = data_all[N-1, :]
-            print "percentiles = {}".format(percentile_values)
             if save:
                 self.save(q, percentile_values)
         else:
@@ -422,139 +421,9 @@ class PercentilesMPI(object):
 
     def save(self, q, values):
         if self.rank == 0:
+            print "Saving new percentiles for q = {} in {}: {}".format(q, self.savedir_, values)
             if not os.path.exists(self.savedir_):
                 os.mkdir(self.savedir_)
             np.savetxt(self.savedir_+self.name(q, self.key_)+'.txt', values)
             with open(self.savedir_+'scale_keys.pkl', 'w') as f:
                 pickle.dump(self.key_dict_, f, -1)
-
-
-def load_fcdata_to_root(ext, loadfilef, startrow, startcol, marker_lab, datadir, verbose=True, comm=MPI.COMM_WORLD, **kw):
-    '''
-        As load_fcdata below, but only loading data to first rank when MPI is used.
-    '''
- 
-    rank = comm.Get_rank()
-
-    data = None
-    metasamp = {'names': None}
-    metadata = {'samp':metasamp, 'marker_lab': None}  
-
-    if rank == 0:
-        data, metadata = load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir, **kw)
-
-    if rank == 0 and verbose:
-        print "sampnames = {}".format(metadata['samp']['names'])
-        print "data sizes = {}".format([dat.shape for dat in data])
-
-    return data, metadata            
-
-def load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir, 
-                Nsamp=None, Nevent=None, scale='percentilescale', 
-                rm_extreme=True, perturb_extreme=False, eventind=[], 
-                eventind_dic = {}, datanames=None, load_eventind=True, 
-                i_eventind_load = 0):
-    """
-        Load flow cytometry data. Will default arguments the indices of the subsampled data will 
-        be saved in a file "eventind_'Nevent'_0.json" in datadir and when load_fcdata is called
-        subsequently, the eventindices will be loaded from this file.
-
-        ext             -   file extension for fc data files.
-        loadfilef       -   function for loading one flow cytometry data file into a np.array.
-        startrow        -   first row that could be used.
-        startcol        -   first column that should be used.
-        marker_lab      -   names of markers. Should equal the number of columns used.
-        datadir         -   directory where fc data files have been saved.
-        Nsamp           -   number of flow cytometry samples to use. If None, all files matching
-                            the file extension in datadir will be used.
-        Nevent          -   number of events that should be sampled from the fc data file.
-        scale           -   'maxminscale', 'percentilescale' or None. If 'maxminscale' each sample is scaled so that
-                            the minimal value in each dimension go to 0 and the maximal value in each
-                            dimension go to 1. If 'percentilescale' each sample is scaled so that the 1st percentile of
-                            the pooled data goes to 0 and the 99th percentile of the pooled data go to 1.
-                            If False, no scaling is done.
-        rm_extreme      -   boolean. Should extreme values be removed? (If not removed or perturbed they
-                            might lead to singular covariance matrices.)
-        perturb_extreme -   boolean. Should extreme values be perturbed? (If not removed or perturbed they
-                            might lead to singular covariance matrices.)
-        eventind        -   list. The ith element contains a list of the indices that will be loaded
-                            for the ith sample.
-        eventind_dic    -   dictionary. eventind_dic[sampname] contains the indices that will be loaded for 
-                            the sample with filename sampname.
-        datanames       -   list of fc data file names that will be loaded.
-        load_eventind   -   bool. Should eventind be loaded from data directory? If eventind.json does
-                            not exist in data directory it will be saved to it.
-        i_eventind_load -   index of eventindfile to load.
-    """
-
-    if datanames is None:
-        datafiles = glob.glob(datadir+'*'+ext) 
-        #print "datafiles = {}".format(datafiles)
-    else:
-        datafiles = [datadir + name + ext for name in datanames]
-    J = len(datafiles)
-    if not Nsamp is None:
-        J = min(J, Nsamp)
-        
-    data = []
-    sampnames = []
-    print "J = {} samples will be loaded".format(J)
-    for j in range(J):
-        sampnames.append(datafiles[j].replace(datadir, '').replace(' ', '').replace(ext, ''))
-        data.append(loadfilef(datafiles[j])[startrow:, startcol:])
-
-    metadata = meta_data(sampnames, marker_lab)         
-
-    compute_new_eventind = True
-    if load_eventind:
-        try:
-            eventind_dic = ls.load_eventind(datadir, Nevent, i_eventind_load)
-        except:
-            eventind_dic = {}
-
-    if all([name in eventind_dic.keys() for name in sampnames]) or len(eventind) > J:
-        compute_new_eventind = False
-
-    if perturb_extreme or (rm_extreme and compute_new_eventind):
-        if rm_extreme:
-            ok_inds = []
-        for j, dat in enumerate(data):
-            if rm_extreme and (sampnames[j] in eventind_dic.keys()):
-                ok_inds.append([])
-            else:
-                ok = non_extreme_ind(dat)
-                if perturb_extreme:
-                    data[j][~ok, :] = add_noise(data[j][~ok, :])
-                if rm_extreme:
-                    ok_inds.append(np.nonzero(ok)[0]) 
-
-    if not rm_extreme:
-        ok_inds = [np.arange(dat.shape[0]) for dat in data]
-
-    for j, dat in enumerate(data):
-        if compute_new_eventind and not sampnames[j] in eventind_dic.keys():
-            if Nevent is None:
-                indices_j = ok_inds[j]
-            else:
-                indices_j = npr.choice(ok_inds[j], Nevent, replace=False)
-            eventind.append(indices_j)
-            eventind_dic[sampnames[j]] = indices_j
-        else:
-            try:
-                indices_j = eventind_dic[sampnames[j]]
-            except KeyError as e:
-                print "Key error({0}): {1}".format(e.errno, e.strerror)
-                indices_j = eventind[j]
-        data[j] = dat[indices_j, :]
-
-    if compute_new_eventind:
-        ls.save_eventind(eventind_dic, datadir, Nevent)  
-
-    if scale == 'maxminscale':
-        maxminscale(data)
-    elif scale == 'percentilescale':
-        percentilescale(data)
-    elif not scale is None:
-        raise ValueError, "Scaling {} is unsupported".format(scale)
-
-    return data, metadata

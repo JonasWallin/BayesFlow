@@ -505,13 +505,13 @@ class hierarical_mixture_mpi(object):
             for k in range(self.K):
                 self.wishart_p_nus[k].Q_class.nu_s = nu
 
-    def load_data(self, sampnames, datadir, ext, loadfilef, **kw):
+    def load_data(self, sampnames, datadirs, ext, loadfilef, **kw):
         """
             Load data corresponding to sampnames directly onto worker.
             When called multiple times, new data is appended after the
             old data.
         """
-        data = load_fcdata(datadir, ext, loadfilef, comm=self.comm,
+        data = load_fcdata(datadirs, ext, loadfilef, comm=self.comm,
                            sampnames=sampnames, **kw)
         rank = self.comm.Get_rank()
 

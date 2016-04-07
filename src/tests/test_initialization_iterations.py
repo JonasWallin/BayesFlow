@@ -3,7 +3,7 @@ import numpy as np
 from mpi4py import MPI
 import matplotlib.pyplot as plt
 
-from .test_pipeline import Pipeline, SynSample2, BadQualityError
+from .pipeline import Pipeline, SynSample2, BadQualityError
 from .test_modified_label_sw import TrackDict
 
 comm = MPI.COMM_WORLD
