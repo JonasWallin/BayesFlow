@@ -116,7 +116,7 @@ void update_mu_Q_sample(double* mu_sample, double *Q_sample, const double* Q_pmu
 
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, Q_sample,d);
-#elif ATL_INT
+#elif defined ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, Q_sample,d);
 #else
     char lower[] = "U";
@@ -167,7 +167,7 @@ void wishartrand(double* phi, const int d , double* X_rand, double* X_out){
 	//triu(R)
 #ifdef MKL
 	LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'U',d, phi,d);
-#elif ATL_INT
+#elif defined ATL_INT
 	LAPACK_DPOTRF( CblasRowMajor, CblasUpper,d, phi,d);
 #else
 	// using Lower since this corresponds to Upper with colum mayor!!
@@ -221,7 +221,7 @@ void inv_c( double *X_inv, const double *X,const int d)
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
     LAPACK_DPOTRI(LAPACK_ROW_MAJOR, 'L',d, X_inv,d);
-#elif ATL_INT
+#elif defined ATL_INT
     LAPACK_DPOTRF( CblasRowMajor, CblasLower,d, X_inv, d);
     LAPACK_DPOTRI( CblasRowMajor, CblasLower,d, X_inv, d);
 #else

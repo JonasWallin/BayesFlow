@@ -136,7 +136,9 @@ cdef extern void draw_x_c(long* x,long* x_index, long* x_count,const double* P,c
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def draw_x(np.ndarray[long, ndim=1, mode="c"] x not None, np.ndarray[long, ndim=2] x_index,np.ndarray[long, ndim=1] x_count , np.ndarray[double, ndim=2, mode="c"] P not None):
+def draw_x(np.ndarray[long, ndim=1, mode="c"] x not None, 
+           np.ndarray[long, ndim=2] x_index,np.ndarray[long, ndim=1] x_count , 
+           np.ndarray[double, ndim=2, mode="c"] P not None):
 	"""
 	draws random sample of the vector P
 

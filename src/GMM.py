@@ -219,18 +219,18 @@ class mixture(PPGMM.mixture):
             (warning not defined is component in active, or noise component
         """
         
-        if self.noise_class:
-            raise Exception('self.noise_class not implimented with logistic regression')
-        
+        #if self.noise_class:
+        #    raise Exception('self.noise_class not implimented with logistic regression')
+        #TODO add option with our without missing comp
         if np.sum(self.active_komp == 0):
             raise Exception('self.active_komp not implimented with logistic regression')
         
         
-        n = np.zeros(self.K)
+        n = np.zeros(self.K + self.noise_class)
         for k in range(self.K + self.noise_class):
             if self.active_komp[k]:
                 n[k] += np.sum(self.x==k)
-        self.logisticNormal.set_data(n)
+        self.logisticNormal.set_data(n[:self.K])
         self.logisticNormal.sample()
         self.p = self.logisticNormal.get_p()
       

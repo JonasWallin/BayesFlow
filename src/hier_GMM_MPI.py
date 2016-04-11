@@ -441,6 +441,7 @@ class hierarical_mixture_mpi(object):
 
         for i,  Sigma in enumerate(Sigmas):
             prior = {'mu': mus[i,:], 'Sigma':Sigma}
+            print(prior)
             self.GMMs[i].set_prior_alpha(prior)
         
         self.comm.Barrier()
@@ -816,7 +817,7 @@ class hierarical_mixture_mpi(object):
     def set_GMM_init(self):
         self.set_GMMs_mu_Sigma_from_prior()
         for gmm in self.GMMs:
-            gmm.p = gmm.alpha_vec/sum(gmm.alpha_vec)
+            gmm.p = gmm.logisticNormal.get_p()
             gmm.active_komp = np.ones(self.K+self.noise_class, dtype='bool')
 
     def set_GMMs_mu_Sigma_from_prior(self):

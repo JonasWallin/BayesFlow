@@ -23,8 +23,8 @@ extern "C" {
 
 #else
 
-#define LAPACK_DPOTRF dpotrf
-#define LAPACK_DPOTRI dpotri
+#define LAPACK_DPOTRF dpotrf_
+#define LAPACK_DPOTRI dpotri_
 
 #endif
 #endif
@@ -94,7 +94,7 @@ void sample_muc(double *sigma_inv, const double *sigma_mu_inv, double* mu_c,  do
     }
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#elif ATL_INT
+#elif defined ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
 #else
 	// using Upper since this corresponds to Lower with colum mayor!!
@@ -118,7 +118,7 @@ void inv_sigma_c( double *sigma_inv, const double *sigma, const int d)
 #ifdef MKL
     LAPACK_DPOTRF(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
     LAPACK_DPOTRI(LAPACK_COL_MAJOR, 'U',d, sigma_inv,d);
-#elif ATL_INT
+#elif defined ATL_INT
     LAPACK_DPOTRF( CblasColMajor, CblasUpper,d, sigma_inv,d);
     LAPACK_DPOTRI( CblasColMajor, CblasUpper,d, sigma_inv,d);
 #else
