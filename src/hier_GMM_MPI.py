@@ -26,11 +26,11 @@ from .utils import load_fcdata
 from .utils.jsonutil import ObjJsonEncoder, class_decoder 
 from .exceptions import SimulationError
 from . import HMlog
-
+from logisticnormal import LogisticRegressionPrior #todo not error
 
 #TODO: change to geomtrical median instead of mean!!
 #TODO: if a cluster is turned off use the latent mean insead of mu
-#		and then it will work!
+#        and then it will work!
 def distance_sort(hGMM):
     """
         sorts the clusters after the geometrical mean of the means
@@ -106,7 +106,8 @@ class hierarical_mixture_mpi(object):
     """
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
                  thetas=None, expSigmas=None, high_memory=True, timing=False,
-                 AMCMC=False, comm=MPI.COMM_WORLD, init=True):
+                 AMCMC=False, comm=MPI.COMM_WORLD, init=True,
+                 alpha_prior = LogisticRegressionPrior()):
         """
             starting up the class and defning number of classes
             
@@ -133,7 +134,6 @@ class hierarical_mixture_mpi(object):
         self.high_memory = high_memory
 
         set_data_out = self.set_data(data, sampnames)
-        print "prior = {}".format(prior)
         if not prior is None:
             if set_data_out == 0:
                 self.set_prior(prior, init=init, thetas=thetas, expSigmas=expSigmas)
@@ -141,6 +141,9 @@ class hierarical_mixture_mpi(object):
                 self.prior = prior
 
         self.timing = timing
+        
+        #logistic normal component
+        self.alpha_prior = alpha_prior
 
     def mpiexceptabort(self, type_in, value, tb):
         traceback.print_exception(type_in, value, tb)
@@ -278,7 +281,6 @@ class hierarical_mixture_mpi(object):
             self.d = self.GMMs[0].d
             self.n = len(self.GMMs)
             #mixture.unpickle(name)
-        # TODO: Send counts. Send names?
             
     def save_GMMS_to_file(self,dirname):
         """
@@ -327,6 +329,10 @@ class hierarical_mixture_mpi(object):
     
             for wpn in self.wishart_p_nus:
                 wpn.set_prior_param0(self.d)
+            
+            self.alpha_prior.set_prior_param0()
+            self.alpha_prior.initialization()
+        #TODO: add prior here for alpha
     
     
     def reset_nus(self, nu, Q = None):
@@ -360,7 +366,15 @@ class hierarical_mixture_mpi(object):
                     npw.param['Sigma']  = 10**10*np.eye(npw.param['Sigma'].shape[0])
                 else:
                     npw.param['Sigma'][:]  = Sigma[:]
+
+    def reset_alpha(self, Sigma = None):
+        """
+            reseting the mean and covariates for probabilites
         
+        """
+        #TODO: reset_alpha
+        print('reset_alpha is not implimented')
+        pass
         
     def reset_prior(self,nu = 10):
         """
@@ -382,10 +396,10 @@ class hierarical_mixture_mpi(object):
             sigma_nu = np.array([wpn.param['nu'] for wpn in self.wishart_p_nus],dtype='i')
             sigma_Q = np.array([wpn.param['Q'] for wpn in self.wishart_p_nus],dtype='d')
         else:
-            mu_theta = np.empty((self.K,self.d),dtype='d')
-            mu_sigma = np.empty((self.K,self.d,self.d),dtype='d')
-            sigma_nu = np.empty(self.K,dtype='i')
-            sigma_Q  = np.empty((self.K,self.d,self.d),dtype='d')
+            mu_theta      = np.empty((self.K,self.d),dtype='d')
+            mu_sigma      = np.empty((self.K,self.d,self.d),dtype='d')
+            sigma_nu      = np.empty(self.K,dtype='i')
+            sigma_Q       = np.empty((self.K,self.d,self.d),dtype='d')
             
         self.comm.Bcast([mu_theta, MPI.DOUBLE])  # @UndefinedVariable
         self.comm.Bcast([mu_sigma, MPI.DOUBLE])  # @UndefinedVariable
@@ -396,13 +410,51 @@ class hierarical_mixture_mpi(object):
         for i in range(self.n):
             self.GMMs[i].set_prior_mu_np(mu_theta, mu_sigma)
             self.GMMs[i].set_prior_sigma_np(sigma_nu, sigma_Q)
+
+        self.set_alpha_prior()
+        self.comm.Barrier()
+
+    def set_alpha_prior(self):
+        
+        """
+            How to update the alpha prior in each GMM,
+            moves mean and Covariance to eah GMM
+        """
+        rank = self.comm.Get_rank()  # @UndefinedVariable
+        if rank == 0:
+            size = self.comm.Get_size()  # 
+            send_mus = np.array_split(np.array(self.alpha_prior.mus,dtype='d'), size)
+        else:
+            send_mus      = None
+            #Sigmas   = np.empty(( self.d, self.d),dtype='d')
+            #Sigmas = np.array(self.alpha_prior.Sigmas,dtype='d')    
     
+        mus = self.comm.scatter(send_mus, root= 0)  # @UndefinedVariable
+        
+        
+        if rank == 0:
+            send_Sigmas = np.array_split(np.array(self.alpha_prior.Sigmas,dtype='d'), size)
+        else:
+            send_Sigmas = None
+        
+        Sigmas = self.comm.scatter(send_Sigmas, root= 0)  # @UndefinedVariable
+
+        for i,  Sigma in enumerate(Sigmas):
+            prior = {'mu': mus[i,:], 'Sigma':Sigma}
+            self.GMMs[i].set_prior_alpha(prior)
+        
+        self.comm.Barrier()
+            
+            
+            
+        pass
+
     def update_prior(self):
         """
             transforms the data from the GMM to the prior
         
         """
-        
+
         rank = self.comm.Get_rank()  # @UndefinedVariable
         
         if rank == 0:
@@ -434,6 +486,23 @@ class hierarical_mixture_mpi(object):
 
         if cl_off[0]:
             warnings.warn('One cluster turned off in all samples')
+            
+        #collecting the alphas
+        if rank == 0:
+            alphas = np.empty((self.n_all, self.K - 1),dtype='d')
+        else:
+            alphas = None
+    
+        send_obj = np.array([GMM.logisticNormal.alpha.flatten()   for GMM in self.GMMs ],dtype='d')
+        #self.counts number of classes (K) * number of GMMs for each object
+        #here we have number of classes (K -1) * number of GMMs for each object 
+        self.comm.Gatherv(sendbuf=[send_obj, MPI.DOUBLE], recvbuf=[alphas, ((self.counts/ self.K) * (self.K - 1), None), MPI.DOUBLE],  root=0)  # @UndefinedVariable
+        
+        if rank == 0:
+            
+            self.alpha_prior.alphas = alphas
+            
+            
 
     def set_simulation_param(self, sim_par):
         self.set_p_labelswitch(sim_par['p_sw'])
@@ -541,11 +610,31 @@ class hierarical_mixture_mpi(object):
                              high_memory=self.high_memory))
         self.hasdata = True
 
+
+    def set_logisticdata(self, B   = None,
+                         mean_ind  = None, 
+                         cov_index = None):
+        """
+            setting the logistic regression covariates
+            
+            B           - covariates
+            mean_ind    - the covaraites beloning to mean
+            cov_index   - the covaraites beloning to scaling
+        """
+        
+        if self.rank == 0:
+            if B is None:
+                B = [np.eye(self.K-1) for j in range(self.n_all)]
+                mean_ind = range(self.K-1) 
+        
+            self.alpha_prior.set_covariates(B, mean_ind, cov_index)
+                
+            
     def set_data(self, data, names=None):
         """
             List of np.arrays
             Three possible inputs:
-                - data is None at all ranks => no data is set
+                - data is None at all ranks          => no data is set
                 - data is None at all ranks except 0 => data is
                 scattered from rank 0.
                 - data is list of np.arrays at all ranks.
@@ -561,8 +650,11 @@ class hierarical_mixture_mpi(object):
             nodata_at_any = True in nodata_at_any
         nodata_at_any = self.comm.bcast(nodata_at_any)
 
+        
         if not nodata_at_any:
             dat, names_dat = data, names
+            if names_dat is None:
+                names_dat = range(len(data))
             self.d = data[0].shape[1]
             self.d = self.comm.bcast(self.d)
         else:
@@ -588,7 +680,9 @@ class hierarical_mixture_mpi(object):
             names_dat = self.comm.scatter(send_name, root= 0)  # @UndefinedVariable
 
         self.n = len(dat)
-        for Y, name in zip(dat,names_dat):
+        
+        
+        for Y, name in zip(dat, names_dat):
             if self.d != Y.shape[1]:
                 raise ValueError('dimension mismatch in the data: self.d = {}, Y.shape[1] = {}'.format(self.d, Y.shape[1]))
             self.GMMs.append(GMM.mixture(data= Y, K = self.K, name = name,high_memory = self.high_memory))
@@ -625,8 +719,8 @@ class hierarical_mixture_mpi(object):
             for gmm in self.GMMs:
                 gmm.Sigma_mu_sw = prior.Sigma_mu_sw
 
-        for gmm in self.GMMs:
-            gmm.alpha_vec = prior.a
+        #for gmm in self.GMMs:
+        #    gmm.alpha_vec = prior.a
 
         if init:
             self.set_latent_init(prior, thetas, expSigmas)
@@ -892,6 +986,14 @@ class hierarical_mixture_mpi(object):
 
         return recv_obj
     
+    def get_alphs(self):
+        """
+            return all the logistic objects
+        """
+    
+        pass
+    
+    
     def get_activekompontent(self):
         """
             returning the vector over all active components
@@ -1074,7 +1176,6 @@ class hierarical_mixture_mpi(object):
         for GMM in self.GMMs:
             GMM.sample() 
         
-        
         if (self.comm.Get_rank() == 0) and self.timing:
             self.simulation_times['GMM']          += time.time()    
             self.simulation_times['update_prior'] -= time.time()    
@@ -1096,7 +1197,8 @@ class hierarical_mixture_mpi(object):
             if self.timing:
                 self.simulation_times['sample_prior'] += time.time()    
                 self.simulation_times['update_GMM']   -= time.time()    
-                
+            
+            self.alpha_prior.sample()
         self.comm.Barrier()
         self.update_GMM()
         

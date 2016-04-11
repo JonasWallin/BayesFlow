@@ -13,7 +13,7 @@ from . import GMM
 #from BayesFlow.distribution import normal_p_wishart, Wishart_p_nu
 from .distribution import normal_p_wishart, Wishart_p_nu
 
-
+from logisticnormal import LogisticRegressionPrior #todo not error
 
 class hierarical_mixture(object):
 	
