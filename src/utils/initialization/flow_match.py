@@ -4,7 +4,6 @@ try:
     from rpy2 import robjects
 except:
     pass
-import numpy as np
 
 
 def flow_match(dist_matrix, lambd):

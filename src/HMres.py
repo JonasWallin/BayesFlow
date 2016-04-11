@@ -79,22 +79,15 @@ class HMres(Mres):
         marker_lab = metadata.pop('marker_lab')
         ext = metadata.pop('ext')
         loadfilef = metadata.pop('loadfilef')
-        try:
+        if 'datadir' in metadata:
             datadir = metadata.pop('datadir')
-            data = load_fcdata(datadir, ext, loadfilef, sampnames=hmlog.names,
+            data = load_fcdata([datadir], ext, loadfilef, sampnames=hmlog.names,
                                comm=comm, **metadata)
-            names = hmlog.names
-        except KeyError:
+        else:
             datadirs = metadata.pop('datadirs')
-            data = []
-            names = []
-            for datadir in datadirs:
-                datadir_names = sampnames_scattered(comm, datadir, ext)
-                names_dir = [name for name in hmlog.names if name in datadir_names]
-                data += load_fcdata(datadir, ext, loadfilef, sampnames=names_dir,
-                                    comm=comm, **metadata)
-                names += names_dir
-
+            data = load_fcdata(datadirs, ext, loadfilef, sampnames=hmlog.names,
+                               comm=comm, **metadata)
+        names = hmlog.names
         metadata.update(marker_lab=marker_lab, samp={'names': names})
         if verbose:
             print "metadata = {}".format(metadata)

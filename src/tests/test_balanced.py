@@ -3,7 +3,7 @@ import cPickle as pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .test_pipeline import Pipeline, SynSample
+from .pipeline import Pipeline, SynSample
 
 Js = [2, 5, 50]
 Ks = [2, 4, 8, 16, 32]

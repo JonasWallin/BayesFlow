@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-from .test_pipeline import Pipeline, SynSample, BadQualityError
+from .pipeline import Pipeline, SynSample, BadQualityError
 from .test_balanced import SaveDict
 
 

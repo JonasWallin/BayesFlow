@@ -1,4 +1,4 @@
-from .test_pipeline import Pipeline
+from .pipeline import Pipeline
 
 J, K, N, d = 6, 4, 100, 3
 pipeline = Pipeline(J, K, N, d)

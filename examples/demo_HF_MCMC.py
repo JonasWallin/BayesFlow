@@ -14,9 +14,9 @@ from example_util import retrieve_healthyFlowData, load_setup_HF, get_J
 
 timer = Timer()
 
-retrieve_healthyFlowData(data_kws['datadir'])
+retrieve_healthyFlowData(data_kws['datadirs'][0])
 metadata = {'marker_lab': data_kws.pop('marker_lab'),
-            'samp': {'names': sampnames_scattered(comm, data_kws['datadir'], data_kws['ext'])}}
+            'samp': {'names': sampnames_scattered(comm, data_kws['datadirs'], data_kws['ext'])}}
 print "metadata['samp']['names'] = {}".format(metadata['samp']['names'])
 timer.timepoint('retrieve data')
 
