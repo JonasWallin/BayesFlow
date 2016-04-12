@@ -107,7 +107,7 @@ class hierarical_mixture_mpi(object):
     def __init__(self, K=None, data=None, sampnames=None, prior=None,
                  thetas=None, expSigmas=None, high_memory=True, timing=False,
                  AMCMC=False, comm=MPI.COMM_WORLD, init=True,
-                 alpha_prior = LogisticRegressionPrior()):
+                 alpha_prior=None):
         """
             starting up the class and defning number of classes
             
@@ -143,6 +143,8 @@ class hierarical_mixture_mpi(object):
         self.timing = timing
         
         #logistic normal component
+        if alpha_prior is None:
+            alpha_prior = LogisticRegressionPrior()
         self.alpha_prior = alpha_prior
 
     def mpiexceptabort(self, type_in, value, tb):
@@ -153,7 +155,7 @@ class hierarical_mixture_mpi(object):
         jsondict = {'__type__': 'hierarical_mixture_mpi'}
         for arg in self.__dict__.keys():
             if arg in ['GMMs', 'normal_p_wisharts', 'wishart_p_nus',
-                       'comm', 'rank']:
+                       'comm', 'rank', 'alpha_prior']:
                 continue
             jsondict[arg] = getattr(self, arg)
         return jsondict
