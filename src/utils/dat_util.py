@@ -28,20 +28,23 @@ def load_fcdata(datadirs, ext, loadfilef, comm=MPI.COMM_WORLD, sampnames=None,
                 Nsamp=None, Nevent=None, i_eventind_load=0,
                 scale='percentilescale', q=(1, 99), **kw):
 
-    data = []
-    sampnames_in_dir = sampnames_scattered(comm, datadirs, ext, Nsamp)
-    if not sampnames is None:
-        sampnames_in_dir = [name for name in sampnames_in_dir if name in sampnames]
+    if sampnames is None:
+        sampnames = sampnames_scattered(comm, datadirs, ext, Nsamp)
 
+    data = []
+    sampnames_in_dir = []
     for datadir in datadirs:
         dirfiles = os.listdir(datadir)
-        for name in sampnames_in_dir:
+        for name in sampnames:
             if name+ext in dirfiles:
                 data.append(load_fcsample(name, datadir, ext, loadfilef, Nevent,
                                           i_eventind_load, **kw))
+                sampnames_in_dir.append(name)
+    if set(sampnames) != set(sampnames_in_dir):
+        raise ValueError('Not all required sampnames found in given directories')
 
     if scale == 'percentilescale':
-        perc = PercentilesMPI(datadirs, ext, comm, sampnames_in_dir,
+        perc = PercentilesMPI(datadirs, ext, comm, sampnames,
                               Nevent, i_eventind_load, kw)
         lower = perc.percentiles_pooled_data(q[0], data)
         upper = perc.percentiles_pooled_data(q[1], data)
