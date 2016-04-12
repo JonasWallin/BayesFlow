@@ -986,13 +986,14 @@ class hierarical_mixture_mpi(object):
 
         return recv_obj
     
-    def get_alphs(self):
+    def get_alphas(self):
         """
             return all the logistic objects
         """
     
         pass
     
+
     
     def get_activekompontent(self):
         """
