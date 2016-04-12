@@ -441,7 +441,6 @@ class hierarical_mixture_mpi(object):
 
         for i,  Sigma in enumerate(Sigmas):
             prior = {'mu': mus[i,:], 'Sigma':Sigma}
-            print(prior)
             self.GMMs[i].set_prior_alpha(prior)
         
         self.comm.Barrier()
@@ -595,7 +594,7 @@ class hierarical_mixture_mpi(object):
             self.counts = np.array([n*self.K for n in ns], dtype='i')
         else:
             self.counts = 0
-        print "self.counts at rank {} = {}".format(rank, self.counts)
+        #print "self.counts at rank {} = {}".format(rank, self.counts)
 
         if not hasattr(self, 'hasdata') or not self.hasdata:
             if rank == 0:
