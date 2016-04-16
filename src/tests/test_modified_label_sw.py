@@ -1,7 +1,7 @@
 import os
 from mpi4py import MPI
 
-from test_pipeline import Pipeline, SynSample, BadQualityError
+from pipeline import Pipeline, SynSample, BadQualityError
 from test_balanced import SaveDict
 
 

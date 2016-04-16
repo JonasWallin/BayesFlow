@@ -60,11 +60,11 @@ def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
         Set seed
     '''
     if rank == 0:
-        with open(savedir+'seed.dat', 'w') as f:
+        with open(savedir+'seed_rank0.dat', 'w') as f:
             f.write(str(seed))
     seed = comm.bcast(seed)
-    np.random.seed(seed)
-    print "seed set to {} at rank {}".format(seed, rank)
+    np.random.seed(seed+rank)
+    print "seed set to {} at rank {}".format(seed+rank, rank)
 
     return savedir, run
 

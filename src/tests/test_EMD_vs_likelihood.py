@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 
-from .test_pipeline import SynSample
+from .pipeline import SynSample
 from ..utils.initialization.EM import (EM_pooled, EMD_to_generated_from_model,
                                        data_log_likelihood)
 from ..utils.initialization.distributed_data import DataMPI

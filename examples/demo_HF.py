@@ -16,7 +16,7 @@ dataset = 'HF'
 data_kws = {'ext': '.dat', 'loadfilef': lambda filename: np.loadtxt(filename),
             'startrow': 0, 'startcol': 0,
             'marker_lab': ['CD4', 'CD8', 'CD3', 'CD19'],
-            'datadir': 'data/HF'}
+            'datadirs': ['data/HF']}
 hGMMtiming = False
 Nevent = 2000
 testrun = True  # with true, only a short run (few iterations) is made, to test functionality.

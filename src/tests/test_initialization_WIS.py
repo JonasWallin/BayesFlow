@@ -3,7 +3,7 @@ import time
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 
-from .test_pipeline import SynSample2
+from .pipeline import SynSample2
 from ..utils.initialization.EM import EM_pooled
 from ..utils.initialization.distributed_data import DataMPI
 from ..plot import component_plot
