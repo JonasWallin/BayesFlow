@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 try:
     from rpy2.robjects.packages import importr, data
     from rpy2.rinterface import RRuntimeError
-except ImportError as e:
+except Exception as e:
     print "{} --- will not be able to transform dip values to p-value".format(e)
 
 
