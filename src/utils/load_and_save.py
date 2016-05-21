@@ -38,7 +38,7 @@ def save_object(obj, savedir, filename=None, objtype=None):
         if hasattr(obj,'mergeMeth'):
             filename += obj.mergeMeth
         filename += '.pkl'
-        print "saving file {}".format(filename)
+        print("saving file {}".format(filename))
         save_object_to_file(obj,savedir+filename)
 
 def eventfilename(savedir,Nevent,i,name=None):
@@ -78,7 +78,7 @@ def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False):
             line1 = f.readline()
             eventind_dic = yaml.load(line1)
         except:
-            print "Loading eventind Matlab style"
+            print("Loading eventind Matlab style")
             lines = [line1]+f.readlines()
             line = ' '.join(lines)
             line = line.replace('\r','')
@@ -86,7 +86,7 @@ def load_eventind(savedir,Nevent=None,i=0,name=None,pkl=False):
             line = line.replace('\n','')
             line = re.sub('\[([0-9]+)\]','\\1',line)
             eventind_dic = yaml.load(line)
-    print "Events loaded ok"
+    print("Events loaded ok")
     for key in eventind_dic:
         eventind_dic[key] = np.array(eventind_dic[key])
     return eventind_dic

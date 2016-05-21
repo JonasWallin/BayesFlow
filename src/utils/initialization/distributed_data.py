@@ -42,7 +42,7 @@ class WeightsMPI(object):
                 W_cum += W_locs[i]
                 self.comm.send(alpha_i, i)
         alpha_loc = self.comm.recv()
-        #print "alpha_loc retrieved"
+        #print("alpha_loc retrieved")
         ind_w = [0]+list(np.searchsorted(alpha_loc, np.cumsum(self.ws_loc)))
         w_cum = 0.
         indices = []
@@ -142,7 +142,7 @@ class DataMPI(object):
 
     def subsample_weighted_to_root(self, weights, N):
         weightsMPI = WeightsMPI(self.comm, weights)
-        print "tot weight for subsampling {}".format(weightsMPI.W)
+        print("tot weight for subsampling {}".format(weightsMPI.W))
         indices = weightsMPI.sample_from_all(N)
         data_loc = np.vstack([self.data[j][ind, :]
                               for j, ind in enumerate(indices)])
@@ -151,7 +151,7 @@ class DataMPI(object):
 
     def subsample_weighted(self, weights, N):
         weightsMPI = WeightsMPI(self.comm, weights)
-        print "tot weight for subsampling {}".format(weightsMPI.W)
+        print("tot weight for subsampling {}".format(weightsMPI.W))
         indices = weightsMPI.sample_from_all(N)
         return [self.data[j][ind, :] for j, ind in enumerate(indices)]
 

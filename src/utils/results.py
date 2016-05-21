@@ -35,7 +35,7 @@ def GMM_means_for_best_BIC(data,Ks,n_init=10,n_iter=100,covariance_type='full'):
         g = skmixture.GMM(n_components=K,covariance_type=covariance_type,n_init=n_init,n_iter=n_iter)
         g.fit(data)
         bic = g.bic(data)
-        print "BIC for {} clusters: {}".format(K,bic)
+        print("BIC for {} clusters: {}".format(K,bic))
         if bic < bestbic:
             means = g.means_
             bestbic = bic
@@ -106,7 +106,7 @@ class Mres(object):
         prob_mer = [np.sum(self.p[:,scind]) for scind in self.mergeind]
         suco_ord = np.argsort(-np.array(prob_mer))
         mergeind_sort = [self.mergeind[i] for i in suco_ord]
-        print "mergeind_sort = {}".format(mergeind_sort)
+        print("mergeind_sort = {}".format(mergeind_sort))
         comp_ord = [ind for suco in mergeind_sort for ind in suco]
         return comp_ord,suco_ord
 
@@ -180,7 +180,7 @@ class Mres(object):
             self.complist.remove([])
         self.mergeind = self.flatten_complist()
         self.clust_m.hclean()
-        print "self.mergeind = {}".format(self.mergeind)
+        print("self.mergeind = {}".format(self.mergeind))
         
         #left_comp = np.array([suco[0] for suco in self.mergeind])
         #print "left_comp = {}".format(left_comp)
@@ -324,7 +324,7 @@ class Clustering(object):
         self.classif_freq = [clf[:,~removed_comp_freq] for clf in self.classif_freq]
         self.p = self.p[:,~removed_comp]
         self.K = self.p.shape[1]
-        print "Sizes of merged clusters: {}".format(self.p)
+        print("Sizes of merged clusters: {}".format(self.p))
         
     def gclean(self,mergeind):
         newp = np.empty((self.J,len(mergeind)))
@@ -351,7 +351,7 @@ class Clustering(object):
         mbhd = get_medprop_pers(bhd,fixvalind,fixval)
         while (mbhd > bhatthr).any():
             ind = np.unravel_index(np.argmax(mbhd),mbhd.shape)
-            print "Dip test for {} and {}".format(*ind)
+            print("Dip test for {} and {}".format(*ind))
             if self.okdiptest(ind,dipthr):
                 return mbhd
             fixvalind.append(ind)
@@ -453,7 +453,7 @@ class Clustering(object):
                     xcum,ycum = diptest.cum_distr(self.data[j][:,dd],self.classif_freq[j][:,k])
                     dip = diptest.dip_from_cdf(xcum,ycum)
                     pdip[j,dd] = diptest.dip_pval_tabinterpol(dip,self.p[j,k]*self.classif_freq[j].shape[0])
-            print "Diptest computed for component {}".format(k)
+            print("Diptest computed for component {}".format(k))
             pdiplist.append(np.copy(pdip))
             
         self.pdiplist = pdiplist
@@ -507,9 +507,9 @@ class Clustering(object):
     def okdiptest(self,ind,thr):
         if not hasattr(self,'vacuous_komp'):
             self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])
-            print "vacuous_komp = {}".format(self.vacuous_komp)
+            print("vacuous_komp = {}".format(self.vacuous_komp))
         maxbelow = np.ceil((self.J-sum(self.vacuous_komp[:,ind[0]]+self.vacuous_komp[:,ind[1]]))/4) - 1
-        print "maxbelow = {}".format(maxbelow)
+        print("maxbelow = {}".format(maxbelow))
         for dim in [None]+range(self.d):
             below = 0
             for j in range(self.J):
@@ -517,9 +517,9 @@ class Clustering(object):
                     if self.get_pdip_discr_jkl(j,ind[0],ind[1],dim) < thr:
                         below += 1
                         if below > maxbelow:
-                            print "For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim)
+                            print("For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim))
                             return False
-        print "Diptest ok for {} and {}".format(ind[0],ind[1])
+        print("Diptest ok for {} and {}".format(ind[0],ind[1]))
         return True
         
     def sample_x(self,j):

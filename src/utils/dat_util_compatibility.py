@@ -26,8 +26,8 @@ def load_fcdata_to_root(ext, loadfilef, startrow, startcol, marker_lab, datadir,
         data, metadata = load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir, **kw)
 
     if rank == 0 and verbose:
-        print "sampnames = {}".format(metadata['samp']['names'])
-        print "data sizes = {}".format([dat.shape for dat in data])
+        print("sampnames = {}".format(metadata['samp']['names']))
+        print("data sizes = {}".format([dat.shape for dat in data]))
 
     return data, metadata
 
@@ -72,7 +72,7 @@ def load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir,
 
     if datanames is None:
         datafiles = glob.glob(datadir+'*'+ext)
-        #print "datafiles = {}".format(datafiles)
+        #print("datafiles = {}".format(datafiles))
     else:
         datafiles = [datadir + name + ext for name in datanames]
     J = len(datafiles)
@@ -81,7 +81,7 @@ def load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir,
 
     data = []
     sampnames = []
-    print "J = {} samples will be loaded".format(J)
+    print("J = {} samples will be loaded".format(J))
     for j in range(J):
         sampnames.append(datafiles[j].replace(datadir, '').replace(' ', '').replace(ext, ''))
         data.append(loadfilef(datafiles[j])[startrow:, startcol:])
@@ -126,7 +126,7 @@ def load_fcdata_no_mpi(ext, loadfilef, startrow, startcol, marker_lab, datadir,
             try:
                 indices_j = eventind_dic[sampnames[j]]
             except KeyError as e:
-                print "Key error({0}): {1}".format(e.errno, e.strerror)
+                print("Key error({0}): {1}".format(e.errno, e.strerror))
                 indices_j = eventind[j]
         data[j] = dat[indices_j, :]
 

@@ -26,7 +26,7 @@ class HMplot(object):
                 mimic = bmres.mimics[mimic_key]
                 self.mcsp[mimic_key] = MimicPlot(mimic)
         except AttributeError as e:
-            print e
+            print(e)
             pass
 
         if hasattr(bmres, 'meta_data'):
@@ -135,10 +135,10 @@ class HMplot(object):
 
         if name in self.mcsp and Nsamp is None:
             loadsyn = True
-            print "self.mcsp[name] = {}".format(self.mcsp[name])
+            print("self.mcsp[name] = {}".format(self.mcsp[name]))
         else:
             loadsyn = False
-            print "no mimic found, generating new data"
+            print("no mimic found, generating new data")
             if not name is 'pooled':
                 j = self.sampnames.index(name)
                 totdata = self.bmres.data[j]
@@ -229,9 +229,9 @@ class HMplot(object):
             order = self.comp_ord
 
         pdiplist = self.bmres.get_pdip(suco)
-        print "len(pdiplist) = {}".format(len(pdiplist))
-        print "len(order) = {}".format(len(order))
-        print "suco = {}".format(suco)
+        print("len(pdiplist) = {}".format(len(pdiplist)))
+        print("len(order) = {}".format(len(order)))
+        print("suco = {}".format(suco))
         for i, k in enumerate(order):
             pdip = pdiplist[k]
             ax = fig.add_subplot(1, len(pdiplist), i+1)

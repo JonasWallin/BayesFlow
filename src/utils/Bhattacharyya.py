@@ -43,10 +43,10 @@ if __name__ == "__main__":
     b = np.ones((1, 3))
     Sigma1 = np.eye(3)
     Sigma2 = 2*np.eye(3)
-    print bhattacharyya_overlap(a, Sigma1, b, Sigma2)
+    print(bhattacharyya_overlap(a, Sigma1, b, Sigma2))
     #a *= np.nan
     bhattacharyya_overlap(a, Sigma1, b, Sigma2)
     Sigma1 = np.ones((3, 3))
-    print bhattacharyya_overlap(a, Sigma1, b, Sigma2)
+    print(bhattacharyya_overlap(a, Sigma1, b, Sigma2))
     Sigma2 = 3*np.ones((3, 3))
-    print bhattacharyya_overlap(a, Sigma1, b, Sigma2)
+    print(bhattacharyya_overlap(a, Sigma1, b, Sigma2))

@@ -256,10 +256,10 @@ class EventInd(object):
         fpath = savedir+str(self)+'.npy'
         if not overwrite:
             while os.path.exists(fpath):
-                print fpath+' already exists, increasing i'
+                print(fpath+' already exists, increasing i')
                 self.i += 1
                 fpath = savedir+str(self)+'.npy'
-        print "Saving new eventind at {}".format(fpath)
+        print("Saving new eventind at {}".format(fpath))
         with open(fpath, 'w') as f:
             np.save(f, self.indices)
 
@@ -365,7 +365,7 @@ class PercentilesMPI(object):
     def key(self):
         if self.rank == 0:
             curr_dict = self.key_dict_
-            #print "curr_dict = {}".format(curr_dict)
+            #print("curr_dict = {}".format(curr_dict))
             samp_frozen = frozenset(self.sampnames_all)
             key_ = ''
             for j, dat in enumerate([samp_frozen, self.Nevent, self.i_eventind_load,
@@ -376,7 +376,7 @@ class PercentilesMPI(object):
                     curr_dict[dat] = (len(curr_dict), {})
                     i, curr_dict = curr_dict[dat]
                 key_ += '_%d' % i
-            #print "parent_dict = {}".format(parent_dict)
+            #print("parent_dict = {}".format(parent_dict))
             #with open(self.key_file_, 'w') as f:
             #    pickle.dump(self.key_dict_, f)
         else:
@@ -424,7 +424,7 @@ class PercentilesMPI(object):
 
     def save(self, q, values):
         if self.rank == 0:
-            print "Saving new percentiles for q = {} in {}: {}".format(q, self.savedir_, values)
+            print("Saving new percentiles for q = {} in {}: {}".format(q, self.savedir_, values))
             if not os.path.exists(self.savedir_):
                 os.mkdir(self.savedir_)
             np.savetxt(self.savedir_+self.name(q, self.key_)+'.txt', values)

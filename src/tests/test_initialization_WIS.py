@@ -24,7 +24,7 @@ if rank == 0:
 else:
     js = None
 js = comm.scatter(js)
-print "js at rank {} = {}".format(rank, js)
+print("js at rank {} = {}".format(rank, js))
 
 samples = [SynSample2(j, n_obs, d=d, ver='C') for j in js]
 data = [sample.data for sample in samples]
@@ -42,8 +42,8 @@ res_wis_maxd = EM_pooled(comm, data, K=K, WIS=True, n_iter=n_iter, n_init=n_init
                          N=n_obs/10, selection='sum_min_dist')
 
 if rank == 0:
-    print "Time EM: {}".format(t1-t0)
-    print "Time EMWIS: {}".format(t2-t1)
+    print("Time EM: {}".format(t1-t0))
+    print("Time EMWIS: {}".format(t2-t1))
 
 plotdim = [(i, j) for i in range(d) for j in range(i+1, d)]
 if rank == 0:

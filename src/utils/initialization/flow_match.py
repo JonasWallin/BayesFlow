@@ -11,7 +11,7 @@ def flow_match(dist_matrix, lambd):
     try:
         flowMatch = importr('flowMatch')
     except RRuntimeError as e:
-        print "You need to install the R Bioconductor package flowMatch to use flow_match"
+        print("You need to install the R Bioconductor package flowMatch to use flow_match")
         raise e
 
     K, L = dist_matrix.shape
@@ -57,8 +57,8 @@ if __name__ == '__main__':
     L = 4
     lambd = 0.6
     a = 0.2*np.array(range(K*L)).reshape(K, L)
-    print "a = {}".format(a)
+    print("a = {}".format(a))
     a_R = robjects.r.matrix(robjects.FloatVector(a.ravel(order='F')), nrow=a.shape[0])
-    print "a_R = {}".format(a_R)
+    print("a_R = {}".format(a_R))
 
-    print "flow_match(a, lambd) = {}".format(flow_match(a, lambd))
+    print("flow_match(a, lambd) = {}".format(flow_match(a, lambd)))

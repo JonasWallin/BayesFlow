@@ -54,7 +54,7 @@ def bcast_array_1d(array,nptype,mpitype,comm = MPI.COMM_WORLD,root=0):
 
     if rank != root:
         array = np.empty(n,nptype)
-        print "array = {}".format(array)
+        print("array = {}".format(array))
     comm.Bcast([array,mpitype],root=root)
     return array
 

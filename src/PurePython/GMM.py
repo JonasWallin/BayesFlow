@@ -187,7 +187,7 @@ class mixture(object):
 		try:
 			self.AMCMC = params["AMCMC"]
 		except AttributeError:
-			print "No AMCMC setting loaded"
+			print("No AMCMC setting loaded")
 		
 		
 	def write_param(self):
@@ -255,7 +255,7 @@ class mixture(object):
 			self.p = np.hstack((self.p * (1- 0.01), 0.01))
 			self.alpha_vec =  np.hstack((self.alpha_vec,a))
 		else:
-			print "Noise class already present"
+			print("Noise class already present")
 
 		if Sigma is None:
 			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
@@ -1008,13 +1008,13 @@ class mixture(object):
 				else:
 					dist = [bhattacharyya_distance(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
-					#print "thetas = {}".format(thetas)
-					#print "mu = {}".format(self.mu)
-					#print "aquitted = {}".format(aquitted)
+					#print("thetas = {}".format(thetas))
+					#print("mu = {}".format(self.mu))
+					#print("aquitted = {}".format(aquitted))
 					self.deactivate_component(k)
 					any_deactivated = 1
 		if np.sum(self.active_komp) == 0:
-			print "All components deactivated"
+			print("All components deactivated")
 		return any_deactivated
 	
 	def deactivate_component(self, k_off):

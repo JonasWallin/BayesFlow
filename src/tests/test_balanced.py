@@ -58,50 +58,50 @@ if __name__ == '__main__':
         J, K, N, d = param0
         for N in Ns:
             if not (i, J, K, N, d) in dists.keys():
-                print "computing dists for {}".format((i, J, K, N, d))
+                print("computing dists for {}".format((i, J, K, N, d)))
                 pipeline = Pipeline(J=J, K=K, N=N, d=d, C=C,
                                     data_class=SynSample, ver='A',
                                     par_file=par)
                 pipeline.run()
-                print "pipeline.rundir = {}".format(pipeline.rundir)
+                print("pipeline.rundir = {}".format(pipeline.rundir))
                 dists.update((i, J, K, N, d), (pipeline.res.get_bh_distance_to_own_latent(),
                              pipeline.res.get_center_dist()))
 
         J, K, N, d = param0
         for d in ds:
             if not (i, J, K, N, d) in dists.keys():
-                print "computing dists for {}".format((i, J, K, N, d))
+                print("computing dists for {}".format((i, J, K, N, d)))
                 pipeline = Pipeline(J=J, K=K, N=N, d=d, C=C,
                                     data_class=SynSample, ver='A',
                                     par_file=par)
                 pipeline.run()
-                print "pipeline.rundir = {}".format(pipeline.rundir)
+                print("pipeline.rundir = {}".format(pipeline.rundir))
                 dists.update((i, J, K, N, d), (pipeline.res.get_bh_distance_to_own_latent(),
                              pipeline.res.get_center_dist()))
 
         # J, K, N, d = 5, 4, 1000, 3
         # for K in Ks:
         #     if not (i, J, K, N, d) in dists.keys():
-        #         print "computing dists for {}".format((i, J, K, N, d))
+        #         print("computing dists for {}".format((i, J, K, N, d)))
         #         pipeline = Pipeline(J=J, K=K, N=N, d=d, C=C, data_class=SynSample, ver='A')
         #         pipeline.run()
-        #         print "pipeline.rundir = {}".format(pipeline.rundir)
+        #         print("pipeline.rundir = {}".format(pipeline.rundir))
         #         dists.update((i, J, K, N, d), (pipeline.res.get_bh_distance_to_own_latent(),
         #                      pipeline.res.get_center_dist()))
 
         J, K, N, d = param0
         for J in Js:
             if not (i, J, K, N, d) in dists.keys():
-                print "computing dists for {}".format((i, J, K, N, d))
+                print("computing dists for {}".format((i, J, K, N, d)))
                 pipeline = Pipeline(J=J, K=K, N=N, d=d, C=C,
                                     data_class=SynSample, ver='A',
                                     par_file=par)
                 pipeline.run()
-                print "pipeline.rundir = {}".format(pipeline.rundir)
+                print("pipeline.rundir = {}".format(pipeline.rundir))
                 dists.update((i, J, K, N, d), (pipeline.res.get_bh_distance_to_own_latent(),
                              pipeline.res.get_center_dist()))
 
-    print "dists.keys() = {}".format(dists.keys())
+    print("dists.keys() = {}".format(dists.keys()))
 
     is_ = [0, 1, 2]
     Js = [2, 5, 50]

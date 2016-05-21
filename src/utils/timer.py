@@ -33,7 +33,7 @@ class Timer:
         if self.rank == 0:
             if iter is None:
                 for tp in self.t:
-                    print "{}: {} s\n".format(tp, self.t[tp])
+                    print("{}: {} s\n".format(tp, self.t[tp]))
             else:
                 for tp in self.t:
-                    print "{}: {} s per iteration".format(tp, self.t[tp]/iter)
+                    print("{}: {} s per iteration".format(tp, self.t[tp]/iter))

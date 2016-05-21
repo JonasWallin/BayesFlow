@@ -97,7 +97,7 @@ class Pipeline(object):
         self.K = K  # Number of components.
         self.N = N
         self.savedir = 'blah'  # tempfile.mkdtemp()
-        print "savedir = {}".format(self.savedir)
+        print("savedir = {}".format(self.savedir))
         self.datadir = os.path.join(self.savedir, 'data')
         if self.rank == 0:
             js = np.array_split(np.arange(J), comm.Get_size())
@@ -148,8 +148,8 @@ class Pipeline(object):
         try:
             self.bf_setup = imp.load_source('src.tests.param.setup', self.parfile).setup
         except IOError as e:
-            print "Setupfile {} does not exist".format(self.parfile)
-            print "Setupdir has files: {}".format(os.listdir(os.path.split(self.parfile)[0]))
+            print("Setupfile {} does not exist".format(self.parfile))
+            print("Setupdir has files: {}".format(os.listdir(os.path.split(self.parfile)[0])))
             raise e
         self.Nevent = np.mean([synsamp.n_obs for synsamp in self.synsamples])
         self.prior, self.simpar, self.postpar = self.bf_setup(
@@ -163,9 +163,9 @@ class Pipeline(object):
         self.hGMM = hierarical_mixture_mpi(K=self.prior.K, AMCMC=self.simpar.AMCMC,
                                            comm=self.comm)
         #sampnames = sampnames_scattered(self.comm, self.datadir, self.data_kws['ext'])
-        #print "sampnames before load: {}".format(sampnames)
+        #print("sampnames before load: {}".format(sampnames))
         self.hGMM.load_data(self.names, **self.data_kws)
-        print "after load data"
+        print("after load data")
         self.hGMM.set_prior(prior=self.prior, init=False)
         t0 = time.time()
         self.hGMM.set_init(self.prior, method=method, WIS=WIS,
@@ -179,7 +179,7 @@ class Pipeline(object):
         t0 = time.time()
         HGMM_pre_burnin(self.hGMM)
         t1 = time.time()
-        print "pre burnin: {} s".format(t1 - t0)
+        print("pre burnin: {} s".format(t1 - t0))
 
     def MCMC(self, plot_sim=False, save_hGMM=False):
         '''
@@ -196,7 +196,7 @@ class Pipeline(object):
         self.hGMM.resize_var_priors(1./self.simpar.tightinitfac)
         self.hGMM.simulate(self.simpar.phases['B1b'], 'Burnin phase 1b', **sim_settings)
         self.hGMM.set_theta_to_median()
-        #print "any deactivated at rank {}: {}".format(self.comm.Get_rank(), self.hGMM.deactivate_outlying_components())
+        #print("any deactivated at rank {}: {}".format(self.comm.Get_rank(), self.hGMM.deactivate_outlying_components()))
         self.hGMM.set_GMMs_mu_Sigma_from_prior()
         self.comm.Barrier()
         self.hGMM.simulate(self.simpar.phases['B2a'], 'Burnin phase 2a', **sim_settings)
@@ -214,10 +214,10 @@ class Pipeline(object):
 
         t2 = time.time()
 
-        print 'burnin iterations ({}) and postproc: {} s'.format(
-            self.simpar.nbriter*self.simpar.qburn, t1-t0)
-        print 'production iterations ({}) and postproc: {} s'.format(
-            self.simpar.nbriter*self.simpar.qprod, t2-t1)
+        print('burnin iterations ({}) and postproc: {} s'.format(
+            self.simpar.nbriter*self.simpar.qburn, t1-t0))
+        print('production iterations ({}) and postproc: {} s'.format(
+            self.simpar.nbriter*self.simpar.qprod, t2-t1))
 
         if save_hGMM:
             self.hGMM.save(self.rundir)
@@ -247,41 +247,41 @@ class Pipeline(object):
         return len(self.logdata['lab_sw'])
 
     def quality_check(self):
-        print "self.res.active_komp = {}".format(self.res.active_komp)
+        print("self.res.active_komp = {}".format(self.res.active_komp))
 
         self.res.traces.plot.all(figsize=(18, 4), yscale=True)
         self.res.traces.plot.nu()
         self.res.traces.plot.nu_sigma()
         plt.show()
-        print "Are trace plots ok? (y/n)"
+        print("Are trace plots ok? (y/n)")
         while 1:
             ans = raw_input()
             if ans.lower() == 'y':
                 break
             if ans.lower() == 'n':
                 raise BadQualityError('Trace plots not ok')
-            print "Bad answer. Are trace plots ok? (y/n)"
+            print("Bad answer. Are trace plots ok? (y/n)")
 
         fig, axs = plt.subplots(self.res.K, 2, figsize=(9, 4))
         try:
             self.res.components.plot.center_distance_quotient(axs=axs[:, 0])
             self.res.components.plot.bhattacharyya_overlap_quotient(axs=axs[:, 1])
         except NoOtherClusterError:
-            print "Only one super component, cannot plot center distance \
-                   and bhattacharyya overlap quotients."
+            print("Only one super component, cannot plot center distance \
+                   and bhattacharyya overlap quotients.")
             pass
 
         self.res.components.plot.cov_dist(figsize=(4, 4))
 
         plt.show()
-        print "Are distances to latent components ok? (y/n)"
+        print("Are distances to latent components ok? (y/n)")
         while 1:
             ans = raw_input()
             if ans.lower() == 'y':
                 break
             if ans.lower() == 'n':
                 raise BadQualityError('Distance to latent components not ok')
-            print "Bad answer. Are distance to latent components ok? (y/n)"
+            print("Bad answer. Are distance to latent components ok? (y/n)")
 
         emds, e_dim = self.res.earth_movers_distance_to_generated()
         log_lik = np.empty(self.J)
@@ -311,14 +311,14 @@ class Pipeline(object):
         self.res.plot.component_fit(plotdim, name='pooled', figsize=(18, 25))
 
     def clean_up(self):
-        print "removing savedir {} ...".format(self.savedir)
+        print("removing savedir {} ...".format(self.savedir))
         try:
             pass
             #shutil.rmtree(self.savedir)
         except Exception as e:
-            print "Could not remove savedir {}: {}".format(self.savedir, e)
+            print("Could not remove savedir {}: {}".format(self.savedir, e))
         else:
-            print "removing savedir {} done".format(self.savedir)
+            print("removing savedir {} done".format(self.savedir))
 
     def run(self, init_method='EM_pooled', WIS=False, rho=2, init_n_iter=20,
             n_init=10, init_plotting=False, init_selection='likelihood', gamma=2,
@@ -328,7 +328,7 @@ class Pipeline(object):
             self.setup_run()
             self.init_hGMM(method=init_method, WIS=WIS, rho=rho, n_iter=init_n_iter,
                            n_init=n_init, plotting=init_plotting, selection=init_selection, gamma=gamma)
-            print "prior vals: {}".format(self.hGMM.prior.__dict__)
+            print("prior vals: {}".format(self.hGMM.prior.__dict__))
             if pre_burnin:
                 self.pre_burnin()
             self.MCMC(plot_sim, save_hGMM=save_hGMM)

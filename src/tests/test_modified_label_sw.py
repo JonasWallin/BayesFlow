@@ -27,8 +27,8 @@ class TrackDict(SaveDict):
         self.load()
         dict_ = self._dic
         width = min(max([len(str(key)) for key in dict_.keys()]), 15)
-        print "\n".join("{:<{width}s}  {}".format(
-            str(key), dict_[key], width=width) for key in sorted(dict_.keys()))
+        print("\n".join("{:<{width}s}  {}".format(
+            str(key), dict_[key], width=width) for key in sorted(dict_.keys())))
 
 if __name__ == '__main__':
 

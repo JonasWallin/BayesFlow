@@ -25,7 +25,7 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #        g = skmixture.GMM(n_components=K,covariance_type=covariance_type,n_init=n_init,n_iter=n_iter)
 #        g.fit(data)
 #        bic = g.bic(data)
-#        print "BIC for {} clusters: {}".format(K,bic)
+#        print("BIC for {} clusters: {}".format(K,bic))
 #        if bic < bestbic:
 #            means = g.means_
 #            bestbic = bic
@@ -178,8 +178,8 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #        
 #    def hclean(self):
 #        removed_comp = self.p[0,:] == 2
-#        #print "removed_comp.shape = {}".format(removed_comp.shape)
-#        #print "np.hstack([removed_comp,True]) = {}".format(np.hstack([removed_comp,True]))
+#        #print("removed_comp.shape = {}".format(removed_comp.shape))
+#        #print("np.hstack([removed_comp,True]) = {}".format(np.hstack([removed_comp,True])))
 #        if self.p.shape[1] < self.classif_freq[0].shape[1]:
 #            removed_comp_freq = np.hstack([removed_comp,False])
 #        else:
@@ -187,7 +187,7 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #        self.classif_freq = [clf[:,~removed_comp_freq] for clf in self.classif_freq]
 #        self.p = self.p[:,~removed_comp]
 #        self.K = self.p.shape[1]
-#        print "Sizes of merged clusters: {}".format(self.p)
+#        print("Sizes of merged clusters: {}".format(self.p))
 #        
 #    def gclean(self,mergeind):
 #        newp = np.empty((self.J,len(mergeind)))
@@ -289,7 +289,7 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #                    xcum,ycum = diptest.cum_distr(self.data[j][:,dd],self.classif_freq[j][:,k])
 #                    dip = diptest.dip_from_cdf(xcum,ycum)
 #                    pdip[j,dd] = diptest.dip_pval_tabinterpol(dip,self.p[j,k]*self.classif_freq[j].shape[0])
-#            print "Diptest computed for component {}".format(k)
+#            print("Diptest computed for component {}".format(k))
 #            pdiplist.append(np.copy(pdip))
 #            
 #        self.pdiplist = pdiplist
@@ -338,9 +338,9 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #    def okdiptest(self,ind,thr):
 #        if not hasattr(self,'vacuous_komp'):
 #            self.vacuous_komp = np.vstack([np.sum(clf,axis=0) < 3 for clf in self.classif_freq])
-#            print "vacuous_komp = {}".format(self.vacuous_komp)
+#            print("vacuous_komp = {}".format(self.vacuous_komp))
 #        maxbelow = np.ceil((self.J-sum(self.vacuous_komp[:,ind[0]]+self.vacuous_komp[:,ind[1]]))/4) - 1
-#        print "maxbelow = {}".format(maxbelow)
+#        print("maxbelow = {}".format(maxbelow))
 #        for dim in [None]+range(self.d):
 #            below = 0
 #            for j in range(self.J):
@@ -348,9 +348,9 @@ from .utils.results import MetaData, Traces, MimicSample, Clustering, Components
 #                    if self.get_pdip_discr_jkl(j,ind[0],ind[1],dim) < thr:
 #                        below += 1
 #                        if below > maxbelow:
-#                            print "For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim)
+#                            print("For ind {} and {}, diptest failed for dim: {}".format(ind[0],ind[1],dim))
 #                            return False
-#        print "Diptest ok for {} and {}".format(ind[0],ind[1])
+#        print("Diptest ok for {} and {}".format(ind[0],ind[1]))
 #        return True
 #        
 #    def sample_x(self,j):
@@ -514,7 +514,7 @@ class BMres(object):
 
             self.traces = Traces(bmlog_burn,bmlog)
             self.mimics = {}
-            print "bmlog.savesapnames = {}".format(bmlog.savesampnames)
+            print("bmlog.savesapnames = {}".format(bmlog.savesampnames))
             for i,name in enumerate(bmlog.savesampnames):
                 j = bmlog.names.index(name)
                 self.mimics[name] = MimicSample(self.data[j],name,bmlog.Y_sim[i],'BHM_MCMC')
@@ -588,7 +588,7 @@ class BMres(object):
                         nextsuco += [nm]
                     else:
                         nextsuco += sucos[suco_assign[nm]]
-                #print "nextmerge = {}".format(nextmerge)
+                #print("nextmerge = {}".format(nextmerge))
                 suco_assign[np.array(nextsuco)] = len(sucos)
                 sucos.append(nextsuco)
             mm[nextmerge[0],nextmerge[1]] = -np.inf
@@ -601,10 +601,10 @@ class BMres(object):
             self.complist.remove([])
         self.mergeind = self.flatten_complist()
         self.clust_m.hclean()
-        print "self.mergeind = {}".format(self.mergeind)
+        print("self.mergeind = {}".format(self.mergeind))
         
         #left_comp = np.array([suco[0] for suco in self.mergeind])
-        #print "left_comp = {}".format(left_comp)
+        #print("left_comp = {}".format(left_comp))
 
     def gclean(self):
         self.clust_m.gclean(self.mergeind)

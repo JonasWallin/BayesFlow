@@ -11,7 +11,7 @@ try:
     from rpy2.rinterface import RRuntimeError
     import rpy2.robjects as robjects
 except ImportError as e:
-    print "{} --- will not be able to load dataset healthyFlowData".format(e)
+    print("{} --- will not be able to load dataset healthyFlowData".format(e))
 
 from ..utils.dat_util import percentilescale
 
@@ -56,5 +56,5 @@ def load(Nsamp=None, scale=True):
 
 if __name__ == '__main__':
     data, metadata = load()
-    print "data = {}".format(data)
-    print "metadata = {}".format(metadata)
+    print("data = {}".format(data))
+    print("metadata = {}".format(metadata))

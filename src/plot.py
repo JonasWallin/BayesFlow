@@ -232,7 +232,7 @@ def visualEigen(Sigma, mu, dim):
     try:
         E, V = np.linalg.eig(Sigma)
     except np.linalg.LinAlgError:
-        print "Exception caught, Sigma = {}".format(Sigma)
+        print("Exception caught, Sigma = {}".format(Sigma))
         return None
     t = np.linspace(0, 2*np.pi, 100)
     e = np.array([np.cos(t), np.sin(t)])
@@ -371,8 +371,8 @@ def pca_biplot(data, comp, ax=None, varcol=None, varlabels=None, varlabsh=None, 
     # Compute variance contained in two first components
     lam = s * s
     lam /= sum(lam)
-    print "Proportion of variance by components in biplot: {}".format(
-        sum(lam[comp]))
+    print("Proportion of variance by components in biplot: {}".format(
+        sum(lam[comp])))
 
     ax.axis('off')
 

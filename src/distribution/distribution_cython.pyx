@@ -462,7 +462,7 @@ cdef class  multivariatenormal:
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -474,7 +474,7 @@ cdef class  multivariatenormal:
 			
 			object = multivariatenormal.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)	
 		
 					
@@ -613,7 +613,7 @@ cdef class invWishart:
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -625,7 +625,7 @@ cdef class invWishart:
 			
 			object = invWishart.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)	
 				
 	@cython.boundscheck(False)
@@ -769,7 +769,7 @@ cdef class Wishart:
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -781,7 +781,7 @@ cdef class Wishart:
 			
 			object = Wishart.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)	
 
 			

@@ -49,10 +49,10 @@ for i, mix in enumerate(res):
 
 if rank == 0:
     plt.show()
-    print "Order initializations:"
+    print("Order initializations:")
     visual_order = raw_input().split()
-    print "visual_ranking = {}".format(visual_order)
+    print("visual_ranking = {}".format(visual_order))
 
     for ind in visual_order:
         ind = int(ind)-1
-        print "{:<{width}.1f}{:<{width}.1e}".format(EMD[ind], log_lik[ind], width=8)
+        print("{:<{width}.1f}{:<{width}.1e}".format(EMD[ind], log_lik[ind], width=8))

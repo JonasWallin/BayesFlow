@@ -54,7 +54,7 @@ class HMres(Mres):
 
             self.traces = Traces(hmlog_burn, hmlog)
             self.mimics = {}
-            #print "hmlog.savesampnames = {}".format(hmlog.savesampnames)
+            #print("hmlog.savesampnames = {}".format(hmlog.savesampnames))
             for i, name in enumerate(hmlog.savesampnames):
                 j = hmlog.names.index(name)
                 self.mimics[name] = MimicSample(self.data[j], name, hmlog.Y_sim[i], 'BHM_MCMC')
@@ -90,12 +90,12 @@ class HMres(Mres):
         names = hmlog.names
         metadata.update(marker_lab=marker_lab, samp={'names': names})
         if verbose:
-            print "metadata = {}".format(metadata)
+            print("metadata = {}".format(metadata))
         res = cls(hmlog, hmlog_burn, data, metadata, comm=comm)
         if not no_postproc:
             try:
                 if verbose:
-                    print "savedir = {}".format(savedir)
+                    print("savedir = {}".format(savedir))
                 with open(os.path.join(savedir, 'postproc_results.json'), 'r') as f:
                     postproc_res = json.load(f)
             except IOError:
@@ -156,7 +156,7 @@ class HMres(Mres):
         self.traces.plot.nu()
         self.traces.plot.nu_sigma()
         plt.show()
-        print "Are trace plots ok? (y/n)"
+        print("Are trace plots ok? (y/n)")
         while 1:
             ans = raw_input()
             if ans.lower() == 'y':
@@ -165,7 +165,7 @@ class HMres(Mres):
             if ans.lower() == 'n':
                 self.quality['convergence'] = 'no'
                 raise BadQualityError('Trace plots not ok')
-            print "Bad answer. Are trace plots ok? (y/n)"
+            print("Bad answer. Are trace plots ok? (y/n)")
 
     def check_noise(self, noise_lim=0.01):
         if self.noise_class:
@@ -253,7 +253,7 @@ class HMres(Mres):
             Sigmas.append(self.noise_sigma)
             ps.append(self.p_noise[j])
         if debug:
-            print "np.sum(ps) = {}".format(np.sum(ps))
+            print("np.sum(ps) = {}".format(np.sum(ps)))
         ps /= np.sum(ps)  # renormalizing
         return mus, Sigmas, np.array(ps)
 
@@ -278,10 +278,10 @@ class HMres(Mres):
                     DataMPI(MPI.COMM_SELF, [dat]), mus, Sigmas, ps, N_synsamp,
                     gamma=gamma, nbins=50, dims=dims))
                 * (1./N_synsamp))
-            print "\r EMD computed for {} samples".format(j+1),
-        print "\r ",
-        print ""
+            print("\r EMD computed for {} samples".format(j+1),)
+        print("\r ",)
+        print("")
         self._earth_movers_distance_to_generated = np.vstack(emds)
         self._emd_dims = dims
-        print "dims = {}".format(dims)
+        print("dims = {}".format(dims))
         return self._earth_movers_distance_to_generated, self._emd_dims
