@@ -4,7 +4,7 @@ Created on Wed Jan  7 21:23:52 2015
 
 @author: johnsson
 """
-import cPickle as pickle
+import pickle
 import os
 import numpy as np
 import json

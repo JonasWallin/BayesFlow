@@ -8,7 +8,7 @@ from __future__ import division
 
 import numpy as np
 import numpy.random as npr
-import cPickle as pickle
+import pickle
 
 #DONE: simulerings test som visar att samplingen funkar (Done)
 #DONE: AMCMC version (Done)

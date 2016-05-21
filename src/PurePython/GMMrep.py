@@ -7,7 +7,7 @@ from __future__ import division
 import numpy as np
 import numpy.random as npr
 import copy as cp
-import cPickle as pickle
+import pickle
 import scipy.linalg as sla
 import scipy.special as sps
 

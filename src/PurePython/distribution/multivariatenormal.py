@@ -6,7 +6,7 @@ Created on Jun 30, 2014
 import copy as cp
 import numpy as np
 
-import cPickle as pickle
+import pickle
 
 
 class multivariatenormal(object):

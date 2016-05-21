@@ -2,7 +2,7 @@
 import numpy as np
 cimport numpy as np
 cimport cython
-import cPickle as pickle
+import pickle
 cdef extern void outer_Y(double* YYt, const double* Y, const int n, const int d) nogil
 
 

@@ -3,7 +3,7 @@ import numpy.random as npr
 from numpy.linalg import cholesky, solve
 from scipy.stats import chi2
 
-import cPickle as pickle
+import pickle
 
 def wishart_var(nu, phi):
 	var = np.zeros_like(phi)

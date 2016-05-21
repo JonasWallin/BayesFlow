@@ -10,7 +10,7 @@ import numpy.random as npr
 #import copy
 import glob
 from mpi4py import MPI
-import cPickle as pickle
+import pickle
 import os
 from pprint import pformat
 

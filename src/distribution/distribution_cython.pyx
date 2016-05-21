@@ -9,7 +9,7 @@ cdef extern void update_mu_Q_sample(double* mu_sample, double *Q_sample, const d
 						const double* Q_p, const double* sumY, const long int n, const int d) nogil
 cdef extern void Lt_XpZ(const double* L, double* X, const double* Z, const int d) nogil
 
-import cPickle as pickle
+import pickle
 cdef extern void outer_Y(double* YYt, const double* Y, const int n, const int d) nogil
 cdef extern void wishartrand(double* phi, const int d , double* X_rand, double* X_out) nogil
 cdef extern  void inv_c( double *X_inv, const double *X, const int d) nogil

@@ -12,7 +12,7 @@ import time
 import os
 import json
 import scipy.special as sps
-import cPickle as pickle
+import pickle
 import scipy.linalg as sla
 #import matplotlib.pyplot as plt
 

@@ -5,7 +5,7 @@ import collections
 import warnings
 from scipy import io, sparse
 import os
-import cPickle as pickle
+import pickle
 import json
 
 from .utils import mpiutil
