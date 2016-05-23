@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 
 from BayesFlow import setup_sim, hierarical_mixture_mpi, HMlogB, HMElog, HMres
 from BayesFlow.utils import load_fcdata
-from BayesFlow.utils.dat_util import sampnames_mpi
 from BayesFlow.PurePython.GMM import mixture
 from BayesFlow.exceptions import NoOtherClusterError
 
