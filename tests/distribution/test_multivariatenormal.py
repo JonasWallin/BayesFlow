@@ -6,8 +6,11 @@ Created on Jun 30, 2014
 import unittest
 import numpy as np
 import scipy.linalg as spl
-from bayesianmixture.PurePython.distribution import multivariatenormal as mv_python
-from bayesianmixture.distribution import multivariatenormal as mv  # @UnresolvedImport
+try:
+	from bayesianmixture.purepython.distribution import multivariatenormal as mv_python
+	from bayesianmixture.distribution import multivariatenormal as mv  # @unresolvedimport
+except ImportError:
+	raise unittest.SkipTest("bayesianmixture not available")
 import os
 
 class multivariatenormal_base(object):
