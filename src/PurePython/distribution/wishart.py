@@ -72,7 +72,7 @@ class Wishart(object):
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -84,7 +84,7 @@ class Wishart(object):
 			
 			object = Wishart.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)	
 	
 	def set_parameter(self, param):
@@ -148,7 +148,7 @@ class invWishart(object):
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -160,7 +160,7 @@ class invWishart(object):
 			
 			object = normal_p_wishart.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)
 			
 	def set_prior(self,prior):
