@@ -19,7 +19,7 @@ class mixture(PPGMM.mixture):
     """
         The main Gaussian mixture model
     """
-    def __init__(self, data, K,  prior = None, high_memory=True , name = None):
+    def __init__(self, data=None, K=None,  prior = None, high_memory=True , name = None):
         super(mixture,self).__init__(None,K = K, prior = prior, high_memory = high_memory, name = name)
         #self.rng = rng_cython.rng_class()
         self.set_data(data)
