@@ -238,7 +238,7 @@ class mixture_repeat_measurements(object):
 		
 		"""
 		if data.shape[0] <= data.shape[1]:
-				raise ValueError, 'the number of observations must be larger then the dimenstion'
+				raise ValueError('the number of observations must be larger then the dimenstion')
 		self.data = np.empty_like(data)
 		self.data[:] = data[:]
 		self.measurement = np.empty_like(measurement)

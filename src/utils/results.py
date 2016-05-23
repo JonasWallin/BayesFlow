@@ -134,7 +134,7 @@ class Mres(object):
         elif method == 'no_merging':
             self.mergeind = [[k] for k in range(self.K)]
         else:
-            raise NameError, 'Unknown method for merging'
+            raise NameError('Unknown method for merging')
         del self.complist
         self.merged = True
         self.mergeMeth = method
@@ -143,7 +143,7 @@ class Mres(object):
 
     def hierarchical_merge(self,mergeMeasureFun,thr,**mmfArgs):
         if (self.p < 0).any():
-            raise ValueError, 'Negative p'
+            raise ValueError('Negative p')
         mm = mergeMeasureFun(**mmfArgs)
         if (mm > thr).any():
             self.merge_kl(np.unravel_index(np.argmax(mm),mm.shape))

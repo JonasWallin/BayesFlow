@@ -247,7 +247,7 @@ class mixture(object):
 		
 		
 		if self.data  is None:
-				raise ValueError, 'need data to be loaded first'
+				raise ValueError('need data to be loaded first')
 		
 		if not self.noise_class:
 			self.noise_class = 1
@@ -426,7 +426,7 @@ class mixture(object):
 	def set_data(self, data):
 		
 		if data.shape[0] <= data.shape[1]:
-				raise ValueError, 'the number of observations must be larger then the dimenstion'
+				raise ValueError('the number of observations must be larger then the dimenstion')
 		self.data = np.empty_like(data)
 		self.data[:] = data[:]
 		self.n = self.data.shape[0]
