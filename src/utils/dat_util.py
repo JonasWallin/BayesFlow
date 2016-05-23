@@ -395,9 +395,8 @@ class PercentilesMPI(object):
 
     def load_values(self, q):
         if self.rank == 0:
+            fname = self.savedir_+self.name(q, self.key_)+'.txt'
             try:
-                fname = self.savedir_+self.name(q, self.key_)+'.txt'
-
                 values = np.loadtxt(fname)
                 data_found = True
 
@@ -405,7 +404,8 @@ class PercentilesMPI(object):
                     # saved percentile file older than data.
                     raise OldFileError
 
-            except (IOError, OldFileError) as e:
+            except (IOError, OldFileError) as e_:
+                e = e_
                 data_found = False
             else:
                 e = None
