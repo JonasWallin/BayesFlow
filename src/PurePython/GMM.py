@@ -867,7 +867,7 @@ class mixture(object):
 					temp_data = self.data_mu[k][self.index_AMCMC]
 					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
 					
-					slice[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
+					slice_p[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
 				else:
 					X_mu = X_slice - mu[k]
 					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
