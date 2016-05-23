@@ -239,7 +239,7 @@ class EventInd(object):
             raise IOError("{} does not exist".format(fname))
         if os.path.getmtime(fname) < os.path.getmtime(data_fname):
             raise OldFileError('Data file was modified after eventind file')
-        with open(fname, 'r') as f:
+        with open(fname, 'rb') as f:
             indices = np.load(f)
         return cls(sampname, Nevent, indices, rm_extreme)
 
@@ -260,7 +260,7 @@ class EventInd(object):
                 self.i += 1
                 fpath = savedir+str(self)+'.npy'
         print("Saving new eventind at {}".format(fpath))
-        with open(fpath, 'w') as f:
+        with open(fpath, 'wb') as f:
             np.save(f, self.indices)
 
 
@@ -356,7 +356,7 @@ class PercentilesMPI(object):
 
     def key_dict(self):
         try:
-            with open(self.key_file_, 'r') as f:
+            with open(self.key_file_, 'rb') as f:
                 return pickle.load(f)
         except IOError:
             pass
@@ -428,5 +428,5 @@ class PercentilesMPI(object):
             if not os.path.exists(self.savedir_):
                 os.mkdir(self.savedir_)
             np.savetxt(self.savedir_+self.name(q, self.key_)+'.txt', values)
-            with open(self.savedir_+'scale_keys.pkl', 'w') as f:
+            with open(self.savedir_+'scale_keys.pkl', 'wb') as f:
                 pickle.dump(self.key_dict_, f, -1)
