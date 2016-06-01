@@ -4,7 +4,7 @@ Created on Jul 2, 2014
 @author: jonaswallin
 '''
 import numpy as np
-import cPickle as pickle
+import pickle
 
 from .distribution_cython import invWishart, multivariatenormal, Wishart  # @UnresolvedImport
 #from BayesFlow.PurePython.distribution.priors import nu_class 
@@ -105,7 +105,7 @@ class normal_p_wishart(object):
 		"""
 			store object in file
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -117,7 +117,7 @@ class normal_p_wishart(object):
 			
 			object = normal_p_wishart.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)
 
 	
@@ -223,7 +223,7 @@ class Wishart_p_nu(object):
 		"""
 			store writte
 		"""
-		f = file(filename, 'wb')
+		f = open(filename, 'wb')
 		pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
 		f.close()
 
@@ -235,6 +235,6 @@ class Wishart_p_nu(object):
 			
 			object = Wishart_p_nu.unpickle(filename)
 		"""
-		with file(filename, 'rb') as f:
+		with open(filename, 'rb') as f:
 			return pickle.load(f)
 	

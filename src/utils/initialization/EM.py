@@ -11,7 +11,7 @@ try:
     from EarthMover import earth_movers_distance
 except ImportError as e:
     pass
-    #print "Option 'selection=EMD' will not be available: {}".format(e)
+    #print("Option 'selection=EMD' will not be available: {}".format(e))
 
 from . import DataMPI, WeightsMPI
 from ...PurePython.GMM import mixture
@@ -233,7 +233,7 @@ def EM_weighted_iterated_subsampling(comm, data, K, N, noise_class=False,
         K_fix = len(mus_fixed)
 
     # Extra EM it
-    # print "before extra EM it"
+    # print("before extra EM it")
     mus, Sigmas = mus_fixed, Sigmas_fixed
     pis = np.array([1./K for k in range(K)])
     if noise_class:
@@ -267,7 +267,7 @@ def E_step_pooled(comm, data, weights):
     weights_mpi = WeightsMPI(comm, weights)
     if weights_mpi.W == 0:
         raise EmptyClusterError
-    #print "tot weight of cluster = {}".format(weights_mpi.W)
+    #print("tot weight of cluster = {}".format(weights_mpi.W))
     mu_loc = sum([np.sum(dat*weight.reshape(-1, 1), axis=0)
                   for weight, dat in zip(weights, data)])
     mu = sum(comm.bcast(comm.gather(mu_loc)))/weights_mpi.W
@@ -303,8 +303,8 @@ def E_step_pooled(comm, data, weights):
 #@profile
 def M_step_pooled(comm, data, mus, Sigmas, pis):
     K = len(mus)
-    #print "mus = {}".format(mus)
-    #print "Sigmas = {}".format(Sigmas)
+    #print("mus = {}".format(mus))
+    #print("Sigmas = {}".format(Sigmas))
     weights = [np.empty((dat.shape[0], K)) for dat in data]
     for j, dat in enumerate(data):
         for k in range(K):
@@ -347,7 +347,7 @@ def GMM_means_for_best_BIC(data, Ks, n_init=10, n_iter=100, covariance_type='ful
         g = skmixture.GMM(n_components=K, covariance_type=covariance_type, n_init=n_init, n_iter=n_iter)
         g.fit(data)
         bic = g.bic(data)
-        print "BIC for {} clusters: {}".format(K, bic)
+        print("BIC for {} clusters: {}".format(K, bic))
         if bic < bestbic:
             means = g.means_
             bestbic = bic
@@ -366,23 +366,23 @@ if __name__ == '__main__':
     if 1:
         data = DataMPI(MPI.COMM_WORLD, [np.eye(3) for k in range(3)])
         weights = [range(3) for k in range(3)]
-        print "data.J_loc = {}".format(data.J_loc)
-        print "data.J = {}".format(data.J)
-        print "data.n_j = {}".format(data.n_j)
-        print "data.subsample_from_each_to_root(2) = {}".format(data.subsample_from_each_to_root(2))
-        print "data.subsample_weighted_to_root(weights, 20) = {}".format(data.subsample_weighted_to_root(weights, 20))
-        print "data.subsample_to_root(5) = {}".format(data.subsample_to_root(5))
+        print("data.J_loc = {}".format(data.J_loc))
+        print("data.J = {}".format(data.J))
+        print("data.n_j = {}".format(data.n_j))
+        print("data.subsample_from_each_to_root(2) = {}".format(data.subsample_from_each_to_root(2)))
+        print("data.subsample_weighted_to_root(weights, 20) = {}".format(data.subsample_weighted_to_root(weights, 20)))
+        print("data.subsample_to_root(5) = {}".format(data.subsample_to_root(5)))
 
     if 0:
         pi = np.array([1, 3, 5, 0.1, 0.2])
         k_fixed = [3, 4]
-        print "normalize_pi(pi, k_fixed) = {}".format(normalize_pi(pi, k_fixed))
-        print "sum(normalize_pi(pi, k_fixed)) = {}".format(sum(normalize_pi(pi, k_fixed)))
+        print("normalize_pi(pi, k_fixed) = {}".format(normalize_pi(pi, k_fixed)))
+        print("sum(normalize_pi(pi, k_fixed)) = {}".format(sum(normalize_pi(pi, k_fixed))))
 
         pi = np.array([1, 3, 5, 0.1, 0.2, np.nan])
         k_fixed = [3, 4]
-        print "normalize_pi(pi, k_fixed) = {}".format(normalize_pi(pi, k_fixed))
-        print "sum(normalize_pi(pi, k_fixed)) = {}".format(sum(normalize_pi(pi, k_fixed)))
+        print("normalize_pi(pi, k_fixed) = {}".format(normalize_pi(pi, k_fixed)))
+        print("sum(normalize_pi(pi, k_fixed)) = {}".format(sum(normalize_pi(pi, k_fixed))))
     if 0:
         d = 2
         mus = [m*np.ones(d)+np.random.normal(0, m*0.1) for m in [1, 2, 6]]
@@ -398,9 +398,9 @@ if __name__ == '__main__':
          pis_fitted) = EM_weighted_iterated_subsampling(comm, data, K, N/10,
                                                         n_iter=3, iter_final=3,
                                                         plotting=False)
-        # print "mus_fitted = {}".format(mus_fitted)
-        # print "Sigmas_fitted = {}".format(Sigmas_fitted)
-        # print "pis_fitted = {}".format(pis_fitted)
+        # print("mus_fitted = {}".format(mus_fitted))
+        # print("Sigmas_fitted = {}".format(Sigmas_fitted))
+        # print("pis_fitted = {}".format(pis_fitted))
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.scatter(data[0][:, 0], data[0][:, 1])
@@ -425,9 +425,9 @@ if __name__ == '__main__':
                                                         noise_class=True,
                                                         noise_mu=5, noise_sigma=10**2,
                                                         n_iter=3, iter_final=3)
-        # print "mus_fitted = {}".format(mus_fitted)
-        # print "Sigmas_fitted = {}".format(Sigmas_fitted)
-        # print "pis_fitted = {}".format(pis_fitted)
+        # print("mus_fitted = {}".format(mus_fitted))
+        # print("Sigmas_fitted = {}".format(Sigmas_fitted))
+        # print("pis_fitted = {}".format(pis_fitted))
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.scatter(data[0][:, 0], data[0][:, 1])

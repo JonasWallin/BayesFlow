@@ -12,7 +12,7 @@ import time
 import os
 import json
 import scipy.special as sps
-import cPickle as pickle
+import pickle
 import scipy.linalg as sla
 #import matplotlib.pyplot as plt
 
@@ -187,7 +187,7 @@ class mixture(object):
 		try:
 			self.AMCMC = params["AMCMC"]
 		except AttributeError:
-			print "No AMCMC setting loaded"
+			print("No AMCMC setting loaded")
 		
 		
 	def write_param(self):
@@ -247,7 +247,7 @@ class mixture(object):
 		
 		
 		if self.data  is None:
-				raise ValueError, 'need data to be loaded first'
+				raise ValueError('need data to be loaded first')
 		
 		if not self.noise_class:
 			self.noise_class = 1
@@ -255,7 +255,7 @@ class mixture(object):
 			self.p = np.hstack((self.p * (1- 0.01), 0.01))
 			self.alpha_vec =  np.hstack((self.alpha_vec,a))
 		else:
-			print "Noise class already present"
+			print("Noise class already present")
 
 		if Sigma is None:
 			Sigma  = Sigma_scale *  np.cov(self.data.T)*10.
@@ -426,7 +426,7 @@ class mixture(object):
 	def set_data(self, data):
 		
 		if data.shape[0] <= data.shape[1]:
-				raise ValueError, 'the number of observations must be larger then the dimenstion'
+				raise ValueError('the number of observations must be larger then the dimenstion')
 		self.data = np.empty_like(data)
 		self.data[:] = data[:]
 		self.n = self.data.shape[0]
@@ -867,7 +867,7 @@ class mixture(object):
 					temp_data = self.data_mu[k][self.index_AMCMC]
 					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
 					
-					slice[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
+					slice_p[:,k] -= np.sum(temp_data * np.dot(temp_data,Q),1)/2.
 				else:
 					X_mu = X_slice - mu[k]
 					slice_p[:,k] = np.log(np.linalg.det(Q))/2. - (self.d/2.)* np.log(2 * np.pi)
@@ -1008,13 +1008,13 @@ class mixture(object):
 				else:
 					dist = [bhattacharyya_distance(thetas[kk],Sigmas_latent[kk],self.mu[k],self.sigma[k]) for kk in range(self.K)]
 				if not np.argmin(dist) in aquitted_k:
-					#print "thetas = {}".format(thetas)
-					#print "mu = {}".format(self.mu)
-					#print "aquitted = {}".format(aquitted)
+					#print("thetas = {}".format(thetas))
+					#print("mu = {}".format(self.mu))
+					#print("aquitted = {}".format(aquitted))
 					self.deactivate_component(k)
 					any_deactivated = 1
 		if np.sum(self.active_komp) == 0:
-			print "All components deactivated"
+			print("All components deactivated")
 		return any_deactivated
 	
 	def deactivate_component(self, k_off):

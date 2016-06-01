@@ -5,7 +5,7 @@ import collections
 import warnings
 from scipy import io, sparse
 import os
-import cPickle as pickle
+import pickle
 import json
 
 from .utils import mpiutil
@@ -46,9 +46,9 @@ class HMlogB(object):
             self.nu_sim = np.empty((self.nbrsave, self.K))
             self.nu_sigma_sim = np.empty((self.nbrsave, self.K))
             if verbose:
-                print "log nbrsave = {}".format(self.nbrsave)
-                print "log savefrq = {}".format(self.savefrq)
-                print "log iterations = {}".format(self.sim)
+                print("log nbrsave = {}".format(self.nbrsave))
+                print("log savefrq = {}".format(self.savefrq))
+                print("log iterations = {}".format(self.sim))
 
     def savesim(self, hGMM):
         '''
@@ -68,13 +68,13 @@ class HMlogB(object):
             self.tmp_active_comp_curr_loc[j, :] = GMM.active_komp
             if np.amax(GMM.lab) > -1:
                 self.lab_sw_loc.append([GMM.lab])
-                print "Label switch iteration {}, sample {} at rank {}: {}".format(
-                    self.i, j, self.rank, GMM.lab)
+                print("Label switch iteration {}, sample {} at rank {}: {}".format(
+                    self.i, j, self.rank, GMM.lab))
         self.active_komp_loc += self.tmp_active_comp_curr_loc
         on_or_off = np.nonzero(self.tmp_active_comp_curr_loc - self.active_komp_curr_loc)
         if len(on_or_off[0]) > 0:
-            print "Components switched on or off at iteration {} rank {}, samples: {}, components {}".format(
-                self.i, self.rank, on_or_off[0], on_or_off[1])
+            print("Components switched on or off at iteration {} rank {}, samples: {}, components {}".format(
+                self.i, self.rank, on_or_off[0], on_or_off[1]))
         self.active_komp_curr_loc = np.copy(self.tmp_active_comp_curr_loc)
 
         return nus
@@ -107,10 +107,10 @@ class HMlogB(object):
         debug = False        
         self.set_active_komp()
         if debug:
-            print "active komp set"
+            print("active komp set")
         self.set_lab_sw()
         if debug:
-            print "lab switch set"
+            print("lab switch set")
 
     def get_last_nus(self):
         return self.nu_sim[self.saveind, :]
@@ -159,7 +159,7 @@ class HMlogB(object):
         with open(os.path.join(savedir, logname+'.json'), 'r') as f:
             hmlog = json.load(f, object_hook=lambda obj:
                               class_decoder(obj, cls, comm=comm))
-        #print "load burnlog json"
+        #print("load burnlog json")
         if comm.Get_rank() == 0:
             with open(os.path.join(savedir, logname+'_theta_sim.npy'), 'r') as f:
                 hmlog.theta_sim = np.load(f)
@@ -169,7 +169,7 @@ class HMlogB(object):
                 with open(os.path.join(savedir, logname+'_nu_sigma_sim.npy'), 'r') as f:
                     hmlog.nu_sigma_sim = np.load(f)
             except IOError:
-                print "No nu_sigma_sim available for load."
+                print("No nu_sigma_sim available for load.")
                 pass
         return hmlog
 
@@ -212,8 +212,8 @@ class HMlog(HMlogB):
                         if GMM.name in savesampnames:
                             self.savesamp_loc.append(j)
             if verbose:
-                print "savesamp_loc = {} at rank {}".format(self.savesamp_loc,self.rank)
-                print "len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),self.rank)
+                print("savesamp_loc = {} at rank {}".format(self.savesamp_loc,self.rank))
+                print("len(hGMM.GMMs) = {} at rank {}".format(len(hGMM.GMMs),self.rank))
             self.savesampnames_loc = [hGMM.GMMs[samp].name for samp in self.savesamp_loc]
             if self.rank == 0:
                 self.savesampnames = savesampnames
@@ -265,7 +265,7 @@ class HMlog(HMlogB):
             self.add_prob(ps)
 
     def cat(self):
-        print "cat not implemented yet for this object type"
+        print("cat not implemented yet for this object type")
 
     def postproc(self, high_memory=False):
         '''
@@ -345,13 +345,13 @@ class HMlog(HMlogB):
                                             MPI.DOUBLE, comm=self.comm)
 
     def set_savesampnames(self):
-        #print "self.savesampnames_loc at rank {}: {}".format(self.rank,self.savesampnames_loc)
+        #print("self.savesampnames_loc at rank {}: {}".format(self.rank,self.savesampnames_loc))
         name_data = [np.array([ch for ch in name]) for name in self.savesampnames_loc]
-        #print "name_data at rank {}".format(name_data,self.rank)
+        #print("name_data at rank {}".format(name_data,self.rank))
         name_all = mpiutil.collect_arrays(name_data,1,'S',MPI.UNSIGNED_CHAR)
         if self.rank == 0:
             self.savesampnames = [''.join(nam.reshape((-1,))) for nam in name_all]
-            #print "self.savesampnames at rank 0: {}".format(self.savesampnames)
+            #print("self.savesampnames at rank 0: {}".format(self.savesampnames))
          
     def set_savesamp(self):
         if self.rank == 0:
@@ -407,7 +407,7 @@ class HMlog(HMlogB):
                     with open(os.path.join(syndata_dir, name+'_MODEL.pkl'), 'r') as f:
                         hmlog.Y_sim.append(pickle.load(f))
                 except IOError as e:
-                    # print e
+                    # print(e)
                     nofiles.append(name)
             hmlog.savesampnames = [name for name in hmlog.savesampnames
                                    if name not in nofiles]
@@ -421,8 +421,8 @@ class HMlog(HMlogB):
             if hmlog.noise_sigma is None:
                 hmlog.noise_sigma = 0.5**2*np.eye(hmlog.d)
 
-        #print "np.sum(hmlog.prob_sim_mean, axis=1) = {}".format(np.sum(hmlog.prob_sim_mean, axis=1))
-        #print "hmlog.active_komp = {}".format(hmlog.active_komp)
+        #print("np.sum(hmlog.prob_sim_mean, axis=1) = {}".format(np.sum(hmlog.prob_sim_mean, axis=1)))
+        #print("hmlog.active_komp = {}".format(hmlog.active_komp))
 
         return hmlog
 
@@ -455,7 +455,7 @@ class HMElog(HMlog):
             self.ns = [n for ns in ns_all for n in ns]
             n = sum(self.ns)
             self.batch = min(min(int(max_classif_mem/(n*np.dtype(self.classif_dtype).itemsize)), 1000), sim)
-            print "In HMElog, self.batch = {}".format(self.batch)
+            print("In HMElog, self.batch = {}".format(self.batch))
             if self.batch < 1:
                 raise MemoryError('Not enough memory for saving classification frequencies.')
         else:
@@ -511,7 +511,7 @@ class HMElog(HMlog):
         
     #     if self.rank == 0:
     #         ns = np.empty(self.J,dtype = 'i')
-    #     #print "ns.shape = {}".format(ns.shape)
+    #     #print("ns.shape = {}".format(ns.shape))
     #     else:
     #         ns = None
     #     self.comm.Gatherv(sendbuf=[ns_loc,MPI.INT],recvbuf=[ns,(counts,None),MPI.INT],root=0)
@@ -530,9 +530,9 @@ class HMElog(HMlog):
                 os.mkdir(classif_freq_dir)
         self.comm.Barrier()
         # try:
-        #     print "names_loc at rank {}: {}".format(self.rank,self.names_loc)
+        #     print("names_loc at rank {}: {}".format(self.rank,self.names_loc))
         # except AttributeError as e:
-        #     print e
+        #     print(e)
         #     if self.rank == 0:
         #         for j,name in enumerate(self.names):
         #             io.mmwrite(self.classif_freq_dir+name+'_CLASSIF_FREQ.mtx',sparse.coo_matrix(self.classif_freq[j]))

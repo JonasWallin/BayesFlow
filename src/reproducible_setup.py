@@ -64,7 +64,7 @@ def setup_sim(expdir, seed=None, setupfile=None, comm=MPI.COMM_WORLD, **kws):
             f.write(str(seed))
     seed = comm.bcast(seed)
     np.random.seed(seed+rank)
-    print "seed set to {} at rank {}".format(seed+rank, rank)
+    print("seed set to {} at rank {}".format(seed+rank, rank))
 
     return savedir, run
 
@@ -433,7 +433,7 @@ class SimPar(object):
             phase['p_sw'] = self.phases[last_burnphase]['p_sw']
             phase['p_on_off'] = self.phases[last_burnphase]['p_on_off']
         phase['logpar']['savesampnames'] = self.simsampnames
-        print "Prodphase has simulation param {}".format(phase)
+        print("Prodphase has simulation param {}".format(phase))
         self.phases[name] = phase
 
     def new_failphase(self, nbrit, name='F'):

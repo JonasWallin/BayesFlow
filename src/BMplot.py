@@ -61,7 +61,7 @@ class ClustPlot(object):
         if fig is None:
             fig = plt.figure()
         quantiles = self.clust.get_quantiles((.01,.25,.5,.75,.99))
-        #print "quantiles = {}".format(quantiles)
+        #print("quantiles = {}".format(quantiles))
         nbr_cols = 2*totplots - 1
         col_start = 2*(plotnbr-1)
         boxloc = (np.array(range(self.clust.d)) + .5)/(self.clust.d+1)
@@ -142,9 +142,9 @@ class ClustPlot(object):
         if dds is None:
             dds = range(self.clust.d)
         d = len(dds)
-        print "d = {}".format(d)
+        print("d = {}".format(d))
         nbr_cols = d*totplots + totplots-1
-        print "nbr_cols = {}".format(nbr_cols)
+        print("nbr_cols = {}".format(nbr_cols))
         col_start = (d+1)*(plotnbr-1)
 
         for ik,k in enumerate(ks):
@@ -283,7 +283,7 @@ class CompPlot(object):
         
         for s in range(S):
             comps = comps_list[order[s]]
-            #print "comps = {}".format(comps)
+            #print("comps = {}".format(comps))
             ax = fig.add_subplot(S,nbr_cols,s*nbr_cols + col_start+1)
             for k in comps:
                 mu_ks = self.comp.mupers[:,k,:]
@@ -340,7 +340,7 @@ class CompPlot(object):
             plim    -   only components with size within plim are plotted
             plotlab -   should labels be shown?
         '''
-        #print "suco_list = {}".format(suco_list)
+        #print("suco_list = {}".format(suco_list))
         if ax is None:
     		f = plt.figure()
     		ax = f.add_subplot(111)
@@ -627,14 +627,14 @@ class BMplot(object):
         ##prob_mer = [np.sum(self.bmres.p[:,scind]) for scind in self.bmres.mergeind]
         ##suco_ord = np.argsort(-np.array(prob_mer))
         #mergeind_sort = [self.bmres.mergeind[i] for i in suco_ord]
-        ##print "mergeind_sort = {}".format(mergeind_sort)
+        ##print("mergeind_sort = {}".format(mergeind_sort))
         ##comp_ord = [ind for suco in mergeind_sort for ind in suco]
         #cm = plt.get_cmap('gist_rainbow')
         #nbrsucocol = min(maxnbrsucocol,len(suco_ord))  
         #suco_col = [(0,0,0)]*len(suco_ord)
         #colors = [(0,0,0)]*len(comp_ord)
         #for s,suco in enumerate(mergeind_sort):
-        #    #print "(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol)
+        #    #print("(s % nbrsucocol)/nbrsucocol = {}".format((s % nbrsucocol)/nbrsucocol))
         #    suco_col[suco_ord[s]] = cm((s % nbrsucocol)/nbrsucocol)
         #    if s > maxnbrsucocol:
         #        suco_col[suco_ord[s]] = suco_col[suco_ord[s]][:3]+(0.5,)

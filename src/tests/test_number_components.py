@@ -32,10 +32,10 @@ def main():
                 try:
                     emd, log_lik = pipeline.quality_check()
                 except BadQualityError as e:
-                    print e
+                    print(e)
                 else:
                     K_active = pipeline.res.K_active
-                    print "K_active = {}".format(K_active)
+                    print("K_active = {}".format(K_active))
                     res.update(K_active, (emd, log_lik))
 
     if rank == 0:
@@ -46,7 +46,7 @@ def main():
             emd_dat, log_lik_dat = res.get(K)
             emd_data.append(emd_dat)
             log_lik_data.append(log_lik_dat)
-        print "log_lik_data[2] = {}".format(log_lik_data[2])
+        print("log_lik_data[2] = {}".format(log_lik_data[2]))
         axs[0].boxplot(emd_data)
         axs[1].boxplot(log_lik_data)
         for ax in axs.reshape(-1):

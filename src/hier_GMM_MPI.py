@@ -58,8 +58,8 @@ def distance_sort(hGMM):
                 mus_t = np.array([np.mean(mu,axis=0) for mu in  mus])
                 list_temp = [None for k in range(GMM.K)]
                 for index in index_k:
-                    #print mus_t
-                    #print mus_t - GMM.mu[index]
+                    #print(mus_t)
+                    #print(mus_t - GMM.mu[index])
                     if np.isnan(GMM.mu[index][0]) == False:
                         dist = np.linalg.norm(mus_t - GMM.mu[index],axis=1)
                     else:
@@ -472,7 +472,7 @@ class hierarical_mixture_mpi(object):
         if rank == 0:
             mu_k = np.empty((self.n_all,self.d)) 
             Sigma_k = np.empty((self.n_all,self.d,self.d)) 
-            #print recv_obj[0,:,:self.d]
+            #print(recv_obj[0,:,:self.d])
             for k in range(self.K):
                 mu_k[:] = recv_obj[:,k,:self.d]
                 index = np.isnan(mu_k[:,0])==False
@@ -596,7 +596,7 @@ class hierarical_mixture_mpi(object):
             self.counts = np.array([n*self.K for n in ns], dtype='i')
         else:
             self.counts = 0
-        #print "self.counts at rank {} = {}".format(rank, self.counts)
+        #print("self.counts at rank {} = {}".format(rank, self.counts))
 
         if not hasattr(self, 'hasdata') or not self.hasdata:
             if rank == 0:
@@ -688,7 +688,7 @@ class hierarical_mixture_mpi(object):
             if self.d != Y.shape[1]:
                 raise ValueError('dimension mismatch in the data: self.d = {}, Y.shape[1] = {}'.format(self.d, Y.shape[1]))
             self.GMMs.append(GMM.mixture(data= Y, K = self.K, name = name,high_memory = self.high_memory))
-        #print "mpi = %d, len(GMMs) = %d"%(MPI.COMM_WORLD.rank, len(self.GMMs))  # @UndefinedVariable
+        #print("mpi = %d, len(GMMs) = %d"%(MPI.COMM_WORLD.rank, len(self.GMMs))  # @UndefinedVariable)
 
         #storing the size of the data used later when sending data
         if not nodata_at_any:
@@ -800,7 +800,7 @@ class hierarical_mixture_mpi(object):
                     npwparam['theta'] = thetas[k].reshape(-1)
                 npwparam['Sigma'] = (npw.Sigma_class.Q /
                                      (npw.Sigma_class.nu-self.d-1))
-                print "npwparam = {}".format(npwparam)
+                print("npwparam = {}".format(npwparam))
                 npw.set_parameter(npwparam)
 
                 # Prior for Sigma_jk
@@ -837,8 +837,8 @@ class hierarical_mixture_mpi(object):
         for gmm in self.GMMs:
             j = match_comp.names.index(gmm.name)
             comp = match_comp.samp_comps[j]
-            print "*"*30
-            print "gmm {} has matched comp {}".format(gmm.name, comp.ks)
+            print("*"*30)
+            print("gmm {} has matched comp {}".format(gmm.name, comp.ks))
             param = [None]*prior.K
             for k in range(prior.K):
                 param[k] = {}
@@ -846,7 +846,7 @@ class hierarical_mixture_mpi(object):
                 param[k]['sigma'] = comp.get_Sigma(k)
                 if k > 17:
                     if k in comp.ks:
-                        print "param[{}] = {}".format(k, param[k])
+                        print("param[{}] = {}".format(k, param[k]))
             gmm.set_param(param)
             gmm.p = np.array([comp.get_p(k) for k in range(prior.K)])
             gmm.active_komp = np.array([k in comp.ks for k in range(prior.K)]
@@ -1112,7 +1112,7 @@ class hierarical_mixture_mpi(object):
             
             if colors is None:
                 if len(colors) != self.K:
-                    print "in hier_GMM_MPI.plot_mus: can't use colors aurgmen with length not equal to K"
+                    print("in hier_GMM_MPI.plot_mus: can't use colors aurgmen with length not equal to K")
                     return
         
             
@@ -1285,7 +1285,7 @@ class hierarical_mixture_mpi(object):
                     if plotting:
                         mus = self.get_mus()
                     if self.comm.Get_rank() == 0:
-                        print "{} iteration = {}".format(name, i)
+                        print("{} iteration = {}".format(name, i))
                         if self.timing:
                             timer.print_timepoints(iter=i)
                         if plotting:

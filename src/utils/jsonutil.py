@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     foo = Foo(5, bar=Bar())
     foo_json = json.dumps(foo, cls=ObjJsonEncoder)
-    print "foo_json = {}".format(foo_json)
+    print("foo_json = {}".format(foo_json))
     foo_load = Foo.load(foo_json)
-    print "foo_load = {}".format(foo_load.__dict__)
-    print "foo_load.bar.__dict__ = {}".format(foo_load.bar.__dict__)
+    print("foo_load = {}".format(foo_load.__dict__))
+    print("foo_load.bar.__dict__ = {}".format(foo_load.bar.__dict__))

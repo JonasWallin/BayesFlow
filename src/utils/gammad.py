@@ -36,12 +36,12 @@ def test_speed(d, sim):
 	y = [lg(x) for x in xs]  # @UnusedVariable
 	t1 = time.time()
 	string = "lookup            = %.4f msec/sim (sim ,d ) = (%d %d) "%(1000*np.double(t1-t0)/sim, sim, d )
-	print string
+	print(string)
 	t0 = time.time()
 	yd = [sps.multigammaln(x,d) for x in xs]  # @UnusedVariable
 	t1 = time.time()
 	string = "sps.multigammaln =  %.4f msec/sim (sim ,d ) = (%d %d) "%(1000*np.double(t1-t0)/sim, sim, d )
-	print string
+	print(string)
 if __name__ == '__main__':
 	
 	test_speed(2, 10**3)

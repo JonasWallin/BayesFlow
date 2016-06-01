@@ -25,7 +25,10 @@ from BayesFlow import PurePython
 class oldFaithful(object):
 	sim = 10**3
 	def setUp(self):
-		self.data = np.loadtxt('../data/faithful.dat',skiprows=1,usecols=(0,1))
+		try:
+			self.data = np.loadtxt('../data/faithful.dat',skiprows=1,usecols=(0,1))
+		except IOError:
+			raise unittest.SkipTest('Data not available')
 	def set_param(self):
 		self.set_mu = [np.array([  4.29,  79.97]), np.array([  2.04,  54.48])]
 		self.set_sigma = [np.array([[  0.17 ,  0.94],[  0.94,  36.  ]]),

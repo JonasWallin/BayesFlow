@@ -9,34 +9,13 @@ import matplotlib.pyplot as plt
 
 from BayesFlow import setup_sim, hierarical_mixture_mpi, HMlogB, HMElog, HMres
 from BayesFlow.utils import load_fcdata
-from BayesFlow.utils.dat_util import sampnames_mpi
 from BayesFlow.PurePython.GMM import mixture
 from BayesFlow.exceptions import NoOtherClusterError
 
 
-import __builtin__
-openfiles = set()
-oldfile = __builtin__.file
-class newfile(oldfile):
-    def __init__(self, *args):
-        self.x = args[0]
-        print "### OPENING %s ###" % str(self.x)            
-        oldfile.__init__(self, *args)
-        openfiles.add(self)
-        print "{} FILES OPEN".format(len(openfiles))
-
-    def close(self):
-        print "### CLOSING %s ###" % str(self.x)
-        oldfile.close(self)
-        openfiles.remove(self)
-oldopen = __builtin__.open
-def newopen(*args):
-    return newfile(*args)
-__builtin__.file = newfile
-__builtin__.open = newopen
 
 def printOpenFiles():
-    print "### %d OPEN FILES: [%s]" % (len(openfiles), ", ".join(f.x for f in openfiles))
+    print("### %d OPEN FILES: [%s]" % (len(openfiles), ", ".join(f.x for f in openfiles)))
 
 
 class SynSample(object):
@@ -64,7 +43,7 @@ class Pipeline(object):
 
         self.J = 2
         self.savedir = 'blah'#tempfile.mkdtemp()
-        print "savedir = {}".format(self.savedir)
+        print("savedir = {}".format(self.savedir))
         self.datadir = os.path.join(self.savedir, 'data')
         self.synsamples = [SynSample(j) for j in range(self.J)]
         self.d = self.synsamples[0].d
@@ -86,8 +65,8 @@ class Pipeline(object):
         try:
             self.bf_setup = imp.load_source('', self.parfile).setup
         except IOError as e:
-            print "Setupfile {} does not exist".format(self.parfile)
-            print "Setupdir has files: {}".format(os.listdir(os.path.split(self.parfile)[0]))
+            print("Setupfile {} does not exist".format(self.parfile))
+            print("Setupdir has files: {}".format(os.listdir(os.path.split(self.parfile)[0])))
             raise e
 
     def init_hGMM(self):
@@ -99,9 +78,9 @@ class Pipeline(object):
                                                               self.d, K=8)
         self.hGMM = hierarical_mixture_mpi(K=self.prior.K, comm=self.comm)
         sampnames = sampnames_mpi(self.comm, self.datadir, self.data_kws['ext'])
-        print "sampnames before load: {}".format(sampnames)
+        print("sampnames before load: {}".format(sampnames))
         self.hGMM.load_data(sampnames, **self.data_kws)
-        print "after load data"
+        print("after load data")
         self.hGMM.set_prior(prior=self.prior, init=False)
         self.hGMM.set_init(self.prior, method='EMWIS',
                            N=int(Nevent*self.J/100), rho=2, n_iter=4, n_init=20,
@@ -118,9 +97,9 @@ class Pipeline(object):
 
         self.hGMM.resize_var_priors(self.simpar.tightinitfac)
         self.hGMM.simulate(self.simpar.phases['B1a'], 'Burnin phase 1a', printfrq=printfrq, stop_if_cl_off=False)
-        print "prior vals: {}".format(self.hGMM.prior.__dict__)
+        print("prior vals: {}".format(self.hGMM.prior.__dict__))
         self.hGMM.resize_var_priors(1./self.simpar.tightinitfac)
-        print "prior vals: {}".format(self.hGMM.prior.__dict__)
+        print("prior vals: {}".format(self.hGMM.prior.__dict__))
         self.hGMM.simulate(self.simpar.phases['B1b'], 'Burnin phase 1b', printfrq=printfrq, stop_if_cl_off=False)
         self.hGMM.set_theta_to_median()
         #hGMM.deactivate_outlying_components()
@@ -141,8 +120,8 @@ class Pipeline(object):
 
         t2 = time.time()
 
-        print 'burnin iterations ({}) and postproc: {} s'.format(self.simpar.nbriter*self.simpar.qburn, t1-t0)
-        print 'production iterations ({}) and postproc: {} s'.format(self.simpar.nbriter*self.simpar.qprod, t2-t1)
+        print('burnin iterations ({}) and postproc: {} s'.format(self.simpar.nbriter*self.simpar.qburn, t1-t0))
+        print('production iterations ({}) and postproc: {} s'.format(self.simpar.nbriter*self.simpar.qprod, t2-t1))
 
         del self.hGMM
 
@@ -156,7 +135,7 @@ class Pipeline(object):
         self.res.merge(self.postpar.mergemeth, **self.postpar.mergekws)
 
     def quality_check(self):
-        print "self.res.active_komp = {}".format(self.res.active_komp)
+        print("self.res.active_komp = {}".format(self.res.active_komp))
 
     def plot(self):
 
@@ -188,14 +167,14 @@ class Pipeline(object):
         self.res.plot.component_fit(plotdim, name='pooled', fig=plt.figure(figsize=(18, 25)))
 
     def clean_up(self):
-        print "removing savedir {} ...".format(self.savedir)
+        print("removing savedir {} ...".format(self.savedir))
         try:
             pass
             #shutil.rmtree(self.savedir)
         except Exception as e:
-            print "Could not remove savedir {}: {}".format(self.savedir, e)
+            print("Could not remove savedir {}: {}".format(self.savedir, e))
         else:
-            print "removing savedir {} done".format(self.savedir)
+            print("removing savedir {} done".format(self.savedir))
 
     def run(self):
         if 1:
@@ -203,13 +182,13 @@ class Pipeline(object):
             self.setup_run()
             printOpenFiles()
             self.init_hGMM()
-            print "prior vals: {}".format(self.hGMM.prior.__dict__)
+            print("prior vals: {}".format(self.hGMM.prior.__dict__))
             self.MCMC()
             self.postproc()
             self.quality_check()
-            print "before plot"
+            print("before plot")
             #self.plot()
-            print "after plot"
+            print("after plot")
             #if 1:
             #    plt.show()
         #except Exception as e:

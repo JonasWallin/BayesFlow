@@ -10,7 +10,7 @@ import numpy.random as npr
 #import copy
 import glob
 from mpi4py import MPI
-import cPickle as pickle
+import pickle
 import os
 from pprint import pformat
 
@@ -239,7 +239,7 @@ class EventInd(object):
             raise IOError("{} does not exist".format(fname))
         if os.path.getmtime(fname) < os.path.getmtime(data_fname):
             raise OldFileError('Data file was modified after eventind file')
-        with open(fname, 'r') as f:
+        with open(fname, 'rb') as f:
             indices = np.load(f)
         return cls(sampname, Nevent, indices, rm_extreme)
 
@@ -256,11 +256,11 @@ class EventInd(object):
         fpath = savedir+str(self)+'.npy'
         if not overwrite:
             while os.path.exists(fpath):
-                print fpath+' already exists, increasing i'
+                print(fpath+' already exists, increasing i')
                 self.i += 1
                 fpath = savedir+str(self)+'.npy'
-        print "Saving new eventind at {}".format(fpath)
-        with open(fpath, 'w') as f:
+        print("Saving new eventind at {}".format(fpath))
+        with open(fpath, 'wb') as f:
             np.save(f, self.indices)
 
 
@@ -356,7 +356,7 @@ class PercentilesMPI(object):
 
     def key_dict(self):
         try:
-            with open(self.key_file_, 'r') as f:
+            with open(self.key_file_, 'rb') as f:
                 return pickle.load(f)
         except IOError:
             pass
@@ -365,7 +365,7 @@ class PercentilesMPI(object):
     def key(self):
         if self.rank == 0:
             curr_dict = self.key_dict_
-            #print "curr_dict = {}".format(curr_dict)
+            #print("curr_dict = {}".format(curr_dict))
             samp_frozen = frozenset(self.sampnames_all)
             key_ = ''
             for j, dat in enumerate([samp_frozen, self.Nevent, self.i_eventind_load,
@@ -376,7 +376,7 @@ class PercentilesMPI(object):
                     curr_dict[dat] = (len(curr_dict), {})
                     i, curr_dict = curr_dict[dat]
                 key_ += '_%d' % i
-            #print "parent_dict = {}".format(parent_dict)
+            #print("parent_dict = {}".format(parent_dict))
             #with open(self.key_file_, 'w') as f:
             #    pickle.dump(self.key_dict_, f)
         else:
@@ -395,9 +395,8 @@ class PercentilesMPI(object):
 
     def load_values(self, q):
         if self.rank == 0:
+            fname = self.savedir_+self.name(q, self.key_)+'.txt'
             try:
-                fname = self.savedir_+self.name(q, self.key_)+'.txt'
-
                 values = np.loadtxt(fname)
                 data_found = True
 
@@ -405,7 +404,8 @@ class PercentilesMPI(object):
                     # saved percentile file older than data.
                     raise OldFileError
 
-            except (IOError, OldFileError) as e:
+            except (IOError, OldFileError) as e_:
+                e = e_
                 data_found = False
             else:
                 e = None
@@ -424,9 +424,9 @@ class PercentilesMPI(object):
 
     def save(self, q, values):
         if self.rank == 0:
-            print "Saving new percentiles for q = {} in {}: {}".format(q, self.savedir_, values)
+            print("Saving new percentiles for q = {} in {}: {}".format(q, self.savedir_, values))
             if not os.path.exists(self.savedir_):
                 os.mkdir(self.savedir_)
             np.savetxt(self.savedir_+self.name(q, self.key_)+'.txt', values)
-            with open(self.savedir_+'scale_keys.pkl', 'w') as f:
+            with open(self.savedir_+'scale_keys.pkl', 'wb') as f:
                 pickle.dump(self.key_dict_, f, -1)

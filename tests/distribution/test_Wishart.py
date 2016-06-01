@@ -45,8 +45,8 @@ class Wishart_base(object):
 		Q = np.zeros((self.d, self.d))
 		for i in range(self.sim):
 			Q += self.data[i]
-		#print self.data
-		#print self.Sigma * nu
+		#print(self.data)
+		#print(self.Sigma * nu)
 	def compare_mean_var(self):
 
 		mean_Q = np.zeros((self.dist.d, self.dist.d))
@@ -109,14 +109,14 @@ class test_pythonWishart(unittest.TestCase,Wishart_base):
 
 
 	def setUp(self):
-		print "pyth"
+		print("pyth")
 		self.Wishart = Wis_python
 
 class test_Wishart(unittest.TestCase,Wishart_base):
 
 
 	def setUp(self):
-		print "wish"
+		print("wish")
 		self.Wishart = Wishart
 
 if __name__ == "__main__":

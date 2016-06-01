@@ -209,7 +209,7 @@ class hierarical_mixture(object):
 		"""
 		if colors != None:
 			if len(colors) != self.K:
-				print "in hier_GMM.plot_mus: can't use colors aurgmen with length not equal to K"
+				print("in hier_GMM.plot_mus: can't use colors aurgmen with length not equal to K")
 				return
 		if ax == None:
 			f = plt.figure()

@@ -211,8 +211,8 @@ class MatchComponents(object):
 
         for i, sc in enumerate(samp_comps):
             if verbose:
-                print "matching components sample {}".format(i)
-                print "components sample {}: {}".format(i, sc.ks)
+                print("matching components sample {}".format(i))
+                print("components sample {}: {}".format(i, sc.ks))
             sc.match_to(latent, lamb, dist=dist)
 
         new_latent = samp_comps[0].unmatched_comp
@@ -221,11 +221,11 @@ class MatchComponents(object):
 
         for i, sc in enumerate(samp_comps[1:]):
             if verbose:
-                print "new_latent.ks = {}".format(new_latent.ks)
+                print("new_latent.ks = {}".format(new_latent.ks))
             sc.unmatched_comp.match_to(new_latent, lamb, dist=dist)
             sc.unmatched_comp.unmatched_comp.relabel(latent.K+new_latent.K)
             if verbose:
-                print "sc.unmatched_comp.unmatched_comp.ks = {}".format(sc.unmatched_comp.unmatched_comp.ks)
+                print("sc.unmatched_comp.unmatched_comp.ks = {}".format(sc.unmatched_comp.unmatched_comp.ks))
             new_latent.concatenate(sc.unmatched_comp.unmatched_comp)
 
             sc.unmatched_comp.move_unmatched_to_matched()
